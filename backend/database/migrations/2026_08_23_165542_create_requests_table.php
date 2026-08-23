@@ -13,15 +13,14 @@ return new class extends Migration
     {
         Schema::create('requests', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('student_id')->constrained('users')->cascadeOnDelete();
-            $table->foreignId('class_id')->constrained('classes')->cascadeOnDelete();
-            $table->foreignId('instructor_id')->constrained('users')->cascadeOnDelete();
-            $table->enum('type', ['excuse', 'late']);
-            $table->date('date');
+            $table->foreignId('enrollment_id')->constrained('enrollments')->cascadeOnDelete();
+            $table->enum('type', ['absence', 'late']);
+            $table->date('date_of_absence');
             $table->text('reason');
-            $table->string('proof')->nullable();
+            $table->string('evidence_file_url')->nullable();
             $table->enum('status', ['pending', 'approved', 'noted', 'invalid'])->default('pending');
-            $table->timestamp('responded_at')->nullable();
+            $table->timestamp('date_reviewed')->nullable();
+            $table->foreignId('reviewed_by')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamps();
         });
     }

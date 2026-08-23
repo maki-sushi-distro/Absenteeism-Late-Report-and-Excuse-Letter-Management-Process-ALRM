@@ -15,6 +15,8 @@ return new class extends Migration
             $table->id();
             $table->foreignId('request_id')->constrained('requests')->cascadeOnDelete();
             $table->timestamp('flagged_at');
+            $table->foreignId('escalated_to')->constrained('users')->cascadeOnDelete();
+            $table->enum('status', ['open', 'resolved'])->default('open');
             $table->timestamps();
         });
     }

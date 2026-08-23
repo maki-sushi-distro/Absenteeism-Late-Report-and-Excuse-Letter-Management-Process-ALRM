@@ -16,16 +16,15 @@ return new class extends Migration
             $table->enum('role', ['administrator', 'program_head', 'instructor', 'student'])->nullable()->after('email');
             $table->unsignedBigInteger('program_id')->nullable()->after('role');
             $table->enum('status', ['approved', 'pending'])->nullable()->after('program_id');
+            $table->string('password')->nullable()->change();
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         Schema::table('users', function (Blueprint $table) {
             $table->dropColumn(['google_id', 'role', 'program_id', 'status']);
+            $table->string('password')->nullable(false)->change();
         });
     }
 };

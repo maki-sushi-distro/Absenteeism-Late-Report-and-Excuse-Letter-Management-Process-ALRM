@@ -18,6 +18,7 @@ return new class extends Migration
             $table->unsignedInteger('total_lates')->default(0);
             $table->unsignedInteger('total_absences')->default(0);
             $table->unsignedInteger('converted_absences')->default(0);
+            $table->enum('status', ['safe', 'warning', 'IR'])->default('safe');
             $table->timestamps();
         });
     }

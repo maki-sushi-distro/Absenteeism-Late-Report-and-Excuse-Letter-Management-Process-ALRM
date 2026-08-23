@@ -14,11 +14,12 @@ return new class extends Migration
         Schema::create('notifications', function (Blueprint $table) {
             $table->id();
             $table->foreignId('user_id')->constrained('users')->cascadeOnDelete();
-            $table->string('title');
+            $table->foreignId('request_id')->nullable()->constrained('requests')->nullOnDelete();
+            $table->string('type');
             $table->text('message');
-            $table->enum('channel', ['email', 'in_app', 'both'])->default('both');
+            $table->enum('channel', ['email', 'in_app']);
+            $table->timestamp('date_sent')->useCurrent();
             $table->boolean('is_read')->default(false);
-            $table->timestamps();
         });
     }
 

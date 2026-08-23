@@ -31,7 +31,72 @@ The backend (Laravel REST API) is responsible for:
 
 ---
 
-## 3. Current State (as of this scan)
+## 3. Backend Architecture
+
+How a request actually flows through the Laravel API — routing, auth, business logic, and the scheduled job that runs independently of any request.
+
+```mermaid
+flowchart TB
+    classDef client fill:#6366f1,stroke:#4338ca,color:#fff
+    classDef entry fill:#0ea5e9,stroke:#0284c7,color:#fff
+    classDef logic fill:#10b981,stroke:#059669,color:#fff
+    classDef data fill:#f59e0b,stroke:#d97706,color:#fff
+    classDef external fill:#a855f7,stroke:#7e22ce,color:#fff
+
+    React["React frontend"]:::client
+    Google["Google OAuth / Workspace"]:::external
+
+    subgraph API["Laravel API"]
+        Routes["routes/api.php"]:::entry
+        AuthMW["Auth middleware — session check"]:::entry
+        RoleMW["Role middleware — student / instructor / program_head / administrator"]:::entry
+
+        subgraph Controllers["Controllers"]
+            AuthCtrl["AuthController — Google callback, find-or-create user"]:::logic
+            ReqCtrl["RequestController — submit, auto-route, decision"]:::logic
+            TrackCtrl["AttendanceController — threshold computation"]:::logic
+            AdminCtrl["AdminController — approvals, CRUD"]:::logic
+            NotifCtrl["NotificationController — email + in-app"]:::logic
+        end
+
+        Job["Scheduled Job — Laravel Scheduler
+        runs independently, not tied to a request"]:::logic
+    end
+
+    DB[("MySQL")]:::data
+    Mail["Mail — SMTP"]:::external
+
+    React -->|"HTTP / JSON"| Routes
+    Routes --> AuthMW --> RoleMW --> Controllers
+
+    AuthCtrl <-->|"OAuth redirect + callback"| Google
+    AuthCtrl -->|"find-or-create, set role/status"| DB
+    ReqCtrl -->|"auto-resolve instructor via ENROLLMENTS→CLASSES"| DB
+    ReqCtrl -->|"on decision"| TrackCtrl
+    TrackCtrl -->|"recompute converted_absences,
+    check 2/3 triggers"| DB
+    AdminCtrl -->|"approve staff role, CRUD programs/classes"| DB
+
+    Job -->|"flag unanswered REQUESTS
+    past response window"| DB
+    Job -->|"fire threshold alerts
+    at 2 / 3 absences"| NotifCtrl
+    NotifCtrl -->|"write NOTIFICATIONS row"| DB
+    NotifCtrl -->|"channel = email"| Mail
+    Mail -->|"deliver"| React
+
+    Controllers -->|"JSON response"| Routes
+```
+
+**Key points this diagram is enforcing:**
+- **Auth is a redirect dance, not a form POST** — the browser leaves the app, goes to Google, comes back to `AuthController`'s callback. Domain validation happens *inside* that callback, every time, not just at "registration."
+- **The scheduled job is decoupled from the request/response cycle.** It's the only thing in this system that runs on its own timer (Laravel Scheduler → cron), not triggered by a user action. This is what powers follow-up flagging and threshold notifications — don't try to compute those inline inside a controller.
+- **`RequestController` never asks the client who the instructor is.** It resolves that itself via `ENROLLMENTS → CLASSES.instructor_id`, per the auto-routing requirement.
+- **`NotificationController` sits between the job/controllers and two different outputs** (DB row for in-app, Mail for email) — both driven by the same `channel` field on `NOTIFICATIONS`, so a single alert can go out both ways without duplicating logic.
+
+---
+
+## 4. Current State (as of this scan)
 
 Based on the files found in `/backend`:
 - ✅ Fresh Laravel 13 skeleton — no custom models/migrations/controllers yet besides the default `User`
@@ -47,7 +112,7 @@ Basically **we're still at Phase 1, ground zero.** That's what to prioritize.
 
 ---
 
-## 4. Database Schema (Backend Responsibility)
+## 5. Database Schema (Backend Responsibility)
 
 > Reference only — copied from `ALRM.md` §4 so you don't have to keep switching between docs.
 
@@ -89,7 +154,7 @@ Basically **we're still at Phase 1, ground zero.** That's what to prioritize.
 
 ---
 
-## 5. API Endpoints (target — `routes/api.php`)
+## 6. API Endpoints (target — `routes/api.php`)
 
 > `routes/api.php` doesn't exist yet — that file itself needs to be created before adding any endpoints.
 
@@ -143,7 +208,7 @@ GET    /api/admin/reports/export
 
 ---
 
-## 6. Environment Variables (Backend)
+## 7. Environment Variables (Backend)
 
 ```
 DB_CONNECTION=mysql
@@ -165,7 +230,7 @@ GOOGLE_REDIRECT_URI=
 
 ---
 
-## 7. TODO — Priority Order
+## 8. TODO — Priority Order
 
 > Follow this top-to-bottom. Don't skip ahead — many steps here depend on earlier ones (e.g. you can't build the threshold engine without the `ATTENDANCE_TRACKER` migration existing first).
 
@@ -214,18 +279,18 @@ GOOGLE_REDIRECT_URI=
 
 ---
 
-## 8. Consistency Checks (always check before coding)
+## 9. Consistency Checks (always check before coding)
 
 - ⚠️ The role list is **fixed at 4**: Administrator, Program Head, Instructor, Student. Do not add a "College Secretary" role — that function is already automated away in the design.
 - ⚠️ Threshold logic is **count-based**, not percentage-of-sessions. Do not add session-by-session attendance logging — that was intentionally removed from scope.
 - ⚠️ The instructor on a request is always **auto-resolved**, never manual/user-input.
 - ⚠️ Table names should follow the ERD naming (`PROGRAMS`, `CLASSES`, etc.) — don't rename them arbitrarily.
-- ⚠️ Auth is **Google OAuth/SSO only** — no password-based registration form. See §9 for why this changed from the original `ALRM.md`.
+- ⚠️ Auth is **Google OAuth/SSO only** — no password-based registration form. See §10 for why this changed from the original `ALRM.md`.
 - ⚠️ The User Approval Queue is **staff-only** now. Students are auto-approved on first Google login — don't build a student approval UI/endpoint.
 
 ---
 
-## 9. Scope Change Log
+## 10. Scope Change Log
 
 Keeping a record here since this contradicts what's written in the original `ALRM.md`.
 

@@ -14,8 +14,7 @@ return new class extends Migration
         Schema::create('programs', function (Blueprint $table) {
             $table->id();
             $table->string('program_name');
-            $table->unsignedBigInteger('program_head_id')->nullable();
-            $table->foreign('program_head_id')->references('id')->on('users')->nullOnDelete();
+            $table->foreignId('program_head_id')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamps();
         });
     }

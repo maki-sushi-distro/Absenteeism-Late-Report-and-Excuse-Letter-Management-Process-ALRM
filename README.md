@@ -112,7 +112,7 @@ flowchart TB
 
 | Role | Can do |
 |---|---|
-| **Student** | Register (pending admin approval) · submit excuse/late requests · upload evidence · track own status & threshold history |
+| **Student** | Log in (Using LVCC Email) · submit excuse/late requests · upload evidence · track own status & threshold history |
 | **Instructor** | Review requests for own classes · approve / note / invalid · manually log attendance · view class-level dashboard |
 | **Program Head** | View program-wide (all instructors/sections) · monitor flagged students · receive auto-escalated requests |
 | **Administrator** | College-wide visibility · approve registrations · manage programs/subjects/schedules · export reports |
@@ -176,14 +176,14 @@ alrm/
 - [ ] Seed database with **real** LVCC programs/subjects/accounts — no placeholder/test data
 
 ### Phase 2 — Frontend Core
-- [ ] Login 
+- [ ] Login using SSO via Google Workspace (`@student.laverdad.edu.ph`)
 - [ ] Student: submit request form, request history, threshold tracker
 - [ ] Instructor: pending requests list, decision actions, class dashboard
 - [ ] Program Head: aggregated program dashboard, flagged-students view
 - [ ] Admin: user approval queue, CRUD for programs/subjects/schedules, dashboard
 
 ### Phase 3 — Notifications & Reporting
-- [ ] Email notifications (new request, decision made, threshold warning, follow-up flag)
+- [ ] Email notifications (e.g., new request)
 - [ ] In-app notification bell/list
 - [ ] Exportable reports (PDF/Excel) for accreditation
 - [ ] Audit trail viewer (admin-facing)
@@ -197,7 +197,6 @@ alrm/
 - [ ] Confirm login/test credentials are ready for evaluators
 
 ### Phase 5 — Optional Enhancements (post-presentation)
-- [ ] SSO via Google Workspace (`@student.laverdad.edu.ph`)
 - [ ] SMS/Viber as an additional notification channel
 - [ ] Multi-role account support (e.g., Instructor who is also Program Head)
 - [ ] Term-over-term analytics/trend charts

@@ -99,16 +99,14 @@ flowchart TB
 ## 4. Current State (as of this scan)
 
 Based on the files found in `/backend`:
-- ✅ Fresh Laravel 13 skeleton — no custom models/migrations/controllers yet besides the default `User`
-- ✅ `AppServiceProvider`, `bootstrap/app.php`, `routes/web.php` (just `/`, no `routes/api.php` yet)
-- ❌ No `routes/api.php` file yet — needs to be created
-- ✅ No custom migrations yet (PROGRAMS, CLASSES, ENROLLMENTS, ATTENDANCE_TRACKER, REQUESTS, FOLLOWUP_FLAGS, NOTIFICATIONS, AUDIT_LOG) — only the `users` migration exists
-- ❌ No role/status columns on the `users` table yet
-- ❌ No Eloquent models yet besides `User`
-- ❌ No auth controllers/middleware yet — **and the approach itself changed mid-project**: originally planned as email/password self-registration, now Google OAuth/SSO (see §9)
+- ✅ All migrations created (PROGRAMS, CLASSES, ENROLLMENTS, ATTENDANCE_TRACKER, REQUESTS, FOLLOWUP_FLAGS, NOTIFICATIONS, AUDIT_LOG), plus role/status columns on `users`
+- ✅ Eloquent models created for each table + relationships
+- ✅ `routes/api.php` created and registered in `bootstrap/app.php` (`withRouting`)
+- ✅ Auth & Role System done: Socialite (Google) configured, `AuthController` (redirect/callback/logout/me), `RoleMiddleware` (per-role guard), `Admin/UserApprovalController` (staff-only approve queue)
 - ❌ No scheduled job yet (threshold checks + follow-up flagging)
+- ❌ Core business logic not yet built: request submission/auto-routing, threshold engine, instructor decision endpoint, student history/summary endpoints
 
-Basically **we're still at Phase 1, ground zero.** That's what to prioritize.
+**Priority 1 and Priority 2 are complete. Priority 3 — Core Business Logic — is next.**
 
 ---
 
@@ -291,20 +289,20 @@ GOOGLE_REDIRECT_URI=
 - [x] `attendance_tracker` uses `enrollment_id` FK (not separate `student_id` + `class_id`)
 - [x] `add_program_id_foreign_to_users_table` — FK constraint added after `programs` table exists
 - [x] Create Eloquent models for each table + relationships (hasMany/belongsTo per the ERD)
-- [ ] Create `routes/api.php`, register it in `bootstrap/app.php` (`withRouting`)
+- [x] Create `routes/api.php`, register it in `bootstrap/app.php` (`withRouting`)
 
-### 🟠 Priority 2 — Auth & Role System (Google SSO)
-- [ ] Install & configure Laravel Socialite with the Google driver
-- [ ] `GET /api/auth/google/redirect` — kick off the OAuth flow
-- [ ] `GET /api/auth/google/callback` — handle the return trip:
+### 🟠 Priority 2 — Auth & Role System (Google SSO) ✅ DONE
+- [x] Install & configure Laravel Socialite with the Google driver
+- [x] `GET /api/auth/google/redirect` — kick off the OAuth flow
+- [x] `GET /api/auth/google/callback` — handle the return trip:
   - Validate the email domain (`@student.laverdad.edu.ph` vs `@laverdad.edu.ph`); reject anything outside both, even if Google auth itself succeeded
   - Find-or-create the user by `google_id` / email
   - **Student email** → create with `role = student`, `status = approved` immediately, no manual step
   - **Staff email** → create with `role = null`, `status = pending` — waits for Admin to assign the specific role
   - Issue the session and log the user in
-- [ ] `POST /api/logout`, `GET /api/me`
-- [ ] Role-based middleware (guard per role: student/instructor/program_head/administrator)
-- [ ] `PATCH /api/admin/users/{id}/approve` — **now staff-only.** This is where the specific staff role (Instructor/Program Head/Administrator) gets assigned; students never appear in this queue anymore since they're auto-approved on first login
+- [x] `POST /api/logout`, `GET /api/me`
+- [x] Role-based middleware (guard per role: student/instructor/program_head/administrator)
+- [x] `PATCH /api/admin/users/{id}/approve` — **now staff-only.** This is where the specific staff role (Instructor/Program Head/Administrator) gets assigned; students never appear in this queue anymore since they're auto-approved on first login
 
 ### 🟡 Priority 3 — Core Business Logic
 - [ ] `POST /api/requests` — auto-resolve instructor via `ENROLLMENTS → CLASSES.instructor_id`

@@ -25,10 +25,10 @@ The current process depends on manual, one-by-one coordination across disconnect
 **Target users:**
 | Role | Device | Access |
 |---|---|---|
-| Student | Own phone | Self-registration via school email + admin approval |
+| Student | Own phone | Self-registration via school email |
 | Instructor | Any device/tablet | Login (approves/denies/notes requests for own classes) |
 | Program Head | Any device | Login (monitors entire program, no independent approval authority) |
-| Administrator | Any device | Login (super-admin: college-wide visibility, user approval, reports) |
+| Administrator | Any device | Login (college-wide visibility, user approval, reports) |
 
 ---
 
@@ -126,7 +126,7 @@ flowchart TB
 ## 3. Core Features (MVP Scope)
 
 ### Student Flow
-1. Self-register using `@student.laverdad.edu.ph` email → wait for Admin approval
+1. Self-register using `@student.laverdad.edu.ph` email → login
 2. Submit a digital excuse/late request: subject, date(s), type (absence/late), reason, supporting document upload (e.g., medical certificate)
 3. System **auto-identifies the correct instructor** based on subject/class schedule — no manual routing
 4. Track request status in real time: `pending → approved / noted / invalid`
@@ -144,25 +144,22 @@ flowchart TB
 12. Monitor students flagged for intervention — does **not** independently approve/deny requests, only reviews the instructor's decision + documentation
 13. Receives auto-escalated requests that an Instructor hasn't acted on within the response window
 14. Case-specific handling: for medical absences, track referral to formal leave-of-absence filing; for recurring cases, track "letter of commitment" intervention
+15. Full audit trail visibility
 
 ### Administrator
 15. College-wide dashboard (all programs)
-16. Approve/manage self-registered accounts
-17. CRUD programs and classes (subject, instructor, schedule, program)
-18. Exportable reports (PDF/Excel) for accreditation purposes
-19. Full audit trail visibility
+16. CRUD programs and classes (subject, instructor, schedule, program)
+17. Exportable reports (PDF/Excel) for accreditation purposes
 
 ### System Automation (Backend Logic)
-20. **Auto-routing** — request → correct instructor, based on subject/class schedule, no manual forwarding
-21. **Policy enforcement** — 3 lates automatically convert to 1 absence, tracked as a running count
-22. **Threshold alerts** — 2 absences = warning notification; 3 absences = IR/minor-offense notification, sent to Instructor + Program Head
-23. **Follow-up flagging** — a request unanswered past a defined time window is auto-flagged to the Program Head
-24. **Auto-generated confirmation** — once approved, the system generates the student's evidence/confirmation record automatically (no manual re-send step)
+18. **Auto-routing** — request → correct instructor, based on subject/class schedule, no manual forwarding
+19. **Policy enforcement** — 3 lates automatically convert to 1 absence, tracked as a running count
+20.  **Threshold alerts** — 2 absences = warning notification; 3 absences = IR/minor-offense notification, sent to Instructor + Program Head
+21. **Follow-up flagging** — a request unanswered past a defined time window is auto-flagged to the Program Head
+22. **Auto-generated confirmation** — once approved, the system generates the student's evidence/confirmation record automatically (no manual re-send step)
 
 ### Deferred to Phase 2 (not in MVP)
-- SSO login via Google Workspace (`@student.laverdad.edu.ph`)
 - SMS/Viber as a notification channel
-- Multi-role account switching (one person holding Instructor + Program Head simultaneously) — confirmed as a real case by Admin, but not required for MVP
 - Advanced analytics/trend charts across terms
 - Automatic blocking of retake eligibility once threshold is crossed (currently informational + manual endorsement to Discipline Office)
 

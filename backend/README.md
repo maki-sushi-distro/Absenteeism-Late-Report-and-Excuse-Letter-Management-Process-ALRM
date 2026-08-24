@@ -287,8 +287,9 @@ GOOGLE_REDIRECT_URI=
 > Follow this top-to-bottom. Don't skip ahead — many steps here depend on earlier ones (e.g. you can't build the threshold engine without the `ATTENDANCE_TRACKER` migration existing first).
 
 ### 🔴 Priority 1 — Foundation (do this before anything else)
-- [ ] Extend the `users` migration / add a new migration: `role`, `program_id`, `status` columns
-- [ ] Create migrations: `programs`, `classes`, `enrollments`, `attendance_tracker`, `requests`, `followup_flags`, `notifications`, `audit_log`
+- [x] All migrations created and in correct order
+- [x] `attendance_tracker` uses `enrollment_id` FK (not separate `student_id` + `class_id`)
+- [x] `add_program_id_foreign_to_users_table` — FK constraint added after `programs` table exists
 - [ ] Create Eloquent models for each table + relationships (hasMany/belongsTo per the ERD)
 - [ ] Create `routes/api.php`, register it in `bootstrap/app.php` (`withRouting`)
 

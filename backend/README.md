@@ -290,7 +290,7 @@ GOOGLE_REDIRECT_URI=
 - [x] All migrations created and in correct order
 - [x] `attendance_tracker` uses `enrollment_id` FK (not separate `student_id` + `class_id`)
 - [x] `add_program_id_foreign_to_users_table` — FK constraint added after `programs` table exists
-- [ ] Create Eloquent models for each table + relationships (hasMany/belongsTo per the ERD)
+- [x] Create Eloquent models for each table + relationships (hasMany/belongsTo per the ERD)
 - [ ] Create `routes/api.php`, register it in `bootstrap/app.php` (`withRouting`)
 
 ### 🟠 Priority 2 — Auth & Role System (Google SSO)

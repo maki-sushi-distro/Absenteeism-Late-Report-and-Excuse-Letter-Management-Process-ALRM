@@ -13,13 +13,9 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        //
-        // Priority 2 (README §8): once RoleMiddleware exists, register its
-        // alias here so routes/api.php's 'role:xxx' groups actually work:
-        //
-        // $middleware->alias([
-        //     'role' => \App\Http\Middleware\RoleMiddleware::class,
-        // ]);
+        $middleware->alias([
+            'role' => \App\Http\Middleware\RoleMiddleware::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

@@ -6,15 +6,11 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
         Schema::create('attendance_tracker', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('student_id')->constrained('users')->cascadeOnDelete();
-            $table->foreignId('class_id')->constrained('classes')->cascadeOnDelete();
+            $table->foreignId('enrollment_id')->constrained('enrollments')->cascadeOnDelete();
             $table->unsignedInteger('total_lates')->default(0);
             $table->unsignedInteger('total_absences')->default(0);
             $table->unsignedInteger('converted_absences')->default(0);
@@ -23,9 +19,6 @@ return new class extends Migration
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         Schema::dropIfExists('attendance_tracker');

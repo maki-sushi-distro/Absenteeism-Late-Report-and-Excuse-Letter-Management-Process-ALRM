@@ -102,7 +102,7 @@ Based on the files found in `/backend`:
 - ✅ Fresh Laravel 13 skeleton — no custom models/migrations/controllers yet besides the default `User`
 - ✅ `AppServiceProvider`, `bootstrap/app.php`, `routes/web.php` (just `/`, no `routes/api.php` yet)
 - ❌ No `routes/api.php` file yet — needs to be created
-- ❌ No custom migrations yet (PROGRAMS, CLASSES, ENROLLMENTS, ATTENDANCE_TRACKER, REQUESTS, FOLLOWUP_FLAGS, NOTIFICATIONS, AUDIT_LOG) — only the `users` migration exists
+- ✅ No custom migrations yet (PROGRAMS, CLASSES, ENROLLMENTS, ATTENDANCE_TRACKER, REQUESTS, FOLLOWUP_FLAGS, NOTIFICATIONS, AUDIT_LOG) — only the `users` migration exists
 - ❌ No role/status columns on the `users` table yet
 - ❌ No Eloquent models yet besides `User`
 - ❌ No auth controllers/middleware yet — **and the approach itself changed mid-project**: originally planned as email/password self-registration, now Google OAuth/SSO (see §9)
@@ -113,45 +113,97 @@ Basically **we're still at Phase 1, ground zero.** That's what to prioritize.
 ---
 
 ## 5. Database Schema (Backend Responsibility)
-
-> Reference only — copied from `ALRM.md` §4 so you don't have to keep switching between docs.
-
-### `users` (migration exists already, needs to be extended)
+ 
+> All migrations are ✅ done. This section is now reference-only — schema is finalized and matches the ERD.
+ 
+### `users`
 | Field | Type | Notes |
 |---|---|---|
-| id | bigint (PK) | ✅ already exists |
-| name | string | ✅ already exists — populated from Google profile on first login |
-| email | string, unique | ✅ already exists — **needs validation**: `@student.laverdad.edu.ph` = student, `@laverdad.edu.ph` = staff. Reject anything outside both, even if Google auth succeeds. |
-| password | string, hashed, **nullable** | ✅ column exists — **now optional**, since accounts are created via Google OAuth, not a password form. Keep the column (don't drop it) in case a non-SSO fallback is ever needed. |
-| **google_id** | string, nullable | ❌ missing — Google's unique subject ID, used to match returning users on login |
-| **role** | enum | ❌ missing — `administrator`, `program_head`, `instructor`, `student`. Auto-set to `student` on first login for `@student.laverdad.edu.ph`; left `null` for staff until Admin assigns it. |
-| **program_id** | bigint (FK → PROGRAMS), nullable | ❌ missing |
-| **status** | enum | ❌ missing — `approved` (auto, for students) or `pending` (staff, until Admin assigns role) |
-
-### `PROGRAMS` — ❌ missing
-`id`, `program_name`, `program_head_id` (FK → users, nullable)
-
-### `CLASSES` — ❌ missing
-`id`, `subject_name`, `instructor_id` (FK → users), `schedule`, `program_id` (FK → PROGRAMS)
-
-### `ENROLLMENTS` — ❌ missing
-`id`, `student_id` (FK → users), `class_id` (FK → CLASSES)
-
-### `ATTENDANCE_TRACKER` — ❌ missing
-`id`, `enrollment_id` (FK), `total_lates`, `total_absences`, `converted_absences` (computed: `total_absences + floor(total_lates / 3)`), `status` (`safe`/`warning`/`IR`)
-
-### `REQUESTS` — ❌ missing
-`id`, `enrollment_id` (FK), `type` (`absence`/`late`), `date_of_absence`, `reason`, `status` (`pending`/`approved`/`noted`/`invalid`), `evidence_file_url`, `date_submitted`, `date_reviewed`, `reviewed_by` (FK → users, nullable)
-
-### `FOLLOWUP_FLAGS` — ❌ missing
-`id`, `request_id` (FK), `flagged_date`, `escalated_to` (FK → users), `status`
-
-### `NOTIFICATIONS` — ❌ missing
-`id`, `user_id` (FK), `request_id` (FK, nullable), `type`, `message`, `channel` (`email`/`in_app`), `date_sent`, `is_read`
-
-### `AUDIT_LOG` — ❌ missing
-`id`, `user_id` (FK), `action`, `table_affected`, `record_id`, `timestamp`
-
+| id | bigint (PK) | ✅ |
+| google_id | string, nullable | ✅ — Google's unique subject ID, used to match returning users on login |
+| name | string | ✅ — populated from Google profile on first login |
+| email | string, unique | ✅ — validated in callback: `@student.laverdad.edu.ph` = student, `@laverdad.edu.ph` = staff |
+| role | enum, nullable | ✅ — `administrator`, `program_head`, `instructor`, `student`. Auto-set to `student` for student domain; null for staff until Admin assigns. |
+| program_id | bigint (FK → programs), nullable | ✅ |
+| status | enum, nullable | ✅ — `approved` (auto for students) or `pending` (staff, until Admin assigns role) |
+| password | string, nullable | ✅ — kept nullable since accounts are created via Google OAuth |
+ 
+### `programs`
+| Field | Type | Notes |
+|---|---|---|
+| id | bigint (PK) | ✅ |
+| program_name | string | ✅ |
+| program_head_id | bigint (FK → users), nullable | ✅ — nullOnDelete |
+ 
+### `classes`
+| Field | Type | Notes |
+|---|---|---|
+| id | bigint (PK) | ✅ |
+| subject_name | string | ✅ |
+| instructor_id | bigint (FK → users) | ✅ — cascadeOnDelete |
+| schedule | string | ✅ |
+| program_id | bigint (FK → programs) | ✅ — cascadeOnDelete |
+ 
+### `enrollments`
+| Field | Type | Notes |
+|---|---|---|
+| id | bigint (PK) | ✅ |
+| student_id | bigint (FK → users) | ✅ — cascadeOnDelete |
+| class_id | bigint (FK → classes) | ✅ — cascadeOnDelete |
+ 
+### `attendance_tracker`
+| Field | Type | Notes |
+|---|---|---|
+| id | bigint (PK) | ✅ |
+| enrollment_id | bigint (FK → enrollments) | ✅ — cascadeOnDelete. One tracker per student per class, resolved through enrollment. |
+| total_lates | unsignedInteger, default 0 | ✅ |
+| total_absences | unsignedInteger, default 0 | ✅ |
+| converted_absences | unsignedInteger, default 0 | ✅ — recomputed as `total_absences + floor(total_lates / 3)` on every update |
+| status | enum | ✅ — `safe`, `warning` (2 converted absences), `IR` (3 converted absences) |
+ 
+### `requests`
+| Field | Type | Notes |
+|---|---|---|
+| id | bigint (PK) | ✅ |
+| enrollment_id | bigint (FK → enrollments) | ✅ — cascadeOnDelete. Resolves student + class + instructor automatically. |
+| type | enum | ✅ — `absence`, `late` |
+| date_of_absence | date | ✅ |
+| reason | text | ✅ |
+| evidence_file_url | string, nullable | ✅ |
+| status | enum, default `pending` | ✅ — `pending`, `approved`, `noted`, `invalid` |
+| date_reviewed | timestamp, nullable | ✅ |
+| reviewed_by | bigint (FK → users), nullable | ✅ — nullOnDelete |
+ 
+### `followup_flags`
+| Field | Type | Notes |
+|---|---|---|
+| id | bigint (PK) | ✅ |
+| request_id | bigint (FK → requests) | ✅ — cascadeOnDelete |
+| flagged_at | timestamp | ✅ |
+| escalated_to | bigint (FK → users) | ✅ — cascadeOnDelete (the Program Head receiving the escalation) |
+| status | enum, default `open` | ✅ — `open`, `resolved` |
+ 
+### `notifications`
+| Field | Type | Notes |
+|---|---|---|
+| id | bigint (PK) | ✅ |
+| user_id | bigint (FK → users) | ✅ — cascadeOnDelete |
+| request_id | bigint (FK → requests), nullable | ✅ — nullOnDelete |
+| type | string | ✅ — e.g. `new_request`, `threshold_warning`, `follow_up_flag` |
+| message | text | ✅ |
+| channel | enum | ✅ — `email`, `in_app` |
+| date_sent | timestamp, useCurrent | ✅ |
+| is_read | boolean, default false | ✅ |
+ 
+### `audit_log`
+| Field | Type | Notes |
+|---|---|---|
+| id | bigint (PK) | ✅ |
+| user_id | bigint (FK → users) | ✅ — cascadeOnDelete (the actor) |
+| action | string | ✅ — e.g. `approved_request`, `flagged_request` |
+| table_affected | string | ✅ — polymorphic: which table the action touched |
+| record_id | unsignedBigInteger | ✅ — the specific record's ID in that table |
+| timestamp | timestamp, useCurrent | ✅ |
 ---
 
 ## 6. API Endpoints (target — `routes/api.php`)

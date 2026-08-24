@@ -7,14 +7,24 @@ A web-based Absence/Tardiness Monitoring and Approval System for **La Verdad Chr
 ---
 
 ## 📋 Table of Contents
-- [Overview](#overview)
-- [Tech Stack](#tech-stack)
-- [Deployment Architecture](#deployment-architecture)
-- [User Roles](#user-roles)
-- [Getting Started](#getting-started)
-- [Project Structure](#project-structure)
-- [Implementation Phases (To-Do)](#implementation-phases-to-do)
-- [Environment Variables](#environment-variables)
+- [ALRM — Absenteeism, Late Report, and Excuse Letter Management System](#alrm--absenteeism-late-report-and-excuse-letter-management-system)
+  - [📋 Table of Contents](#-table-of-contents)
+  - [Overview](#overview)
+    - [Email Domains](#email-domains)
+  - [Tech Stack](#tech-stack)
+  - [Deployment Architecture](#deployment-architecture)
+  - [User Roles](#user-roles)
+  - [Getting Started](#getting-started)
+    - [Backend (Laravel)](#backend-laravel)
+    - [Frontend (React)](#frontend-react)
+  - [Project Structure](#project-structure)
+  - [Implementation Phases (To-Do)](#implementation-phases-to-do)
+    - [Phase 1 — Backend Foundation](#phase-1--backend-foundation)
+    - [Phase 2 — Frontend Core](#phase-2--frontend-core)
+    - [Phase 3 — Notifications \& Reporting](#phase-3--notifications--reporting)
+    - [Phase 4 — Polish \& Deploy](#phase-4--polish--deploy)
+    - [Phase 5 — Optional Enhancements (post-presentation)](#phase-5--optional-enhancements-post-presentation)
+  - [Environment Variables](#environment-variables)
 
 ---
 
@@ -166,7 +176,7 @@ alrm/
 - [ ] Seed database with **real** LVCC programs/subjects/accounts — no placeholder/test data
 
 ### Phase 2 — Frontend Core
-- [ ] Login / Register pages
+- [ ] Login 
 - [ ] Student: submit request form, request history, threshold tracker
 - [ ] Instructor: pending requests list, decision actions, class dashboard
 - [ ] Program Head: aggregated program dashboard, flagged-students view

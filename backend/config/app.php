@@ -56,6 +56,20 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Frontend URL (React SPA)
+    |--------------------------------------------------------------------------
+    |
+    | Used by AuthController to redirect the browser back to the React
+    | frontend after the Google OAuth callback completes (with the
+    | Sanctum token attached as a query param). Set this in .env —
+    | local: http://localhost:5173, production: your Vercel URL.
+    |
+    */
+ 
+    'frontend_url' => env('FRONTEND_URL', 'http://localhost:5173'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Timezone
     |--------------------------------------------------------------------------
     |
@@ -64,6 +78,7 @@ return [
     | is set to "UTC" by default as it is suitable for most use cases.
     |
     */
+    
 
     'timezone' => 'UTC',
 

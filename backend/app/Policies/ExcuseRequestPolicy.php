@@ -26,16 +26,24 @@ class ExcuseRequestPolicy
      */
     public function view(User $user, ExcuseRequest $excuseRequest): bool
     {
-        return match ($user->role) {
-            'student'       => $excuseRequest->enrollment->student_id === $user->id,
-            'instructor'    => $excuseRequest->enrollment->class->instructor_id === $user->id,
-            'program_head'  => $user->headedProgram
-                                && $excuseRequest->enrollment->class->program_id === $user->headedProgram->id,
-            'administrator' => true,
-            default         => false,
-        };
-    }
+        if ($user->role === 'administrator') {
+            return true;
+        }
 
+        if ($user->role === 'student') {
+            return $excuseRequest->enrollment->student_id === $user->id;
+        }
+
+        if ($excuseRequest->enrollment->class->instructor_id === $user->id) {
+            return true;
+        }
+
+        // Program Head — primary role OR an instructor who also heads this
+        // program (same override as RoleMiddleware §9.1a).
+        $headedProgram = $user->headedProgram;
+
+        return $headedProgram && $excuseRequest->enrollment->class->program_id === $headedProgram->id;
+    }
     /**
      * Determine whether the user can approve/note/invalidate the request.
      * Only the instructor of the class this request was filed under.

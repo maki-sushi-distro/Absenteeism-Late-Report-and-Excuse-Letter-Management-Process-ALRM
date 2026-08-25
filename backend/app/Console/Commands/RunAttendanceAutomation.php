@@ -39,70 +39,121 @@ class RunAttendanceAutomation extends Command
             ->with('enrollment.student.program.programHead')
             ->get();
 
+        $flagged = 0;
+
         foreach ($overdue as $request) {
-            $programHead = $request->enrollment->student->program?->programHead;
+            $enrollment = $request->enrollment;
+
+            if (! $enrollment || ! $enrollment->student) {
+                $this->warn("Skipped request #{$request->id}: missing enrollment/student data.");
+                continue;
+            }
+
+            $programHead = $enrollment->student->program?->programHead;
+
+            if (! $programHead) {
+                $this->warn("Skipped request #{$request->id}: no Program Head assigned to escalate to.");
+                continue;
+            }
 
             FollowupFlag::create([
                 'request_id'   => $request->id,
                 'flagged_date' => now(),
-                'escalated_to' => $programHead?->id,
+                'escalated_to' => $programHead->id,
                 'status'       => 'open',
             ]);
 
-            if ($programHead) {
-                UserNotification::create([
-                    'user_id'    => $programHead->id,
-                    'request_id' => $request->id,
-                    'type'       => 'followup_flag',
-                    'message'    => "A {$request->type} request has gone unanswered past the response window.",
-                    'channel'    => 'in_app',
-                    'date_sent'  => now(),
-                    'is_read'    => false,
-                ]);
-            }
+            UserNotification::create([
+                'user_id'    => $programHead->id,
+                'request_id' => $request->id,
+                'type'       => 'followup_flag',
+                'message'    => "A {$request->type} request has gone unanswered past the response window.",
+                'channel'    => 'in_app',
+                'date_sent'  => now(),
+                'is_read'    => false,
+            ]);
+
+            $flagged++;
         }
 
-        return $overdue->count();
+        return $flagged;
     }
 
     /**
-     * NOTIFICATIONS: warning at 2 converted absences, IR at 3. Fires exactly
-     * once per threshold via warning_notified_at / ir_notified_at, regardless
-     * of whether/when an instructor ever decides a request.
+     * THRESHOLD_NOTIFICATIONS: AttendanceTracker::recompute() already sets
+     * status to 'warning' (converted_absences >= 2) or 'IR' (>= 3). This job
+     * just needs to notify once per threshold crossing, guarded by the
+     * warning_notified_at / ir_notified_at timestamps so re-running the
+     * command never double-sends.
      */
     private function fireThresholdNotifications(): int
     {
-        $count = 0;
+        $notified = 0;
 
-        AttendanceTracker::where('status', 'warning')
+        $warningTrackers = AttendanceTracker::where('status', 'warning')
             ->whereNull('warning_notified_at')
             ->with('enrollment.student.program.programHead', 'enrollment.class.instructor')
-            ->each(function (AttendanceTracker $tracker) use (&$count) {
-                $this->notifyThreshold($tracker, 'threshold_warning',
-                    "{$tracker->enrollment->student->name} has reached 2 converted absences (warning).");
-                $tracker->update(['warning_notified_at' => now()]);
-                $count++;
-            });
+            ->get();
 
-        AttendanceTracker::where('status', 'IR')
+        foreach ($warningTrackers as $tracker) {
+            $sent = $this->notifyThreshold(
+                $tracker,
+                'attendance_warning',
+                "Student has reached {$tracker->converted_absences} converted absence(s) — Warning threshold."
+            );
+
+            if ($sent) {
+                $tracker->forceFill(['warning_notified_at' => now()])->save();
+                $notified++;
+            }
+        }
+
+        $irTrackers = AttendanceTracker::where('status', 'IR')
             ->whereNull('ir_notified_at')
             ->with('enrollment.student.program.programHead', 'enrollment.class.instructor')
-            ->each(function (AttendanceTracker $tracker) use (&$count) {
-                $this->notifyThreshold($tracker, 'ir_escalation',
-                    "{$tracker->enrollment->student->name} has reached IR status (3 converted absences) and needs follow-up.");
-                $tracker->update(['ir_notified_at' => now()]);
-                $count++;
-            });
+            ->get();
 
-        return $count;
+        foreach ($irTrackers as $tracker) {
+            $sent = $this->notifyThreshold(
+                $tracker,
+                'attendance_ir',
+                "Student has reached {$tracker->converted_absences} converted absence(s) — Incident Report (IR) threshold."
+            );
+
+            if ($sent) {
+                $tracker->forceFill(['ir_notified_at' => now()])->save();
+                $notified++;
+            }
+        }
+
+        return $notified;
     }
 
-    private function notifyThreshold(AttendanceTracker $tracker, string $type, string $message): void
+    /**
+     * Notifies the instructor and/or Program Head for a tracker that crossed
+     * a threshold. Returns false (and logs a warning) instead of throwing
+     * when relationships are missing, so one bad record never halts the run.
+     */
+    private function notifyThreshold(AttendanceTracker $tracker, string $type, string $message): bool
     {
-        $instructor  = $tracker->enrollment->class->instructor;
-        $programHead = $tracker->enrollment->student->program?->programHead;
+        $enrollment = $tracker->enrollment;
 
-        foreach (array_filter([$instructor, $programHead]) as $recipient) {
+        if (! $enrollment) {
+            $this->warn("Skipped tracker #{$tracker->id}: no enrollment found.");
+            return false;
+        }
+
+        $instructor  = $enrollment->class?->instructor;
+        $programHead = $enrollment->student?->program?->programHead;
+
+        $recipients = array_filter([$instructor, $programHead]);
+
+        if (empty($recipients)) {
+            $this->warn("Skipped tracker #{$tracker->id}: no instructor or Program Head found to notify.");
+            return false;
+        }
+
+        foreach ($recipients as $recipient) {
             UserNotification::create([
                 'user_id'    => $recipient->id,
                 'request_id' => null,
@@ -113,5 +164,7 @@ class RunAttendanceAutomation extends Command
                 'is_read'    => false,
             ]);
         }
+
+        return true;
     }
 }

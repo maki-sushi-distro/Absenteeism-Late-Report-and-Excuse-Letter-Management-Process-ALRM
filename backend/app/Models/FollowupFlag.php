@@ -7,30 +7,18 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['request_id', 'flagged_at', 'escalated_to', 'status'])]
+#[Fillable(['request_id', 'flagged_date', 'escalated_to', 'status'])]
 class FollowupFlag extends Model
 {
     /** @use HasFactory<\Database\Factories\FollowupFlagFactory> */
     use HasFactory;
 
-    /*
-    |--------------------------------------------------------------------------
-    | Casts
-    |--------------------------------------------------------------------------
-    */
-
     protected function casts(): array
     {
         return [
-            'flagged_at' => 'datetime',
+            'flagged_date' => 'datetime',
         ];
     }
-
-    /*
-    |--------------------------------------------------------------------------
-    | Relationships
-    |--------------------------------------------------------------------------
-    */
 
     /**
      * The request that triggered this flag.

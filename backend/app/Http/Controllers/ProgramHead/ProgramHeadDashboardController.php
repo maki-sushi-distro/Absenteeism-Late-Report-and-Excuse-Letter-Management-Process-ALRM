@@ -43,7 +43,7 @@ class ProgramHeadDashboardController extends Controller
             'ir_count'         => (clone $trackerQuery)->where('status', 'IR')->count(),
             'recent_flags'     => FollowupFlag::where('escalated_to', Auth::id())
                 ->with('request.enrollment.student', 'request.enrollment.class')
-                ->latest('flagged_at')
+                ->latest('flagged_date')
                 ->take(5)
                 ->get(),
         ];
@@ -72,7 +72,7 @@ class ProgramHeadDashboardController extends Controller
             $query->where('status', $request->query('status'));
         }
 
-        $flags = $query->latest('flagged_at')->get();
+        $flags = $query->latest('flagged_date')->get();
 
         return response()->json([
             'success' => true,

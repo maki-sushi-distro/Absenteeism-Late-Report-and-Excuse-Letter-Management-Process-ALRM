@@ -127,7 +127,7 @@ class InstructorRequestController extends Controller
         if ($tracker->status === 'IR') {
             FollowupFlag::create([
                 'request_id'   => $request->id,
-                'flagged_at'   => now(),
+                'flagged_date'   => now(),
                 'escalated_to' => $programHead?->id,
                 'status'       => 'pending',
             ]);

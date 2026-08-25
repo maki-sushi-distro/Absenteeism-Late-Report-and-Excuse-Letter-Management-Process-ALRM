@@ -43,7 +43,7 @@ A web-based Absence/Tardiness Monitoring and Approval System for **La Verdad Chr
 | Student | `@student.laverdad.edu.ph` | `student` |
 | Faculty / Staff | `@laverdad.edu.ph` | `instructor` / `program_head` / `administrator` (assigned by Admin on approval) |
 
-Registration is rejected for any email outside these two domains. Staff accounts land as `pending` and the Administrator assigns the specific role during approval, since the staff domain alone doesn't distinguish Instructor from Program Head from Admin.
+Login happens via **Google Sign-In**, restricted to LVCC's Google Workspace — there's no separate email/password registration form. Anything outside these two domains is rejected during the OAuth callback, even if Google authentication itself succeeds. Staff accounts land as `pending` and the Administrator assigns the specific role during approval, since the staff domain alone doesn't distinguish Instructor from Program Head from Admin.
 
 ---
 
@@ -53,6 +53,7 @@ Registration is rejected for any email outside these two domains. Staff accounts
 |---|---|
 | Frontend | **React JS** |
 | Backend / API | **Laravel** |
+| Auth | **Google OAuth/SSO** (Laravel Socialite) — no email/password login |
 | Database | **MySQL** |
 | Styling | Tailwind CSS *(or your chosen UI library)* |
 | Frontend hosting | Vercel |
@@ -169,7 +170,7 @@ alrm/
 ### Phase 1 — Backend Foundation
 - [ ] Migrations: `user`, `programs`, `classes`, `enrollments`, `attendance_tracker`, `requests`, `followup_flags`, `notifications`, `audit_log`
 - [ ] Eloquent models + relationships
-- [ ] Role-based auth (self-registration + email domain validation + admin approval + middleware guards)
+- [ ] Role-based auth (Google OAuth/SSO via Laravel Socialite + email domain validation + admin approval for staff role assignment + middleware guards)
 - [ ] Auto-routing logic: excuse request → correct instructor via schedule lookup
 - [ ] Threshold engine: 3 lates → 1 absence, 2/3-absence count triggers
 - [ ] Scheduled job for follow-up flagging (unanswered requests past deadline)
@@ -217,6 +218,9 @@ MAIL_MAILER=smtp
 MAIL_HOST=
 MAIL_USERNAME=
 MAIL_PASSWORD=
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+GOOGLE_REDIRECT_URI=
 ```
 
 **Frontend (`.env`)**

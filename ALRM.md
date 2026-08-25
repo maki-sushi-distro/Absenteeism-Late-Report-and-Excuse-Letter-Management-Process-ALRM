@@ -25,10 +25,10 @@ The current process depends on manual, one-by-one coordination across disconnect
 **Target users:**
 | Role | Device | Access |
 |---|---|---|
-| Student | Own phone | Login via Google Sign-In (school email) |
+| Student | Own phone | Login via Google SSO (`@student.laverdad.edu.ph`) — auto-approved on first login, no waiting on Admin |
 | Instructor | Any device/tablet | Login (approves/denies/notes requests for own classes) |
 | Program Head | Any device | Login (monitors entire program, no independent approval authority) |
-| Administrator | Any device | Login (college-wide visibility, user approval, reports) |
+| Administrator | Any device | Login (college-wide visibility, staff role assignment, reports) |
 
 ---
 
@@ -42,7 +42,7 @@ The current process depends on manual, one-by-one coordination across disconnect
 | Backend | **Laravel** (PHP) | REST API, business logic, validation, auth |
 | Database | **MySQL** | Recommended by the guide; used both locally and in production |
 | Styling | Tailwind CSS (or Bootstrap/Material UI) | Any suitable CSS/UI library is allowed |
-| Auth | **Google OAuth/SSO** (Laravel Socialite) — restricted to LVCC's Workspace domains | ⚠️ Scope change: moved into MVP, replacing the original email/password self-registration + Admin approval flow. No registration form — login/account creation both happen via "Sign in with Google." |
+| Auth | Google OAuth/SSO (Laravel Socialite) | School-email-domain-restricted (see [Email Domain Rules](#email-domain-rules) below); no email/password self-registration — Google Workspace membership is the identity check. Students are auto-approved on first login; staff still need Admin to assign their specific role (Instructor/Program Head/Admin) |
 | Notifications | Email (Laravel Mail) + In-app | Per Admin/Student interviews — email + in-app preferred over Messenger/Viber for the *official* channel |
 | Frontend hosting | Vercel | Required to be publicly deployed for final presentation |
 | Backend hosting | Render | Required to be publicly deployed for final presentation |
@@ -58,12 +58,11 @@ LVCC uses two separate institutional Google Workspace domains, which the system 
 | Student | `@student.laverdad.edu.ph` | `student` |
 | Faculty / Staff (Instructor, Program Head, Admin) | `@laverdad.edu.ph` | `instructor` / `program_head` / `administrator` (assigned by Admin on approval) |
 
-**Login/account-creation logic (Google OAuth):**
-- Login happens via "Sign in with Google," restricted to LVCC's Workspace — there's no separate email/password registration form.
-- On every OAuth callback, the backend validates the email against these two domains — anything outside both is rejected, even if Google authentication itself succeeded.
-- If the domain is `@student.laverdad.edu.ph` → account is created (first login) with `role = student`, `status = approved` immediately, no manual step.
-- If the domain is `@laverdad.edu.ph` → account is created as `pending`, and the **Administrator manually assigns** the specific staff role (Instructor, Program Head, or Administrator) during approval, since the domain alone doesn't distinguish between those three.
-- This also means a single person's staff email can later be re-assigned a second role (e.g., Instructor also made Program Head) without needing a new account — supports the "one person, multiple roles" case confirmed in the Admin interview.
+**Login logic (Google OAuth, not a registration form):**
+- On the Google OAuth callback, the backend validates the email against these two domains — anything outside both is rejected, even if Google auth itself succeeded.
+- If the domain is `@student.laverdad.edu.ph` → account is created (or matched, on return visits) with `role = student`, `status = approved` immediately. **No Admin step for students at all** — Google Workspace membership already is the identity check, so a separate approval gate would just be redundant friction.
+- If the domain is `@laverdad.edu.ph` → account is created as `pending`, and the **Administrator assigns** the specific staff role (Instructor, Program Head, or Administrator), since the domain alone doesn't distinguish between those three. This is role *assignment*, not a legitimacy check — Google already handled that part.
+- **One person who is both Instructor and Program Head:** rather than a full multi-role system, `users.role` stays single-valued (e.g. `instructor`), and Program Head access for that person is granted via the existing `PROGRAMS.program_head_id` FK as a secondary check — if a user's ID shows up as `program_head_id` on any program, they get Program Head views/routes in addition to their primary role. No extra approval step, no schema change. A true many-role-per-user system (pivot table) is deferred — see Phase 5.
 
 ---
 
@@ -81,12 +80,12 @@ flowchart TB
         Student["Student portal — submit/track requests"]
         Instructor["Instructor dashboard — approve/note/invalid"]
         ProgHead["Program Head dashboard — program-wide monitoring"]
-        Admin["Admin dashboard — college-wide + user approval"]
+        Admin["Admin dashboard — college-wide + staff role assignment"]
     end
 
     subgraph BE["Backend — Laravel API (Render)"]
         route["API router — routes/api.php"]
-        authCtrl["AuthController — register/approve/login"]
+        authCtrl["AuthController — Google OAuth callback/assign staff role/login"]
         reqCtrl["RequestController — routing, decisions, threshold updates"]
         notifCtrl["NotificationController — email + in-app"]
         job["Scheduled Job — follow-up flagging + threshold checks"]
@@ -98,7 +97,7 @@ flowchart TB
 
     Student & Instructor & ProgHead & Admin -->|"HTTP / JSON"| route
 
-    route -->|"register/login/approve users"| authCtrl
+    route -->|"login/assign staff roles"| authCtrl
     route -->|"submit/route/decide requests, compute thresholds"| reqCtrl
     route -->|"send alerts"| notifCtrl
     job -->|"auto-flag stale requests, trigger threshold alerts"| notifCtrl
@@ -127,7 +126,7 @@ flowchart TB
 ## 3. Core Features (MVP Scope)
 
 ### Student Flow
-1. Log in using `@student.laverdad.edu.ph` via Google Sign-In (auto-approved, no manual step)
+1. Login via Google SSO using `@student.laverdad.edu.ph` → auto-approved on first login, no waiting on Admin
 2. Submit a digital excuse/late request: subject, date(s), type (absence/late), reason, supporting document upload (e.g., medical certificate)
 3. System **auto-identifies the correct instructor** based on subject/class schedule — no manual routing
 4. Track request status in real time: `pending → approved / noted / invalid`
@@ -174,16 +173,13 @@ flowchart TB
 | Field | Type | Notes |
 |---|---|---|
 | id | bigint (PK) | |
-| google_id | string, nullable | Google's unique subject ID, used to match returning users on login |
-| name | string | populated from Google profile on first login |
+| name | string | |
 | email | string, unique | must match `@student.laverdad.edu.ph` (student) or `@laverdad.edu.ph` (staff) — see [Email Domain Rules](#email-domain-rules) |
-| password | string, nullable | kept nullable since accounts are created via Google OAuth |
-| role | enum, nullable | `administrator`, `program_head`, `instructor`, `student`. Auto-set to `student` for student domain; null for staff until Admin assigns. |
+| google_id | string, nullable | Google's unique subject ID from OAuth — used to match returning users on login |
+| password | string, hashed, nullable | kept nullable since accounts are created via Google OAuth, not a password form |
+| role | enum, nullable | `administrator`, `program_head`, `instructor`, `student` — null for staff until Admin assigns |
 | program_id | bigint (FK → PROGRAMS), nullable | for students/program heads/instructors |
-| status | enum, nullable | `approved` (auto for students) or `pending` (staff, until Admin assigns role) |
-| year_level | string, nullable | added per ERD update |
-| guardian_name | string, nullable | added per ERD update |
-| contact_number | string, nullable | added per ERD update |
+| status | enum, nullable | `approved` (auto, for students) or `pending` (staff, until Admin assigns their specific role) — students never sit in `pending` |
 | created_at / updated_at | timestamp | |
 
 ### `PROGRAMS`
@@ -227,12 +223,10 @@ flowchart TB
 | id | bigint (PK) | |
 | enrollment_id | bigint (FK → ENROLLMENTS) | resolves student + class + (via CLASSES) instructor automatically |
 | type | enum | `absence`, `late` |
-| start_date_of_absence | date | renamed from `date_of_absence` per ERD update |
-| end_date_of_absence | date, nullable | added per ERD update |
+| date_of_absence | date | |
 | reason | text | |
 | status | enum | `pending`, `approved`, `noted`, `invalid` |
 | evidence_file_url | string, nullable | e.g. medical certificate |
-| evidence_type | string, nullable | added per ERD update |
 | date_submitted | timestamp | must be filed before the student returns to class |
 | date_reviewed | timestamp, nullable | |
 | reviewed_by | bigint (FK → user), nullable | who actually reviewed it (flexible — not hardcoded to the auto-resolved instructor) |
@@ -275,13 +269,12 @@ flowchart TB
 
 ### Auth
 ```
-GET   /api/auth/google/redirect            → sends the user to Google's OAuth consent screen
-GET   /api/auth/google/callback            → Google redirects back here with the auth code;
-                                              validate domain, find-or-create the user, issue session
+GET   /api/auth/google/redirect             → sends the user to Google's OAuth consent screen
+GET   /api/auth/google/callback             → validates domain, find-or-creates the user,
+                                               auto-approves students, marks staff pending role assignment
 POST  /api/logout
 GET   /api/me
 ```
-> No more `POST /api/register` or a password-based `POST /api/login` — account creation and login both happen through the Google callback. First-time sign-in = account creation; returning sign-in = login. Domain validation still runs on every callback, not just once.
 
 ### Student
 ```
@@ -309,8 +302,8 @@ GET   /api/program-head/requests           → program-wide, includes auto-escal
 ### Administrator
 ```
 GET    /api/admin/dashboard                → college-wide
-GET    /api/admin/users                    → pending staff accounts (user.status = pending); students are auto-approved on first Google login and never appear here
-PATCH  /api/admin/users/{id}/approve       → assigns specific staff role (Instructor/Program Head/Administrator) if email is @laverdad.edu.ph
+GET    /api/admin/users                    → staff pending role assignment (user.status = pending); students never appear here
+PATCH  /api/admin/users/{id}/approve       → staff-only — assigns the specific staff role (Instructor/Program Head/Admin)
 CRUD   /api/admin/programs
 CRUD   /api/admin/classes
 GET    /api/admin/reports/export           → PDF/Excel
@@ -326,43 +319,13 @@ GET    /api/admin/reports/export           → PDF/Excel
 ## 6. Frontend Structure (React JS)
 
 ```
-/src
-  /pages
-    Login.jsx                 → "Sign in with Google" trigger
-    student/
-      StudentDashboard.jsx
-      SubmitExcuseRequest.jsx
-      RequestHistory.jsx
-    instructor/
-      InstructorDashboard.jsx
-      ExcuseRequestReview.jsx
-    program-head/
-      ProgramHeadDashboard.jsx
-      FlaggedStudents.jsx
-    admin/
-      AdminDashboard.jsx
-      UserApproval.jsx
-      ProgramSubjectManager.jsx
-      Reports.jsx
-  /components
-    RoleGuard.jsx             → route protection per role
-    RequestCard.jsx
-    ThresholdBadge.jsx
-    EvidenceUploader.jsx
-    NotificationBell.jsx
-  /api
-    axios.js                  → base config, Laravel API URL
-    auth.js
-    requests.js
-    attendance.js
-    users.js
-  App.jsx                     → routing (react-router)
+bahala na si mac dito
 ```
 
 **Routing plan:**
 | Route | Purpose |
 |---|---|
-| `/login` | Auth — Google Sign-In trigger + OAuth callback landing |
+| `/login`, `/register` | Auth |
 | `/student`, `/student/requests/new`, `/student/requests` | Student flow |
 | `/instructor`, `/instructor/requests` | Instructor flow |
 | `/program-head` | Program Head monitoring |
@@ -375,18 +338,18 @@ GET    /api/admin/reports/export           → PDF/Excel
 **Phase 1 — Backend Foundation**
 - [ ] Laravel migrations (9 tables above)
 - [ ] Eloquent models + relationships
-- [ ] Role-based auth (Google OAuth/SSO via Laravel Socialite + email domain validation + admin approval for staff role assignment + middleware guards)
+- [ ] Role-based auth (Google SSO + email domain validation + staff-only role assignment + middleware)
 - [ ] Auto-routing logic (excuse request → correct instructor via schedule)
 - [ ] Threshold engine (3 lates = 1 absence, 2/3-absence count triggers)
 - [ ] Scheduled job for follow-up flagging
 - [ ] Seeders with **real** LVCC programs/subjects/sample accounts (no "John Doe" placeholder data)
 
 **Phase 2 — Frontend Core**
-- [ ] Auth page (Google Sign-In trigger + OAuth callback landing)
+- [ ] Auth pages
 - [ ] Student: submit request, history, threshold tracker
 - [ ] Instructor: pending requests, decision actions, dashboard
 - [ ] Program Head: aggregated dashboard, flagged students
-- [ ] Admin: user approval, CRUD, dashboard
+- [ ] Admin: staff role-assignment queue, CRUD, dashboard
 
 **Phase 3 — Notifications & Reporting**
 - [ ] Email notifications (submission, decision, threshold, follow-up flag)
@@ -403,8 +366,10 @@ GET    /api/admin/reports/export           → PDF/Excel
 
 **Phase 5 — Optional Enhancements (post-presentation)**
 - [ ] SMS/Viber notification channel
-- [ ] Multi-role account support
+- [ ] Full multi-role account support (`user_roles` pivot table, any role combination) — the common Instructor+Program Head case is already handled in MVP via the `program_head_id` secondary check (see §2, Login logic), so this is only needed for other combinations
 - [ ] Term-over-term analytics/trend charts
+
+> Note: Google Workspace SSO was originally scoped here as a Phase 2/stretch item but was pulled forward into the MVP — see §2 Tech Stack and the scope note in `BACKEND.md` §10.
 
 ---
 

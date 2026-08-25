@@ -43,7 +43,7 @@ A web-based Absence/Tardiness Monitoring and Approval System for **La Verdad Chr
 | Student | `@student.laverdad.edu.ph` | `student` |
 | Faculty / Staff | `@laverdad.edu.ph` | `instructor` / `program_head` / `administrator` (assigned by Admin on approval) |
 
-Login happens via **Google Sign-In**, restricted to LVCC's Google Workspace — there's no separate email/password registration form. Anything outside these two domains is rejected during the OAuth callback, even if Google authentication itself succeeds. Staff accounts land as `pending` and the Administrator assigns the specific role during approval, since the staff domain alone doesn't distinguish Instructor from Program Head from Admin.
+Login is via Google SSO, not a registration form; any email outside these two domains is rejected at the OAuth callback. **Students are auto-approved on first login** — no Admin step at all, since Google Workspace membership already is the identity check. Staff accounts land as `pending` and the Administrator assigns the specific role during login, since the staff domain alone doesn't distinguish Instructor from Program Head from Admin — this is role *assignment*, not a legitimacy approval.
 
 ---
 
@@ -53,7 +53,6 @@ Login happens via **Google Sign-In**, restricted to LVCC's Google Workspace — 
 |---|---|
 | Frontend | **React JS** |
 | Backend / API | **Laravel** |
-| Auth | **Google OAuth/SSO** (Laravel Socialite) — no email/password login |
 | Database | **MySQL** |
 | Styling | Tailwind CSS *(or your chosen UI library)* |
 | Frontend hosting | Vercel |
@@ -116,7 +115,7 @@ flowchart TB
 | **Student** | Log in (Using LVCC Email) · submit excuse/late requests · upload evidence · track own status & threshold history |
 | **Instructor** | Review requests for own classes · approve / note / invalid · manually log attendance · view class-level dashboard |
 | **Program Head** | View program-wide (all instructors/sections) · monitor flagged students · receive auto-escalated requests |
-| **Administrator** | College-wide visibility · approve registrations · manage programs/subjects/schedules · export reports |
+| **Administrator** | College-wide visibility · assign staff roles (Instructor/Program Head/Admin) · manage programs/subjects/schedules · export reports |
 
 ---
 
@@ -170,7 +169,7 @@ alrm/
 ### Phase 1 — Backend Foundation
 - [ ] Migrations: `user`, `programs`, `classes`, `enrollments`, `attendance_tracker`, `requests`, `followup_flags`, `notifications`, `audit_log`
 - [ ] Eloquent models + relationships
-- [ ] Role-based auth (Google OAuth/SSO via Laravel Socialite + email domain validation + admin approval for staff role assignment + middleware guards)
+- [ ] Role-based auth (Google SSO + email domain validation + staff-only role assignment + middleware guards)
 - [ ] Auto-routing logic: excuse request → correct instructor via schedule lookup
 - [ ] Threshold engine: 3 lates → 1 absence, 2/3-absence count triggers
 - [ ] Scheduled job for follow-up flagging (unanswered requests past deadline)
@@ -181,7 +180,7 @@ alrm/
 - [ ] Student: submit request form, request history, threshold tracker
 - [ ] Instructor: pending requests list, decision actions, class dashboard
 - [ ] Program Head: aggregated program dashboard, flagged-students view
-- [ ] Admin: user approval queue, CRUD for programs/subjects/schedules, dashboard
+- [ ] Admin: staff role-assignment queue (staff-only — students never appear here), CRUD for programs/subjects/schedules, dashboard
 
 ### Phase 3 — Notifications & Reporting
 - [ ] Email notifications (e.g., new request)
@@ -199,7 +198,7 @@ alrm/
 
 ### Phase 5 — Optional Enhancements (post-presentation)
 - [ ] SMS/Viber as an additional notification channel
-- [ ] Multi-role account support (e.g., Instructor who is also Program Head)
+- [ ] Full multi-role account support (`user_roles` pivot table, any role combination) — the common Instructor+Program Head case is already handled via a `program_head_id` secondary check, so this is only for other combinations
 - [ ] Term-over-term analytics/trend charts
 
 ---
@@ -218,9 +217,6 @@ MAIL_MAILER=smtp
 MAIL_HOST=
 MAIL_USERNAME=
 MAIL_PASSWORD=
-GOOGLE_CLIENT_ID=
-GOOGLE_CLIENT_SECRET=
-GOOGLE_REDIRECT_URI=
 ```
 
 **Frontend (`.env`)**

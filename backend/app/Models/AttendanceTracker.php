@@ -7,7 +7,15 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['enrollment_id', 'total_lates', 'total_absences', 'converted_absences', 'status'])]
+#[Fillable([
+    'enrollment_id',
+    'total_lates',
+    'total_absences',
+    'converted_absences',
+    'status',
+    'warning_notified_at',
+    'ir_notified_at',
+])]
 class AttendanceTracker extends Model
 {
     /** @use HasFactory<\Database\Factories\AttendanceTrackerFactory> */
@@ -22,9 +30,11 @@ class AttendanceTracker extends Model
     protected function casts(): array
     {
         return [
-            'total_lates'        => 'integer',
-            'total_absences'     => 'integer',
-            'converted_absences' => 'integer',
+            'total_lates'          => 'integer',
+            'total_absences'       => 'integer',
+            'converted_absences'   => 'integer',
+            'warning_notified_at'  => 'datetime',
+            'ir_notified_at'       => 'datetime',
         ];
     }
 
@@ -34,9 +44,6 @@ class AttendanceTracker extends Model
     |--------------------------------------------------------------------------
     */
 
-    /**
-     * The enrollment this tracker belongs to.
-     */
     public function enrollment(): BelongsTo
     {
         return $this->belongsTo(Enrollment::class);

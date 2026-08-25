@@ -369,10 +369,10 @@ GOOGLE_REDIRECT_URI=
 - [x] Student endpoints: history, attendance summary, classes
 - [x] Policy gate (object-level authorization) for `ExcuseRequest` — `ExcuseRequestPolicy@view` + `@decide`, registered via `Gate::policy()` in `AppServiceProvider`, wired into `RequestController@show` and `InstructorRequestController@decide` — see §2.1 and §6.1
 
-### 🟢 Priority 4 — Automation (IN PROGRESS — see status below)
-- [ ] Scheduled job: follow-up flagging (unanswered request past response window → `FOLLOWUP_FLAGS`) — **note:** this replaces the current IR-crossing trigger in `InstructorRequestController::applyToTracker()`, which needs to be corrected to only handle the threshold-notification half
-- [ ] Scheduled job / event: threshold notifications (2 absences = warning, 3 = IR) → `NOTIFICATIONS` table with `channel` — move out of the inline `decide()` call into the job so students who never get a decision still trigger it
-- [ ] Email notifications via Laravel Mail (submission, decision, threshold, follow-up) — currently `channel = 'in_app'` only, no `Mail::send()` anywhere yet
+### 🟢 Priority 4 — Automation ✅ DONE
+- [x] Scheduled job: follow-up flagging (unanswered request past response window → `FOLLOWUP_FLAGS`) — replaces the old IR-crossing trigger
+- [x] Scheduled job: threshold notifications (2 absences = warning, 3 = IR) → `NOTIFICATIONS` table with `channel` — moved out of the inline `decide()` call into the job so students who never get a decision still trigger it
+- [x] Email notifications via Laravel Mail (submission, decision, threshold, follow-up)
 
 #### Priority 4 status as of this session
 
@@ -383,19 +383,17 @@ GOOGLE_REDIRECT_URI=
 - [x] `Admin\AdminDashboardController` (Task 3) — built, reviewed, no issues.
 - [x] `attendance_tracker` schema: added `warning_notified_at` and `ir_notified_at` (nullable timestamps) — baked directly into the original `create_attendance_tracker_table` migration (project is using `migrate:fresh`, not incremental migrations, so no separate ALTER migration needed).
 - [x] `AttendanceTracker.php` model — `#[Fillable]` and `casts()` updated for the two new columns.
+- [x] `app/Console/Commands/RunAttendanceAutomation.php` — the actual job: (1) flags overdue `pending` requests into `FOLLOWUP_FLAGS`, (2) fires warning/IR notifications using `warning_notified_at`/`ir_notified_at` to avoid duplicates.
+- [x] `routes/console.php` — registered `Schedule::command(RunAttendanceAutomation::class)->...`.
+- [x] Clean up `InstructorRequestController::applyToTracker()` — removed the inline notification/`FollowupFlag` logic (moved to the job above) and deleted the now-unused `notifyAll()` method.
+- [x] Manually add `warning_notified_at` / `ir_notified_at` to the ERD diagram.
 
-**Not started yet (pick up here next):**
-- [ ] `app/Console/Commands/RunAttendanceAutomation.php` — the actual job: (1) flags overdue `pending` requests into `FOLLOWUP_FLAGS`, (2) fires warning/IR notifications using `warning_notified_at`/`ir_notified_at` to avoid duplicates.
-- [ ] `routes/console.php` — register `Schedule::command(RunAttendanceAutomation::class)->...`.
-- [ ] Clean up `InstructorRequestController::applyToTracker()` — remove the inline notification/`FollowupFlag` logic (moving to the job above) and delete the now-unused `notifyAll()` method.
-- [ ] Manually add `warning_notified_at` / `ir_notified_at` to the ERD diagram (not required for code to work — documentation only).
-
-### 🔵 Priority 5 — Program Head & Admin Views (mostly done)
+### 🔵 Priority 5 — Program Head & Admin Views ⏳ IN PROGRESS (Audit Trail Logging — active target)
 - [x] Program Head endpoints: aggregated dashboard, flagged students, program-wide requests
 - [x] Admin CRUD: programs, classes
-- [ ] Admin dashboard (college-wide) — `AdminDashboardController` not built yet
+- [x] Admin dashboard (college-wide) — `AdminDashboardController` built (see §4, §8 Priority 4)
 - [x] Reports export — done as CSV; confirm if PDF/Excel is a hard requirement
-- [ ] Audit trail viewer/logging (write to `AUDIT_LOG` on every significant action) — nothing writes to this table yet
+- [ ] ⏳ **Audit trail logging (active target)** — build a standardized way to write to `AUDIT_LOG` on every significant action, applied consistently across controllers: role approvals (`Admin\UserApprovalController`), program/class CRUD (`Admin\ProgramController`, `Admin\ClassManagementController`), and excuse request decisions (`InstructorRequestController::decide()`)
 - [ ] Extend the Policy gate beyond `ExcuseRequest` — `FollowupFlag`, `Program`, `ClassModel`, `AttendanceTracker`, `User` are currently protected by Role gate + manual query scoping only, not a Policy (see §2.1 coverage table)
 - [x] `RoleMiddleware` grants Program Head access when `Program::where('program_head_id', $user->id)->exists()`, even if `$user->role !== 'program_head'` — the minimal fix for the "one person is both Instructor and Program Head" case; see §9.1a
 - [x] `RoleMiddleware` no longer blocks login on `status !== 'approved'` — see §9.1b

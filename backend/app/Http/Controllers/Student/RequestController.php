@@ -75,17 +75,12 @@ class RequestController extends Controller
     }
 
     /**
-     * Show a single request — must belong to the authenticated student.
+     * Show a single request — must belong to the authenticated student
+     * (or a scoped instructor/program head/admin — see ExcuseRequestPolicy).
      */
     public function show(ExcuseRequest $request)
     {
-        if ($request->enrollment->student_id !== Auth::id()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Not authorized to view this request.',
-                'data'    => null,
-            ], 403);
-        }
+        $this->authorize('view', $request);
 
         return response()->json([
             'success' => true,

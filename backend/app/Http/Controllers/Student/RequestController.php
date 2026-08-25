@@ -18,11 +18,13 @@ class RequestController extends Controller
     public function store(HttpRequest $httpRequest)
     {
         $validated = $httpRequest->validate([
-            'class_id'          => ['required', 'integer', 'exists:classes,id'],
-            'type'              => ['required', 'in:absence,late'],
-            'date_of_absence'   => ['required', 'date'],
-            'reason'            => ['required', 'string'],
-            'evidence_file_url' => ['nullable', 'string'],
+            'class_id'              => ['required', 'integer', 'exists:classes,id'],
+            'type'                  => ['required', 'in:absence,late'],
+            'start_date_of_absence' => ['required', 'date'],
+            'end_date_of_absence'   => ['nullable', 'date', 'after_or_equal:start_date_of_absence'],
+            'reason'                => ['required', 'string'],
+            'evidence_file_url'     => ['nullable', 'string'],
+            'evidence_type'         => ['nullable', 'string'],
         ]);
 
         $enrollment = Enrollment::where('student_id', Auth::id())
@@ -38,12 +40,15 @@ class RequestController extends Controller
         }
 
         $excuseRequest = ExcuseRequest::create([
-            'enrollment_id'     => $enrollment->id,
-            'type'              => $validated['type'],
-            'date_of_absence'   => $validated['date_of_absence'],
-            'reason'            => $validated['reason'],
-            'evidence_file_url' => $validated['evidence_file_url'] ?? null,
-            'status'            => 'pending',
+            'enrollment_id'         => $enrollment->id,
+            'type'                  => $validated['type'],
+            'start_date_of_absence' => $validated['start_date_of_absence'],
+            'end_date_of_absence'   => $validated['end_date_of_absence'] ?? null,
+            'reason'                => $validated['reason'],
+            'evidence_file_url'     => $validated['evidence_file_url'] ?? null,
+            'evidence_type'         => $validated['evidence_type'] ?? null,
+            'status'                => 'pending',
+            'date_submitted'        => now(),
         ]);
 
         return response()->json([

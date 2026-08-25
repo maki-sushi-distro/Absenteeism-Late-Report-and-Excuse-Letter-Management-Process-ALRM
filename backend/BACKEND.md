@@ -369,10 +369,26 @@ GOOGLE_REDIRECT_URI=
 - [x] Student endpoints: history, attendance summary, classes
 - [x] Policy gate (object-level authorization) for `ExcuseRequest` — `ExcuseRequestPolicy@view` + `@decide`, registered via `Gate::policy()` in `AppServiceProvider`, wired into `RequestController@show` and `InstructorRequestController@decide` — see §2.1 and §6.1
 
-### 🟢 Priority 4 — Automation (NEXT)
+### 🟢 Priority 4 — Automation (IN PROGRESS — see status below)
 - [ ] Scheduled job: follow-up flagging (unanswered request past response window → `FOLLOWUP_FLAGS`) — **note:** this replaces the current IR-crossing trigger in `InstructorRequestController::applyToTracker()`, which needs to be corrected to only handle the threshold-notification half
 - [ ] Scheduled job / event: threshold notifications (2 absences = warning, 3 = IR) → `NOTIFICATIONS` table with `channel` — move out of the inline `decide()` call into the job so students who never get a decision still trigger it
 - [ ] Email notifications via Laravel Mail (submission, decision, threshold, follow-up) — currently `channel = 'in_app'` only, no `Mail::send()` anywhere yet
+
+#### Priority 4 status as of this session
+
+**Done:**
+- [x] `RoleMiddleware` program-head override (Task 1) — already correct, confirmed, no change needed.
+- [x] Policies for `Program`, `ClassModel`, `FollowupFlag`, `AttendanceTracker`, `User` (Task 2) — all created and registered in `AppServiceProvider::boot()`.
+- [x] `ExcuseRequestPolicy` — discovered it was referenced in `AppServiceProvider` but the file itself was missing/stub; created/fixed, including the instructor-who-is-also-program-head case in `view()` (same override logic as §9.1a, now applied at the Policy level too).
+- [x] `Admin\AdminDashboardController` (Task 3) — built, reviewed, no issues.
+- [x] `attendance_tracker` schema: added `warning_notified_at` and `ir_notified_at` (nullable timestamps) — baked directly into the original `create_attendance_tracker_table` migration (project is using `migrate:fresh`, not incremental migrations, so no separate ALTER migration needed).
+- [x] `AttendanceTracker.php` model — `#[Fillable]` and `casts()` updated for the two new columns.
+
+**Not started yet (pick up here next):**
+- [ ] `app/Console/Commands/RunAttendanceAutomation.php` — the actual job: (1) flags overdue `pending` requests into `FOLLOWUP_FLAGS`, (2) fires warning/IR notifications using `warning_notified_at`/`ir_notified_at` to avoid duplicates.
+- [ ] `routes/console.php` — register `Schedule::command(RunAttendanceAutomation::class)->...`.
+- [ ] Clean up `InstructorRequestController::applyToTracker()` — remove the inline notification/`FollowupFlag` logic (moving to the job above) and delete the now-unused `notifyAll()` method.
+- [ ] Manually add `warning_notified_at` / `ir_notified_at` to the ERD diagram (not required for code to work — documentation only).
 
 ### 🔵 Priority 5 — Program Head & Admin Views (mostly done)
 - [x] Program Head endpoints: aggregated dashboard, flagged students, program-wide requests

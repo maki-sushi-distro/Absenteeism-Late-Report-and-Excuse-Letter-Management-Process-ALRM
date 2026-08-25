@@ -20,6 +20,9 @@ class AttendanceTracker extends Model
 {
     /** @use HasFactory<\Database\Factories\AttendanceTrackerFactory> */
     use HasFactory;
+    
+    protected $table = 'attendance_tracker';
+
 
     /*
     |--------------------------------------------------------------------------

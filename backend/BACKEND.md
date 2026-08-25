@@ -167,7 +167,7 @@ Based on the files in `/backend`:
 | email | string, unique | ✅ — validated in callback: `@student.laverdad.edu.ph` = student, `@laverdad.edu.ph` = staff |
 | role | enum, nullable | ✅ — `administrator`, `program_head`, `instructor`, `student`. Auto-set to `student` for student domain; null for staff until Admin assigns. |
 | program_id | bigint (FK → programs), nullable | ✅ |
-| status | enum, nullable | ✅ — `approved` (auto for students) or `pending` (staff, until Admin assigns role) |
+| status | enum, nullable | ✅ — `approved` (auto for students) or `pending` (staff, until Admin assigns role). **Tracking only, not a login gate** — see §9.1b: a pending staff account can still log in and hit general endpoints, it just fails role-scoped routes because `role` is null. |
 | year_level | string, nullable | ✅ |
 | guardian_name | string, nullable | ✅ |
 | contact_number | string, nullable | ✅ |
@@ -381,7 +381,8 @@ GOOGLE_REDIRECT_URI=
 - [x] Reports export — done as CSV; confirm if PDF/Excel is a hard requirement
 - [ ] Audit trail viewer/logging (write to `AUDIT_LOG` on every significant action) — nothing writes to this table yet
 - [ ] Extend the Policy gate beyond `ExcuseRequest` — `FollowupFlag`, `Program`, `ClassModel`, `AttendanceTracker`, `User` are currently protected by Role gate + manual query scoping only, not a Policy (see §2.1 coverage table)
-- [ ] `RoleMiddleware` (or a small helper) needs to also grant Program Head access when `Program::where('program_head_id', $user->id)->exists()`, even if `$user->role !== 'program_head'` — this is the minimal fix for the "one person is both Instructor and Program Head" case; see §9.1a
+- [x] `RoleMiddleware` grants Program Head access when `Program::where('program_head_id', $user->id)->exists()`, even if `$user->role !== 'program_head'` — the minimal fix for the "one person is both Instructor and Program Head" case; see §9.1a
+- [x] `RoleMiddleware` no longer blocks login on `status !== 'approved'` — see §9.1b
 
 ### ⚪ Priority 6 — Seeding, Testing, Deploy Prep
 - [ ] Seeders — **real** LVCC programs/subjects/accounts (no placeholder/"John Doe" data — this is a requirement in the README)
@@ -399,6 +400,7 @@ GOOGLE_REDIRECT_URI=
 - ⚠️ Auth is **Google OAuth/SSO only** — no password-based registration form. See §10 for why this changed from the original `ALRM.md`.
 - ⚠️ The User Approval Queue is **staff-only** now. Students are auto-approved on first Google login — don't build a student approval UI/endpoint. It exists purely for staff *role assignment*, not a legitimacy check.
 - ⚠️ Instructor-who-is-also-Program-Head is handled via the `program_head_id` secondary check in `RoleMiddleware` (§9.1a), **not** a `user_roles` pivot table. Don't build the pivot table for MVP — that's Phase 5.
+- ⚠️ `RoleMiddleware` does **not** check `user.status` anymore — pending staff can log in and reach general endpoints, they just fail role-scoped routes because `role` is null. Don't re-add a status-based 403 in `RoleMiddleware`; see §9.1b.
 - ⚠️ `status` on `requests` is `pending`/`approved`/`noted`/`invalid` — **not** `approved`/`rejected`. `approved` and `noted` both resolve to "VALID" per the BPM flowchart; only `invalid` counts against the tracker.
 
 ### 9.1a Decision — Instructor also Program Head: minimal fix, not full multi-role
@@ -409,6 +411,15 @@ Confirmed decision: `users.role` stays **single-valued** — do not add a `user_
 - Concretely: `RoleMiddleware` should pass a `role:program_head` route if `$user->role === 'program_head'` **OR** `Program::where('program_head_id', $user->id)->exists()`. Same OR-logic if this ever needs checking inside a Policy instead of the middleware.
 - No schema change, no rewrite of existing role-check call sites for the other three roles — only the Program Head branch gets the extra check.
 - A real many-role-per-user system (pivot table, supports any combination, not just this one pairing) is explicitly deferred to Phase 5 — see the Scope Change Log below and `README.md`/`ALRM.md` Phase 5.
+
+### 9.1b Decision — staff can log in immediately; `status` no longer blocks access
+
+Confirmed decision: `RoleMiddleware` no longer rejects a request just because `user.status !== 'approved'`. Every authenticated user — student or staff, role-assigned or not — can log in and reach general/authenticated endpoints (`GET /api/me`, etc.).
+
+- What still restricts access is the **role check alone**. A staff account with `role = null` (not yet assigned by Admin) naturally fails any `role:instructor|program_head|administrator` route with a 403 — there's no need for a separate status check to produce that outcome.
+- `user.status` still exists and is still written the same way (`approved` for students immediately, `pending` for staff until Admin assigns a role) — it's just no longer read by `RoleMiddleware`. Its only remaining job is letting `Admin\UserApprovalController::index()` list who's still waiting on a role.
+- `AuthController::callback()` didn't need to change — it was already issuing a Sanctum token regardless of `status`.
+- Practical effect: a newly-logged-in staff member isn't locked out while waiting on Admin; they just won't see any role-specific screens until a role is assigned. Frontend should treat `role === null` (from `GET /api/me`) as "show a waiting-for-role-assignment state" rather than treating a 403 as the signal.
 
 ### 9.1 Known Issue — FollowupFlag trigger is wrong, threshold notifications are inline
 Two related problems to fix together when Priority 4 is built:
@@ -440,6 +451,9 @@ Keeping a record here since this contradicts what's written in the original `ALR
 > - `followup_flags`: `flagged_at` corrected to `flagged_date` to match the ERD.
 >
 > `RequestController.php` (Student), `ExcuseRequest` model (`$fillable`, `casts()`), `User` model (`$fillable`), and `FollowupFlag` model + every controller referencing it were updated to match.
+
+**Login-gate scope confirmed (this conversation):**
+> Reconfirmed further: staff should be able to log in immediately too, same as students — there's no scenario in ALRM where a user is authenticated but blocked from logging in entirely. `RoleMiddleware`'s `status !== 'approved'` check was removed for this reason (previously it 403'd a pending staff account before they could reach *any* role-scoped route). The role check alone already produces the right outcome for a role-less pending account, so nothing else needed to change. See §9.1b for the exact reasoning and `RoleMiddleware.php`.
 
 **User-approval scope confirmed (this conversation):**
 > Reconfirmed: there is no general "approve every user" step in ALRM. Students are fully auto-approved at Google login — no admin queue, no waiting. The only thing left under `Admin/UserApprovalController` is **staff role assignment** (deciding whether a `@laverdad.edu.ph` account is Instructor, Program Head, or Administrator), because the domain alone can't tell those three apart. `README.md` and `ALRM.md` updated to stop calling this "user approval" generically and say "staff role assignment" instead, since the old wording implied a legitimacy check that Google Workspace already handles.

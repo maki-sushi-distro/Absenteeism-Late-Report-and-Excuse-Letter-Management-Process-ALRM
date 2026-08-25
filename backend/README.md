@@ -24,7 +24,7 @@ The backend (Laravel REST API) is responsible for:
 | Layer | Technology | Note |
 |---|---|---|
 | Framework | **Laravel 13** (PHP ^8.3) | per `composer.json` |
-| Database | **MySQL** (production) / SQLite (local dev default) | ⚠️ needs to be switched to MySQL in `.env` before deploying |
+| Database | **MySQL** (production and local dev via Laragon) | local dev already on MySQL — no SQLite involved |
 | Auth | **Google OAuth/SSO (Laravel Socialite)** + custom role-based middleware | ⚠️ **Scope change (see §9):** moved up from Phase 2 to MVP. No more email/password registration form — login/account creation happens via "Sign in with Google", restricted to LVCC's Workspace domains. Not set up yet, needs to be built. |
 | Mail | Laravel Mail (SMTP) | `.env` already has `MAIL_*` vars, currently on `log` driver |
 | Hosting | Render | `.env` should point `DB_*` to an external MySQL host (Railway/Aiven/Clever Cloud) — **not** Render's own disk, since the free tier has no persistent storage |
@@ -124,6 +124,9 @@ Based on the files found in `/backend`:
 | role | enum, nullable | ✅ — `administrator`, `program_head`, `instructor`, `student`. Auto-set to `student` for student domain; null for staff until Admin assigns. |
 | program_id | bigint (FK → programs), nullable | ✅ |
 | status | enum, nullable | ✅ — `approved` (auto for students) or `pending` (staff, until Admin assigns role) |
+| year_level | string, nullable | ✅ — added per ERD update |
+| guardian_name | string, nullable | ✅ — added per ERD update |
+| contact_number | string, nullable | ✅ — added per ERD update |
 | password | string, nullable | ✅ — kept nullable since accounts are created via Google OAuth |
  
 ### `programs`
@@ -165,10 +168,13 @@ Based on the files found in `/backend`:
 | id | bigint (PK) | ✅ |
 | enrollment_id | bigint (FK → enrollments) | ✅ — cascadeOnDelete. Resolves student + class + instructor automatically. |
 | type | enum | ✅ — `absence`, `late` |
-| date_of_absence | date | ✅ |
+| start_date_of_absence | date | ✅ — renamed from `date_of_absence` per ERD update |
+| end_date_of_absence | date, nullable | ✅ — added per ERD update |
 | reason | text | ✅ |
 | evidence_file_url | string, nullable | ✅ |
+| evidence_type | string, nullable | ✅ — added per ERD update |
 | status | enum, default `pending` | ✅ — `pending`, `approved`, `noted`, `invalid` |
+| date_submitted | timestamp, nullable | ✅ — added per ERD update |
 | date_reviewed | timestamp, nullable | ✅ |
 | reviewed_by | bigint (FK → users), nullable | ✅ — nullOnDelete |
  
@@ -275,7 +281,6 @@ GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=
 GOOGLE_REDIRECT_URI=
 ```
-⚠️ The current `.env.example` still defaults to `DB_CONNECTION=sqlite` — switch this over once MySQL is set up.
 ⚠️ `GOOGLE_*` vars are new — needed for Laravel Socialite. Get these from the Google Cloud Console OAuth client (the one currently set to "Internal" user type, restricted to LVCC's Workspace).
 
 ---
@@ -324,7 +329,6 @@ GOOGLE_REDIRECT_URI=
 
 ### ⚪ Priority 6 — Seeding, Testing, Deploy Prep
 - [ ] Seeders — **real** LVCC programs/subjects/accounts (no placeholder/"John Doe" data — this is a requirement in the README)
-- [ ] Switch `.env` to MySQL (test locally first) before deploying to Render
 - [ ] Basic Feature tests per endpoint (auth, routing logic, threshold logic)
 - [ ] Point the production `.env` to an external MySQL host (Railway/Aiven/Clever Cloud) — Render's free tier has no persistent disk
 
@@ -356,3 +360,10 @@ Keeping a record here since this contradicts what's written in the original `ALR
 **Still needs confirming with you:**
 - Are `@student.laverdad.edu.ph` and `@laverdad.edu.ph` on the **same Google Workspace customer/org**? If they're separate orgs, the "Internal" restriction on one OAuth client may not automatically cover both domains — worth double-checking in Google Cloud Console before building on this assumption.
 - Should `ALRM.md` itself be updated to match (move the SSO bullet out of "Deferred to Phase 2"), or do you want to keep `ALRM.md` as the original proposal doc and treat this file as the up-to-date implementation reality? Flagging this so the two docs don't quietly drift apart.
+
+**Schema update (this conversation):**
+> The ERD was revised after the initial migrations were already built. Two tables changed:
+> - `requests`: `date_of_absence` split into `start_date_of_absence` + `end_date_of_absence`; added `evidence_type` and `date_submitted`.
+> - `users`: added `year_level`, `guardian_name`, `contact_number`.
+>
+> Since this was still local dev with no data worth preserving, the fix was applied directly to the original migration files (not a separate alter migration), followed by `php artisan migrate:fresh`. `RequestController.php` (Student) and the `ExcuseRequest` model (`$fillable`, `casts()`) were updated to match the new column names.

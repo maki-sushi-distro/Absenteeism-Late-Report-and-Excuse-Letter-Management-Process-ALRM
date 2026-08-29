@@ -28,7 +28,7 @@ The backend (Laravel REST API) is responsible for:
 | Auth | **Google OAuth/SSO (Laravel Socialite)** + custom role-based middleware | ✅ Done — see §8 Priority 2 |
 | Authorization | **Policies + Gate** (`app/Policies`, registered in `AppServiceProvider::boot()`) | ⚠️ Just started — see §6.1 |
 | Mail | Laravel Mail (SMTP) | `.env` already has `MAIL_*` vars, currently on `log` driver. Not wired to any notification yet. |
-| Hosting | Render | `.env` should point `DB_*` to an external MySQL host (Railway/Aiven/Clever Cloud) — **not** Render's own disk, since the free tier has no persistent storage |
+| Hosting | Render | `.env` should point `DB_*` to an external MySQL-compatible host — **not** Render's own disk, since the free tier has no persistent storage. **Decision:** using **TiDB Cloud** (Serverless tier, MySQL-compatible, free tier, native FK support) — see §7 for connection details. |
 
 ---
 
@@ -359,6 +359,7 @@ DB_PORT=
 DB_DATABASE=alrm
 DB_USERNAME=
 DB_PASSWORD=
+MYSQL_ATTR_SSL_CA=
 MAIL_MAILER=smtp
 MAIL_HOST=
 MAIL_USERNAME=
@@ -368,6 +369,25 @@ GOOGLE_CLIENT_SECRET=
 GOOGLE_REDIRECT_URI=
 ```
 ⚠️ `GOOGLE_*` vars are new — needed for Laravel Socialite. Get these from the Google Cloud Console OAuth client (the one currently set to "Internal" user type, restricted to LVCC's Workspace).
+
+### 7.1 Production DB — TiDB Cloud (decided)
+
+Production/cloud database is **TiDB Cloud** (Serverless tier) instead of a locally-hosted MySQL — chosen because Render's free tier has no persistent disk. TiDB Cloud is fully MySQL-wire-compatible and has native Foreign Key support, so the existing migrations/models work without rewriting.
+
+**Differences from local (Laragon) `.env` values:**
+- `DB_HOST` — from the TiDB Cloud dashboard's Connect panel (e.g. `gateway01.xx-xxxxx.prod.aws.tidbcloud.com`), not `127.0.0.1`
+- `DB_PORT` — typically `4000`, not `3306`
+- `DB_USERNAME` / `DB_PASSWORD` — TiDB-generated credentials from the Connect panel, not `root`/blank
+- `MYSQL_ATTR_SSL_CA` — **new, required.** TiDB Cloud connections need TLS. Download the CA cert from the Connect panel, store it somewhere in the project (e.g. `storage/certs/tidb-ca.pem`), and point this var at that path.
+
+**`config/database.php` needs the SSL option added to the `mysql` connection's `options` array** (not yet done — flagging for Priority 6):
+```php
+'options' => extension_loaded('pdo_mysql') ? array_filter([
+    PDO::MYSQL_ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
+]) : [],
+```
+
+Local dev (Laragon) keeps using plain local MySQL — only the production `.env` (and Render's environment variable settings) needs the TiDB Cloud values + SSL cert.
 
 ---
 
@@ -445,7 +465,7 @@ GOOGLE_REDIRECT_URI=
 ### ⚪ Priority 6 — Seeding, Testing, Deploy Prep
 - [ ] Seeders — **real** LVCC programs/subjects/accounts (no placeholder/"John Doe" data — this is a requirement in the README)
 - [ ] Basic Feature tests per endpoint (auth, routing logic, threshold logic)
-- [ ] Point the production `.env` to an external MySQL host (Railway/Aiven/Clever Cloud) — Render's free tier has no persistent disk
+- [ ] Point the production `.env` to **TiDB Cloud** (decided — see §7.1) — get connection details + CA cert from the TiDB Cloud dashboard, add `MYSQL_ATTR_SSL_CA` option to `config/database.php`, set the same env vars in Render's dashboard
 
 ---
 

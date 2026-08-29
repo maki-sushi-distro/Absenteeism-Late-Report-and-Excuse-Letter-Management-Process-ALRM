@@ -53,9 +53,9 @@ So: **Role gate = "are you even the right type of user for this endpoint at all"
 | Resource | Role gate | Policy gate |
 |---|---|---|
 | `ExcuseRequest` (view/decide) | ✅ `role:student\|instructor\|program_head` | ✅ `ExcuseRequestPolicy` |
-| `Program`, `ClassModel` CRUD | ✅ `role:administrator` | ❌ role gate only — fine for now since admin is a single trusted role, but any move to multiple admins scoped to specific programs would need a Policy |
-| `FollowupFlag`, `AttendanceTracker`, `User` | ✅ role gate | ❌ not yet — currently correct only because controllers manually scope queries (e.g. `where('escalated_to', Auth::id())`) instead of fetching-then-checking. Works, but is the pattern a Policy should eventually replace for consistency. |
-| Program Head routes, for a user whose `role` is `instructor` but who is *also* a Program Head | ⚠️ **not yet built** — `RoleMiddleware` currently only checks `user.role === 'program_head'`, so a role of `instructor` alone fails a `role:program_head` route even when that same user is listed as `program_head_id` on a program | n/a — this is a Role-gate change, not a Policy | See §9.1a for the fix |
+| `Program`, `ClassModel` CRUD | ✅ `role:administrator` | ✅ `ProgramPolicy`, `ClassModelPolicy` — wired via `$this->authorize()` in `Admin\ProgramController` / `Admin\ClassManagementController` |
+| `FollowupFlag`, `AttendanceTracker`, `User` | ✅ role gate | ✅ `FollowupFlagPolicy`, `AttendanceTrackerPolicy`, `UserPolicy` — wired into `ProgramHead\FollowupFlagController`, `Student\AttendanceController@summary`, `Admin\UserApprovalController@approve` respectively |
+| Program Head routes, for a user whose `role` is `instructor` but who is *also* a Program Head | ✅ **done** — `RoleMiddleware` grants access via `Program::where('program_head_id', $user->id)->exists()` even when `role !== 'program_head'` | n/a — this is a Role-gate change, not a Policy | See §9.1a |
 
 ---
 
@@ -95,7 +95,7 @@ flowchart TB
 
         Job["Scheduled Job — Laravel Scheduler
         runs independently, not tied to a request
-        ⚠️ NOT BUILT YET"]:::logic
+        ✅ RunAttendanceAutomation"]:::logic
     end
 
     DB[("MySQL")]:::data
@@ -143,14 +143,14 @@ Based on the files in `/backend`:
 - ✅ `routes/api.php` created and registered in `bootstrap/app.php` (`withRouting`)
 - ✅ Auth & Role System done: Socialite (Google) configured, `AuthController` (redirect/callback/logout/me), `RoleMiddleware` (per-role guard), `Admin/UserApprovalController` (staff-only role-assignment queue — students are never in this queue, they're auto-approved at login; see §9.1a for the outstanding Instructor+Program Head middleware fix)
 - ✅ **Priority 3 (Core Business Logic) done:** `RequestController` (store/index/show, auto-routes instructor via enrollment), `AttendanceTracker::recompute()` threshold engine, `InstructorRequestController::decide()`, `AttendanceController::summary()`, student `ClassController::index()`
-- ✅ **Priority 5 (mostly) done:** `ProgramHeadDashboardController` (dashboard/flaggedStudents/requests), `Admin\ProgramController` + `Admin\ClassManagementController` (full CRUD), `Admin\ReportController::export()` (CSV — see note below)
-- ✅ Authorization layer started: `app/Policies/ExcuseRequestPolicy.php` (`view`, `decide`), registered via `Gate::policy()` in `AppServiceProvider::boot()`; `RequestController::show()` and `InstructorRequestController::decide()` now use `$this->authorize()` instead of manual ownership checks
-- ❌ **`Admin\AdminDashboardController` — still missing.** Route exists in `api.php` (`GET /api/admin/dashboard`) but no controller behind it.
-- ❌ No scheduled job yet (threshold checks + follow-up flagging) — see the two ⚠️ notes in §3
-- ❌ No audit trail writes — `AuditLog` model exists, but nothing in the codebase actually writes to it yet
+- ✅ **Priority 5 done:** `ProgramHeadDashboardController` (dashboard/flaggedStudents/requests), `Admin\ProgramController` + `Admin\ClassManagementController` (full CRUD), `Admin\AdminDashboardController`, `Admin\ReportController::export()` (CSV — see note below), `ProgramHead\FollowupFlagController` (index/resolve)
+- ✅ Authorization layer complete: `ExcuseRequestPolicy`, `ProgramPolicy`, `ClassModelPolicy`, `FollowupFlagPolicy`, `AttendanceTrackerPolicy`, `UserPolicy` — all registered via `Gate::policy()` in `AppServiceProvider::boot()` and called via `$this->authorize()` from their respective controllers — see §6.1
+- ✅ **`Admin\AdminDashboardController`** — built.
+- ✅ Scheduled job built (threshold notifications + follow-up flagging) — `app/Console/Commands/RunAttendanceAutomation.php`, registered in `routes/console.php`
+- ✅ **Audit trail writes done** — `app/Services/AuditLoggerService.php` (Service Pattern), wired into `Admin\UserApprovalController`, `Admin\ProgramController`, `Admin\ClassManagementController`, `Instructor\InstructorRequestController`, `ProgramHead\FollowupFlagController` — see §6.2
 - ❌ Reports export is CSV, not PDF/Excel as originally scoped in §8 Priority 5 — flag if this needs to change (no package installed for PDF/Excel yet, e.g. `barryvdh/laravel-dompdf` or `maatwebsite/excel`)
 
-**Priority 1, 2, and 3 are complete. Priority 5 is mostly done. Priority 4 (Automation) is next — and needs to also correct the two architecture violations flagged in §3.**
+**Priority 1 through 5 are complete. Priority 6 (Seeding, Testing, Deploy Prep) is next.**
 
 ---
 
@@ -283,14 +283,16 @@ GET   /api/instructor/dashboard                 → ✅
 
 ### Program Head
 ```
-GET   /api/program-head/dashboard          → ✅
-GET   /api/program-head/students/flagged   → ✅
-GET   /api/program-head/requests           → ✅
+GET   /api/program-head/dashboard                        → ✅
+GET   /api/program-head/students/flagged                 → ✅
+GET   /api/program-head/requests                         → ✅
+GET   /api/program-head/followup-flags                   → ✅ ProgramHead\FollowupFlagController@index
+PATCH /api/program-head/followup-flags/{followupFlag}/resolve → ✅ authorized via FollowupFlagPolicy@update
 ```
 
 ### Administrator
 ```
-GET    /api/admin/dashboard            → ❌ NOT BUILT — AdminDashboardController missing
+GET    /api/admin/dashboard            → ✅ Admin\AdminDashboardController@index
 GET    /api/admin/users                → ✅
 PATCH  /api/admin/users/{id}/approve   → ✅ assigns staff role if @laverdad.edu.ph
 CRUD   /api/admin/programs             → ✅ Admin\ProgramController
@@ -300,8 +302,8 @@ GET    /api/admin/reports/export       → ✅ Admin\ReportController@export (CS
 
 **Business logic reminders:**
 - On `POST /api/requests`, the instructor is auto-resolved through relationships — **never** taken from user input. ✅ done.
-- Every decision/submission → update `ATTENDANCE_TRACKER`, recompute `converted_absences`, check against the 2/3 triggers. ✅ done, but currently only on decision (invalid), and inline instead of via job — see §3, §9.1.
-- Scheduled job (Laravel Task Scheduling): (1) insert a `FOLLOWUP_FLAGS` row when a request passes its response window, (2) fire `NOTIFICATIONS` at 2 and 3 converted absences. ❌ not built — this is Priority 4.
+- Every decision/submission → update `ATTENDANCE_TRACKER`, recompute `converted_absences`, check against the 2/3 triggers. ✅ done — tracker update happens on decision (invalid); the 2/3 threshold *notifications* now fire from the scheduled job (see below), not inline.
+- Scheduled job (Laravel Task Scheduling): (1) insert a `FOLLOWUP_FLAGS` row when a request passes its response window, (2) fire `NOTIFICATIONS` at 2 and 3 converted absences. ✅ done — `app/Console/Commands/RunAttendanceAutomation.php`, registered in `routes/console.php`. See §8 Priority 4 status.
 
 ### 6.1 Authorization Layer (Policies + Gate)
 ```
@@ -309,12 +311,42 @@ app/Policies/ExcuseRequestPolicy.php
   → view(User, ExcuseRequest)    student(own) | instructor(own class) | program_head(own program) | administrator(any)
   → decide(User, ExcuseRequest)  instructor(own class) only
 
-app/Providers/AppServiceProvider.php
-  → boot(): Gate::policy(ExcuseRequest::class, ExcuseRequestPolicy::class)
-```
-Controllers call `$this->authorize('view'|'decide', $request)` instead of manual `if` ownership checks. Requires `AuthorizesRequests` trait on the base `Controller` — **verify this exists**, it's not in the default Laravel 13 skeleton.
+app/Policies/ProgramPolicy.php
+  → view/create/update/delete    administrator-only for write; view also allows own program_head_id / own program_id
 
-Not yet covered by a Policy (still relies on route-level `RoleMiddleware` + manual query scoping only): `FollowupFlag`, `AttendanceTracker`, `Program`, `ClassModel`, `User`.
+app/Policies/ClassModelPolicy.php
+  → view/create/update/delete    administrator-only for write; view also allows own instructor_id / program_head / enrolled student
+
+app/Policies/FollowupFlagPolicy.php
+  → view/update    administrator or the program_head it was escalated_to; view also allows the class's instructor
+
+app/Policies/AttendanceTrackerPolicy.php
+  → view    administrator | own student | own class instructor | own program_head
+
+app/Policies/UserPolicy.php
+  → view      self | administrator | program_head of that user's program
+  → update    administrator-only (role assignment)
+
+app/Providers/AppServiceProvider.php
+  → boot(): Gate::policy() registered for all 6 models above
+```
+Controllers call `$this->authorize(...)` instead of manual `if` ownership checks:
+- `RequestController::show()`, `InstructorRequestController::decide()` → `ExcuseRequestPolicy`
+- `Admin\ProgramController@store|update|destroy` → `ProgramPolicy`
+- `Admin\ClassManagementController@store|update|destroy` → `ClassModelPolicy`
+- `Admin\UserApprovalController@approve` → `UserPolicy`
+- `Student\AttendanceController@summary` → `AttendanceTrackerPolicy` (per-item, on top of query scoping)
+- `ProgramHead\FollowupFlagController@resolve` → `FollowupFlagPolicy`
+
+Requires `AuthorizesRequests` trait on the base `Controller` — **verify this exists**, it's not in the default Laravel 13 skeleton.
+
+### 6.2 Audit Trail Logging (Service Pattern)
+```
+app/Services/AuditLoggerService.php
+  → log(string $action, string $tableAffected, int $recordId): AuditLog
+    grabs Auth::id() automatically, writes to AUDIT_LOG
+```
+Injected via constructor property promotion into: `Admin\UserApprovalController`, `Admin\ProgramController`, `Admin\ClassManagementController`, `Instructor\InstructorRequestController`, `ProgramHead\FollowupFlagController`. Called after the write succeeds (`create()`/`update()`/`delete()`), never inside an early-return guard clause (403/409). See §8 Priority 5 for the full action/table mapping per controller.
 
 ---
 
@@ -388,13 +420,25 @@ GOOGLE_REDIRECT_URI=
 - [x] Clean up `InstructorRequestController::applyToTracker()` — removed the inline notification/`FollowupFlag` logic (moved to the job above) and deleted the now-unused `notifyAll()` method.
 - [x] Manually add `warning_notified_at` / `ir_notified_at` to the ERD diagram.
 
-### 🔵 Priority 5 — Program Head & Admin Views ⏳ IN PROGRESS (Audit Trail Logging — active target)
+### 🔵 Priority 5 — Program Head & Admin Views ✅ DONE
 - [x] Program Head endpoints: aggregated dashboard, flagged students, program-wide requests
 - [x] Admin CRUD: programs, classes
 - [x] Admin dashboard (college-wide) — `AdminDashboardController` built (see §4, §8 Priority 4)
 - [x] Reports export — done as CSV; confirm if PDF/Excel is a hard requirement
-- [x] ⏳ **Audit trail logging (active target)** — build a standardized way to write to `AUDIT_LOG` on every significant action, applied consistently across controllers: role approvals (`Admin\UserApprovalController`), program/class CRUD (`Admin\ProgramController`, `Admin\ClassManagementController`), and excuse request decisions (`InstructorRequestController::decide()`)
-- [x] Extend the Policy gate beyond `ExcuseRequest` — `FollowupFlag`, `Program`, `ClassModel`, `AttendanceTracker`, `User` are currently protected by Role gate + manual query scoping only, not a Policy (see §2.1 coverage table)
+- [x] **Audit trail logging** — `app/Services/AuditLoggerService.php` (Service Pattern), injected via constructor into 5 controllers, logging `user_id` (via `Auth::id()`), `action`, `table_affected`, `record_id` on every significant write:
+  - `Admin\UserApprovalController@approve` → `assigned_staff_role` / `users`
+  - `Admin\ProgramController@store|update|destroy` → `created_program` / `updated_program` / `deleted_program` / `programs`
+  - `Admin\ClassManagementController@store|update|destroy` → `created_class` / `updated_class` / `deleted_class` / `classes`
+  - `Instructor\InstructorRequestController@decide` → `decided_request_{status}` (approved/noted/invalid) / `requests`
+  - `ProgramHead\FollowupFlagController@resolve` → `resolved_followup_flag` / `followup_flags`
+  - Logged only after the write succeeds — 403/409 guard clauses are never logged.
+  - `timestamp` left out of the service payload on purpose: `audit_log` migration already sets `useCurrent()`, and `timestamp` isn't in `AuditLog`'s `#[Fillable]` attribute — DB default handles it.
+- [x] **Policy gate extended beyond `ExcuseRequest`** — `ProgramPolicy`, `ClassModelPolicy`, `FollowupFlagPolicy`, `AttendanceTrackerPolicy`, `UserPolicy` were already created and registered in `AppServiceProvider::boot()`, but not yet called from any controller. Wired `$this->authorize()` into:
+  - `Admin\ProgramController@store|update|destroy` → `create`/`update`/`delete` on `Program`
+  - `Admin\ClassManagementController@store|update|destroy` → `create`/`update`/`delete` on `ClassModel`
+  - `Admin\UserApprovalController@approve` → `update` on `User`
+  - `Student\AttendanceController@summary` → `view` on each `AttendanceTracker` (on top of existing `where('student_id', Auth::id())` query scoping — defense in depth)
+  - New `ProgramHead\FollowupFlagController` (`index`/`resolve`) built specifically to put `FollowupFlagPolicy` to use — see §2.1, §6.1
 - [x] `RoleMiddleware` grants Program Head access when `Program::where('program_head_id', $user->id)->exists()`, even if `$user->role !== 'program_head'` — the minimal fix for the "one person is both Instructor and Program Head" case; see §9.1a
 - [x] `RoleMiddleware` no longer blocks login on `status !== 'approved'` — see §9.1b
 
@@ -476,3 +520,6 @@ Keeping a record here since this contradicts what's written in the original `ALR
 
 **Authorization update (this conversation):**
 > Added a Policy/Gate layer (`app/Policies`, registered in `AppServiceProvider`) instead of relying solely on manual `if` ownership checks inside controllers. Started with `ExcuseRequestPolicy` only — `RequestController@show` and `InstructorRequestController@decide` now call `$this->authorize()`. Other models (`FollowupFlag`, `Program`, `ClassModel`, `User`, `AttendanceTracker`) still rely on route-level `RoleMiddleware` + manual query scoping — not yet covered by a Policy.
+
+**Authorization update, continued (later session):**
+> The remaining 5 Policy classes (`Program`, `ClassModel`, `FollowupFlag`, `AttendanceTracker`, `User`) were created and registered in `AppServiceProvider` but sat unused. Wired `$this->authorize()` calls into `Admin\ProgramController`, `Admin\ClassManagementController`, `Admin\UserApprovalController`, `Student\AttendanceController`, and a newly-built `ProgramHead\FollowupFlagController` (which didn't exist before — `FollowupFlagPolicy` had no controller to call it). See §2.1 and §6.1 for current coverage.

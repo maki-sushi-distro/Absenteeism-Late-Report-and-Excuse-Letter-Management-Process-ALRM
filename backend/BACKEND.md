@@ -394,7 +394,7 @@ GOOGLE_REDIRECT_URI=
 - [x] Admin dashboard (college-wide) — `AdminDashboardController` built (see §4, §8 Priority 4)
 - [x] Reports export — done as CSV; confirm if PDF/Excel is a hard requirement
 - [x] ⏳ **Audit trail logging (active target)** — build a standardized way to write to `AUDIT_LOG` on every significant action, applied consistently across controllers: role approvals (`Admin\UserApprovalController`), program/class CRUD (`Admin\ProgramController`, `Admin\ClassManagementController`), and excuse request decisions (`InstructorRequestController::decide()`)
-- [ ] Extend the Policy gate beyond `ExcuseRequest` — `FollowupFlag`, `Program`, `ClassModel`, `AttendanceTracker`, `User` are currently protected by Role gate + manual query scoping only, not a Policy (see §2.1 coverage table)
+- [x] Extend the Policy gate beyond `ExcuseRequest` — `FollowupFlag`, `Program`, `ClassModel`, `AttendanceTracker`, `User` are currently protected by Role gate + manual query scoping only, not a Policy (see §2.1 coverage table)
 - [x] `RoleMiddleware` grants Program Head access when `Program::where('program_head_id', $user->id)->exists()`, even if `$user->role !== 'program_head'` — the minimal fix for the "one person is both Instructor and Program Head" case; see §9.1a
 - [x] `RoleMiddleware` no longer blocks login on `status !== 'approved'` — see §9.1b
 

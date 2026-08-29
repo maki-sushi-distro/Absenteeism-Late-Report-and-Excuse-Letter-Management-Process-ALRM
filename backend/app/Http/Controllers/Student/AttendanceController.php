@@ -8,9 +8,6 @@ use Illuminate\Support\Facades\Auth;
 
 class AttendanceController extends Controller
 {
-    /**
-     * Attendance summary across all of the authenticated student's enrollments.
-     */
     public function summary()
     {
         $enrollments = Enrollment::where('student_id', Auth::id())
@@ -18,6 +15,10 @@ class AttendanceController extends Controller
             ->get();
 
         $data = $enrollments->map(function ($enrollment) {
+            if ($enrollment->attendanceTracker) {
+                $this->authorize('view', $enrollment->attendanceTracker);
+            }
+
             return [
                 'class_id'     => $enrollment->class_id,
                 'subject_name' => $enrollment->class->subject_name,

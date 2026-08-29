@@ -14,6 +14,22 @@ use App\Http\Controllers\Admin\UserApprovalController;
 use App\Http\Controllers\Admin\ProgramController;
 use App\Http\Controllers\Admin\ClassManagementController;
 use App\Http\Controllers\Admin\ReportController;
+use App\Http\Controllers\DbTestController;
+
+/*
+|--------------------------------------------------------------------------
+| TEMPORARY — DB / Deploy sanity-check routes (Priority 6)
+|--------------------------------------------------------------------------
+| Not part of the real ALRM feature set. No auth required so they're easy
+| to hit from a browser/Postman right after a deploy. Safe to delete this
+| whole block (and DbTestController.php) once TiDB Cloud + Render are
+| confirmed working end-to-end.
+*/
+Route::get('/health', [DbTestController::class, 'health']);
+Route::get('/test/programs', [DbTestController::class, 'index']);
+Route::post('/test/programs', [DbTestController::class, 'store']);
+Route::patch('/test/programs/{program}', [DbTestController::class, 'update']);
+Route::delete('/test/programs/{program}', [DbTestController::class, 'destroy']);
 
 /*
 |--------------------------------------------------------------------------

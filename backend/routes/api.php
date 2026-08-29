@@ -1,7 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\ProgramHead\FollowupFlagController;
+
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Student\ClassController;
 use App\Http\Controllers\Student\RequestController;
@@ -65,9 +65,6 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/dashboard', [ProgramHeadDashboardController::class, 'index']);
         Route::get('/students/flagged', [ProgramHeadDashboardController::class, 'flaggedStudents']);
         Route::get('/requests', [ProgramHeadDashboardController::class, 'requests']);
-
-        Route::get('/followup-flags', [FollowupFlagController::class, 'index']);
-        Route::patch('/followup-flags/{followupFlag}/resolve', [FollowupFlagController::class, 'resolve']);
     });
 
     /*

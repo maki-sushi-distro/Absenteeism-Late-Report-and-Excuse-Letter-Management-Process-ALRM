@@ -11,9 +11,20 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use Laravel\Sanctum\HasApiTokens;  
+use Laravel\Sanctum\HasApiTokens;
 
-#[Fillable(['google_id', 'name', 'email', 'password', 'role', 'program_id', 'status'])]
+#[Fillable([
+    'google_id',
+    'name',
+    'email',
+    'password',
+    'role',
+    'program_id',
+    'status',
+    'year_level',
+    'guardian_name',
+    'contact_number',
+])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {

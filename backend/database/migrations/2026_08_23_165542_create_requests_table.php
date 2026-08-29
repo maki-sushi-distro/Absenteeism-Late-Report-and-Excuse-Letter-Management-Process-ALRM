@@ -15,10 +15,13 @@ return new class extends Migration
             $table->id();
             $table->foreignId('enrollment_id')->constrained('enrollments')->cascadeOnDelete();
             $table->enum('type', ['absence', 'late']);
-            $table->date('date_of_absence');
+            $table->date('start_date_of_absence');
+            $table->date('end_date_of_absence')->nullable();
             $table->text('reason');
             $table->string('evidence_file_url')->nullable();
+            $table->string('evidence_type')->nullable();
             $table->enum('status', ['pending', 'approved', 'noted', 'invalid'])->default('pending');
+            $table->timestamp('date_submitted')->nullable();
             $table->timestamp('date_reviewed')->nullable();
             $table->foreignId('reviewed_by')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamps();

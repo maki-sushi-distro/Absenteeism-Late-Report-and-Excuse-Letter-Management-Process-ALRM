@@ -1,7 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
-
+use App\Http\Controllers\ProgramHead\FollowupFlagController;
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Student\ClassController;
 use App\Http\Controllers\Student\RequestController;
@@ -20,6 +20,7 @@ use App\Http\Controllers\Admin\ReportController;
 | Auth Routes (Google OAuth/SSO — README §9/§10, no email/password reg)
 |--------------------------------------------------------------------------
 */
+
 Route::prefix('auth')->group(function () {
     Route::get('/google/redirect', [AuthController::class, 'redirect']);
     Route::get('/google/callback', [AuthController::class, 'callback']);
@@ -64,6 +65,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/dashboard', [ProgramHeadDashboardController::class, 'index']);
         Route::get('/students/flagged', [ProgramHeadDashboardController::class, 'flaggedStudents']);
         Route::get('/requests', [ProgramHeadDashboardController::class, 'requests']);
+
+        Route::get('/followup-flags', [FollowupFlagController::class, 'index']);
+        Route::patch('/followup-flags/{followupFlag}/resolve', [FollowupFlagController::class, 'resolve']);
     });
 
     /*

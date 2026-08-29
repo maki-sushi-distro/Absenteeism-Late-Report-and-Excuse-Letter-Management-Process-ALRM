@@ -7,11 +7,15 @@ use App\Models\AttendanceTracker;
 use App\Models\ExcuseRequest;
 use App\Models\FollowupFlag;
 use App\Models\UserNotification;
+use App\Services\AuditLoggerService;
 use Illuminate\Http\Request as HttpRequest;
 use Illuminate\Support\Facades\Auth;
 
 class InstructorRequestController extends Controller
 {
+    public function __construct(
+        protected AuditLoggerService $auditLogger,
+    ) {}
     /**
      * List requests for classes taught by the authenticated instructor.
      */
@@ -20,8 +24,8 @@ class InstructorRequestController extends Controller
         $requests = ExcuseRequest::whereHas('enrollment.class', function ($q) {
             $q->where('instructor_id', Auth::id());
         })->with('enrollment.student', 'enrollment.class')
-          ->latest()
-          ->get();
+            ->latest()
+            ->get();
 
         return response()->json([
             'success' => true,
@@ -37,13 +41,7 @@ class InstructorRequestController extends Controller
      */
     public function decide(HttpRequest $httpRequest, ExcuseRequest $request)
     {
-        if ($request->enrollment->class->instructor_id !== Auth::id()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Not authorized to decide on this request.',
-                'data'    => null,
-            ], 403);
-        }
+        $this->authorize('decide', $request);
 
         if ($request->status !== 'pending') {
             return response()->json([
@@ -62,6 +60,12 @@ class InstructorRequestController extends Controller
             'reviewed_by'   => Auth::id(),
             'date_reviewed' => now(),
         ]);
+
+        $this->auditLogger->log(
+            'decided_request_' . $validated['status'],
+            'requests',
+            $request->id
+        );
 
         if ($validated['status'] === 'invalid') {
             $this->applyToTracker($request);
@@ -120,20 +124,28 @@ class InstructorRequestController extends Controller
         $recipients = array_filter([$instructor, $programHead]);
 
         if ($tracker->status === 'warning') {
-            $this->notifyAll($recipients, $request, 'threshold_warning',
-                "{$student->name} has reached 2 converted absences (warning).");
+            $this->notifyAll(
+                $recipients,
+                $request,
+                'threshold_warning',
+                "{$student->name} has reached 2 converted absences (warning)."
+            );
         }
 
         if ($tracker->status === 'IR') {
             FollowupFlag::create([
                 'request_id'   => $request->id,
-                'flagged_at'   => now(),
+                'flagged_date'   => now(),
                 'escalated_to' => $programHead?->id,
                 'status'       => 'pending',
             ]);
 
-            $this->notifyAll($recipients, $request, 'ir_escalation',
-                "{$student->name} has reached IR status (3 converted absences) and needs follow-up.");
+            $this->notifyAll(
+                $recipients,
+                $request,
+                'ir_escalation',
+                "{$student->name} has reached IR status (3 converted absences) and needs follow-up."
+            );
         }
     }
 

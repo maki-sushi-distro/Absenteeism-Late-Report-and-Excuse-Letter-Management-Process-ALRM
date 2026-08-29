@@ -17,6 +17,9 @@ return new class extends Migration
             $table->unsignedBigInteger('program_id')->nullable()->after('role');
             $table->enum('status', ['approved', 'pending'])->nullable()->after('program_id');
             $table->string('password')->nullable()->change();
+            $table->string('year_level')->nullable();
+            $table->string('guardian_name')->nullable();
+            $table->string('contact_number')->nullable();
         });
     }
 

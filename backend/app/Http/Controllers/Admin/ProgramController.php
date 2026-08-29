@@ -4,11 +4,15 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Program;
+use App\Services\AuditLoggerService;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
 class ProgramController extends Controller
 {
+    public function __construct(
+        protected AuditLoggerService $auditLogger,
+    ) {}
     /**
      * GET /api/admin/programs
      */
@@ -34,6 +38,8 @@ class ProgramController extends Controller
         ]);
 
         $program = Program::create($validated);
+        $this->auditLogger->log('created_program', 'programs', $program->id);
+
 
         return response()->json([
             'success' => true,
@@ -65,6 +71,8 @@ class ProgramController extends Controller
         ]);
 
         $program->update($validated);
+        $this->auditLogger->log('updated_program', 'programs', $program->id);
+
 
         return response()->json([
             'success' => true,
@@ -86,7 +94,11 @@ class ProgramController extends Controller
             ], 409);
         }
 
+        $programId = $program->id;
         $program->delete();
+
+        $this->auditLogger->log('deleted_program', 'programs', $programId);
+
 
         return response()->json([
             'success' => true,

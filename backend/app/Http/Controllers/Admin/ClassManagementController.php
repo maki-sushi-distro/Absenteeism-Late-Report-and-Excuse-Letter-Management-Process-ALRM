@@ -4,11 +4,16 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\ClassModel;
+use App\Services\AuditLoggerService;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
 class ClassManagementController extends Controller
 {
+    public function __construct(
+        protected AuditLoggerService $auditLogger,
+    ) {}
+
     /**
      * GET /api/admin/classes
      */
@@ -36,6 +41,8 @@ class ClassManagementController extends Controller
         ]);
 
         $class = ClassModel::create($validated);
+        $this->auditLogger->log('created_class', 'classes', $class->id);
+
 
         return response()->json([
             'success' => true,
@@ -69,6 +76,8 @@ class ClassManagementController extends Controller
         ]);
 
         $class->update($validated);
+        $this->auditLogger->log('updated_class', 'classes', $class->id);
+
 
         return response()->json([
             'success' => true,
@@ -89,8 +98,11 @@ class ClassManagementController extends Controller
                 'data'    => null,
             ], 409);
         }
-
+            
+        $classId = $class->id;
         $class->delete();
+        $this->auditLogger->log('deleted_class', 'classes', $classId);
+
 
         return response()->json([
             'success' => true,

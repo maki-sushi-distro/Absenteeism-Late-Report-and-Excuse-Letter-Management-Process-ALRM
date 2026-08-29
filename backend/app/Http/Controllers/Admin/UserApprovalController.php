@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Services\AuditLoggerService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -17,6 +18,10 @@ class UserApprovalController extends Controller
      * this queue.
      */
     private const ASSIGNABLE_ROLES = ['instructor', 'program_head', 'administrator'];
+
+    public function __construct(
+        protected AuditLoggerService $auditLogger,
+    ) {}
 
     /**
      * List staff accounts still waiting on role assignment.
@@ -63,6 +68,8 @@ class UserApprovalController extends Controller
         $user->role = $validated['role'];
         $user->status = 'approved';
         $user->save();
+
+        $this->auditLogger->log('assigned_staff_role', 'users', $user->id);
 
         return response()->json([
             'success' => true,

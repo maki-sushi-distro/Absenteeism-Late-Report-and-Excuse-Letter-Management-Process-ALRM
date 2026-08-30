@@ -40,6 +40,7 @@ Route::delete('/test/programs/{program}', [DbTestController::class, 'destroy']);
 Route::prefix('auth')->group(function () {
     Route::get('/google/redirect', [AuthController::class, 'redirect']);
     Route::get('/google/callback', [AuthController::class, 'callback']);
+    Route::post('/exchange', [AuthController::class, 'exchange']);
 });
 
 Route::middleware('auth:sanctum')->group(function () {

@@ -7,7 +7,9 @@ use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use Laravel\Socialite\Facades\Socialite;
 use Laravel\Socialite\Two\InvalidStateException;
 
@@ -100,9 +102,47 @@ class AuthController extends Controller
 
         $token = $user->createToken('alrm-spa')->plainTextToken;
 
+        // Don't put the real token in the URL (browser history, referrer
+        // headers, server logs would all see it). Instead, stash it behind
+        // a short-lived, single-use code and hand the SPA that code. The
+        // SPA immediately exchanges it for the real token server-side via
+        // POST /api/auth/exchange.
+        $code = Str::random(40);
+        Cache::put("auth_exchange:{$code}", $token, now()->addSeconds(60));
+
         return redirect()->away(
-            $frontendUrl.'/auth/callback?token='.urlencode($token)
+            $frontendUrl.'/auth/callback?code='.urlencode($code)
         );
+    }
+
+    /**
+     * Step 3 — SPA exchanges the one-time code (from the callback redirect)
+     * for the actual Sanctum token. The code is single-use and expires
+     * after 60 seconds, so a token never sits exposed in the URL/history.
+     *
+     * POST /api/auth/exchange
+     */
+    public function exchange(Request $request): JsonResponse
+    {
+        $request->validate([
+            'code' => 'required|string',
+        ]);
+
+        $token = Cache::pull("auth_exchange:{$request->string('code')}");
+
+        if (! $token) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid or expired code.',
+                'data'    => null,
+            ], 401);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'OK',
+            'data'    => ['token' => $token],
+        ]);
     }
 
     /**

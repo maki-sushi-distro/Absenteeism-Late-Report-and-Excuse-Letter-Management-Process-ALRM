@@ -96,7 +96,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/dashboard', [AdminDashboardController::class, 'index']);
 
         Route::get('/users', [UserApprovalController::class, 'index']);
-        Route::patch('/users/{user}/approve', [UserApprovalController::class, 'approve']);
+        Route::patch('/users/{user}/role', [UserApprovalController::class, 'updateRole']);
 
         Route::apiResource('programs', ProgramController::class);
         Route::apiResource('classes', ClassManagementController::class);

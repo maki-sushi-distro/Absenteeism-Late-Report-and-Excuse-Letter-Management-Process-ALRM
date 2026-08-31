@@ -17,12 +17,26 @@ class AuthController extends Controller
 {
     /**
      * Domains allowed to sign in, mapped to the role they resolve to.
-     * Student domain auto-resolves to 'student'; staff domain resolves
-     * to null (role assigned later by Admin) per README §9 / ALRM.md §2.
+     *
+     * Student domain auto-resolves to 'student'.
+     * Staff domain auto-resolves to 'instructor' — this is a FALLBACK
+     * default, not a final answer. Some staff are actually Program Heads
+     * or Administrators, but there's no way to tell that from the email
+     * domain alone. Those cases are handled after the fact: an Admin
+     * changes the user's role via PATCH /api/admin/users/{user}/role
+     * once it's known the account needs something other than the
+     * instructor default. See UserApprovalController::updateRole().
      */
     private const STUDENT_DOMAIN = 'student.laverdad.edu.ph';
 
     private const STAFF_DOMAIN = 'laverdad.edu.ph';
+
+    /**
+     * Default role assigned to a brand-new staff-domain account on first
+     * login. Deliberately the most common/least-privileged staff role —
+     * Admin promotes from here, never demotes from something over-assigned.
+     */
+    private const DEFAULT_STAFF_ROLE = 'instructor';
 
     /**
      * Step 1 — Send the user's browser to Google's consent screen.
@@ -87,13 +101,21 @@ class AuthController extends Controller
         $user->name = $googleUser->getName() ?: $user->name;
 
         if ($isNewUser) {
-            // Student email → auto-approved, role locked in immediately.
-            // Staff email → pending, Admin assigns the specific role later.
-            $user->role = $isStudent ? 'student' : null;
-            $user->status = $isStudent ? 'approved' : 'pending';
+            // Both paths are auto-approved now — nobody sits in a "pending,
+            // can't do anything yet" limbo after their very first login.
+            // Student → student. Staff → instructor (the fallback default;
+            // Admin re-assigns to program_head/administrator later if the
+            // account actually needs a different role — see
+            // UserApprovalController::updateRole()).
+            $user->role = $isStudent ? 'student' : self::DEFAULT_STAFF_ROLE;
+            $user->status = 'approved';
             $user->password = null;
         }
 
+        // Role/status are intentionally NOT touched here on existing users
+        // — once assigned (whether by the default above or by an Admin's
+        // manual override), a user's role must never be silently reset by
+        // a subsequent login.
         $user->save();
 
         // Revoke old tokens for this user before issuing a new one, so a

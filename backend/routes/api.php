@@ -102,5 +102,6 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::apiResource('classes', ClassManagementController::class);
 
         Route::get('/reports/export', [ReportController::class, 'export']);
+        Route::get('/reports/preview', [ReportController::class, 'preview']);
     });
 });

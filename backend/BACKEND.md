@@ -23,7 +23,7 @@ The backend (Laravel REST API) is responsible for:
 
 | Layer | Technology | Note |
 |---|---|---|
-| Framework | **Laravel 13** (PHP ^8.3) | per `composer.json` |
+| Framework | **Laravel 13** (PHP ^8.4) | per `composer.json` |
 | Database | **MySQL** (production and local dev via Laragon) | local dev already on MySQL — no SQLite involved |
 | Auth | **Google OAuth/SSO (Laravel Socialite)** + custom role-based middleware | ✅ Done — see §8 Priority 2 |
 | Authorization | **Policies + Gate** (`app/Policies`, registered in `AppServiceProvider::boot()`) | ⚠️ Just started — see §6.1 |

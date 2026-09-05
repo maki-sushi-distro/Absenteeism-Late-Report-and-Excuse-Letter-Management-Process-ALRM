@@ -41,7 +41,7 @@ class ReportController extends Controller
     {
         $validated = $request->validate([
             'program_id' => ['nullable', 'string', 'uuid', 'exists:programs,id'],
-            'status'     => ['nullable', 'string', Rule::in(['pending', 'approved', 'rejected'])],
+            'status'     => ['nullable', 'string', Rule::in(['pending', 'approved', 'noted', 'invalid'])],
             'date_from'  => ['nullable', 'date'],
             'date_to'    => ['nullable', 'date', 'after_or_equal:date_from'],
         ]);

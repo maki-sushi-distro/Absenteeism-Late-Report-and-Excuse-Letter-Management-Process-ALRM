@@ -40,7 +40,7 @@ class ReportController extends Controller
     private function resolveFilters(Request $request): array
     {
         $validated = $request->validate([
-            'program_id' => ['nullable', 'integer', 'exists:programs,id'],
+            'program_id' => ['nullable', 'string', 'uuid', 'exists:programs,id'],
             'status'     => ['nullable', 'string', Rule::in(['pending', 'approved', 'rejected'])],
             'date_from'  => ['nullable', 'date'],
             'date_to'    => ['nullable', 'date', 'after_or_equal:date_from'],

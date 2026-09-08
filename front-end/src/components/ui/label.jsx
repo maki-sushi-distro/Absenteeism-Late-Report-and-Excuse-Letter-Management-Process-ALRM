@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import * as React from "react"
 import { cn } from "cn"
 
@@ -17,3 +18,17 @@ function Label({
 }
 
 export { Label }
+=======
+import { cn } from "@/lib/utils";
+
+function Label({ className, ...props }) {
+  return (
+    <label
+      className={cn("text-sm font-medium leading-none text-slate-700", className)}
+      {...props}
+    />
+  );
+}
+
+export { Label };
+>>>>>>> 124692977e7ca6e04e4feaf7312209e1c6c684cb

@@ -42,10 +42,6 @@ RUN composer dump-autoload --optimize
 RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache \
     && chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
 
-# Render provides the PORT env var; make Apache listen on it
-RUN sed -i 's/80/${PORT}/g' /etc/apache2/sites-available/000-default.conf /etc/apache2/ports.conf
+EXPOSE 10000
 
-EXPOSE 80
-
-# On container start: cache config, run migrations, then start Apache
-CMD bash -c "php artisan config:cache && php artisan migrate --force && apache2-foreground"
+CMD bash -c "sed -i \"s/80/\${PORT:-10000}/g\" /etc/apache2/sites-available/000-default.conf /etc/apache2/ports.conf && php artisan config:cache && php artisan migrate --force && apache2-foreground"

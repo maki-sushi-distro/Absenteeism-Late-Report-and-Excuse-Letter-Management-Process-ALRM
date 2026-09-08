@@ -66,17 +66,22 @@ class AuthController extends Controller
      */
     public function callback(): RedirectResponse
     {
+        Log::debug('Raw code received', [
+            'code' => request()->query('code'),
+            'length' => strlen((string) request()->query('code')),
+        ]);
+
         $frontendUrl = rtrim((string) config('app.frontend_url', env('FRONTEND_URL')), '/');
 
         try {
             $googleUser = Socialite::driver('google')
                 ->stateless()
                 ->user();
-        } catch (InvalidStateException|\Throwable $e) {
+        } catch (InvalidStateException | \Throwable $e) {
             Log::warning('Google OAuth callback failed', ['error' => $e->getMessage()]);
 
             return redirect()->away(
-                $frontendUrl.'/login?error=oauth_failed'
+                $frontendUrl . '/login?error=oauth_failed'
             );
         }
 
@@ -87,7 +92,7 @@ class AuthController extends Controller
         // Google auth itself succeeded — per README §9 / ALRM.md §2.
         if (! in_array($domain, [self::STUDENT_DOMAIN, self::STAFF_DOMAIN], true)) {
             return redirect()->away(
-                $frontendUrl.'/login?error=invalid_domain'
+                $frontendUrl . '/login?error=invalid_domain'
             );
         }
 
@@ -101,39 +106,18 @@ class AuthController extends Controller
         $user->name = $googleUser->getName() ?: $user->name;
 
         if ($isNewUser) {
-            // Both paths are auto-approved now — nobody sits in a "pending,
-            // can't do anything yet" limbo after their very first login.
-            // Student → student. Staff → instructor (the fallback default;
-            // Admin re-assigns to program_head/administrator later if the
-            // account actually needs a different role — see
-            // UserApprovalController::updateRole()).
             $user->role = $isStudent ? 'student' : self::DEFAULT_STAFF_ROLE;
             $user->status = 'approved';
             $user->password = null;
         }
-
-        // Role/status are intentionally NOT touched here on existing users
-        // — once assigned (whether by the default above or by an Admin's
-        // manual override), a user's role must never be silently reset by
-        // a subsequent login.
         $user->save();
-
-        // Revoke old tokens for this user before issuing a new one, so a
-        // re-login doesn't silently pile up valid tokens over time.
         $user->tokens()->delete();
-
         $token = $user->createToken('alrm-spa')->plainTextToken;
-
-        // Don't put the real token in the URL (browser history, referrer
-        // headers, server logs would all see it). Instead, stash it behind
-        // a short-lived, single-use code and hand the SPA that code. The
-        // SPA immediately exchanges it for the real token server-side via
-        // POST /api/auth/exchange.
         $code = Str::random(40);
         Cache::put("auth_exchange:{$code}", $token, now()->addSeconds(60));
 
         return redirect()->away(
-            $frontendUrl.'/auth/callback?code='.urlencode($code)
+            $frontendUrl . '/auth/callback?code=' . urlencode($code)
         );
     }
 

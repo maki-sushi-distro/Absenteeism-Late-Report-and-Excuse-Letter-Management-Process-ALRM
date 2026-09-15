@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Auth\OtpController;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -88,8 +89,6 @@ class AuthController extends Controller
         $email = strtolower((string) $googleUser->getEmail());
         $domain = substr(strrchr($email, '@') ?: '', 1);
 
-        // Reject anything outside both institutional domains, even if
-        // Google auth itself succeeded — per README §9 / ALRM.md §2.
         if (! in_array($domain, [self::STUDENT_DOMAIN, self::STAFF_DOMAIN], true)) {
             return redirect()->away(
                 $frontendUrl . '/login?error=invalid_domain'
@@ -111,13 +110,11 @@ class AuthController extends Controller
             $user->password = null;
         }
         $user->save();
-        $user->tokens()->delete();
-        $token = $user->createToken('alrm-spa')->plainTextToken;
-        $code = Str::random(40);
-        Cache::put("auth_exchange:{$code}", $token, now()->addSeconds(60));
+
+        OtpController::issue($user);
 
         return redirect()->away(
-            $frontendUrl . '/auth/callback?code=' . urlencode($code)
+            $frontendUrl . '/auth/otp?user_id=' . urlencode($user->id)
         );
     }
 

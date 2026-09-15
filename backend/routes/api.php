@@ -14,6 +14,7 @@ use App\Http\Controllers\Admin\UserApprovalController;
 use App\Http\Controllers\Admin\ProgramController;
 use App\Http\Controllers\Admin\ClassManagementController;
 use App\Http\Controllers\Admin\ReportController;
+use App\Http\Controllers\Auth\OtpController;
 use App\Http\Controllers\DbTestController;
 
 /*
@@ -25,6 +26,7 @@ use App\Http\Controllers\DbTestController;
 | whole block (and DbTestController.php) once TiDB Cloud + Render are
 | confirmed working end-to-end.
 */
+
 Route::get('/health', [DbTestController::class, 'health']);
 Route::get('/test/programs', [DbTestController::class, 'index']);
 Route::post('/test/programs', [DbTestController::class, 'store']);
@@ -41,6 +43,8 @@ Route::prefix('auth')->group(function () {
     Route::get('/google/redirect', [AuthController::class, 'redirect']);
     Route::get('/google/callback', [AuthController::class, 'callback']);
     Route::post('/exchange', [AuthController::class, 'exchange']);
+    Route::post('/otp/verify', [OtpController::class, 'verify'])
+        ->middleware('throttle:10,1');
 });
 
 Route::middleware('auth:sanctum')->group(function () {

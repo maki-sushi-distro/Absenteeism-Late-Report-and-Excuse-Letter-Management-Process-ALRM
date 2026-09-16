@@ -17,7 +17,10 @@ use App\Policies\ProgramPolicy;
 use App\Policies\UserNotificationPolicy;
 use App\Policies\UserPolicy;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\ServiceProvider;
+use Symfony\Component\Mailer\Bridge\Brevo\Transport\BrevoTransportFactory;
+use Symfony\Component\Mailer\Transport\Dsn;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -35,5 +38,15 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(AttendanceTracker::class, AttendanceTrackerPolicy::class);
         Gate::policy(User::class, UserPolicy::class);
         Gate::policy(UserNotification::class, UserNotificationPolicy::class); // NEW
+
+        Mail::extend('brevo', function () {
+            return (new BrevoTransportFactory)->create(
+                new Dsn(
+                    'brevo+api',
+                    'default',
+                    config('services.brevo.key')
+                )
+            );
+        });
     }
 }

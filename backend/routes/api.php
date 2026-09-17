@@ -45,6 +45,8 @@ Route::prefix('auth')->group(function () {
     Route::post('/exchange', [AuthController::class, 'exchange']);
     Route::post('/otp/verify', [OtpController::class, 'verify'])
         ->middleware('throttle:10,1');
+    Route::post('/otp/resend', [OtpController::class, 'resend'])
+        ->middleware('throttle:10,1');
 });
 
 Route::middleware('auth:sanctum')->group(function () {

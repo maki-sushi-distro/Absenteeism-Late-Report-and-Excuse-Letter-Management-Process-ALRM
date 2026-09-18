@@ -49,7 +49,7 @@ Route::prefix('auth')->group(function () {
         ->middleware('throttle:10,1');
 });
 
-Route::middleware('auth:sanctum')->group(function () {
+Route::middleware(['auth:sanctum', 'inactive'])->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/me', [AuthController::class, 'me']);
 
@@ -110,4 +110,4 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/reports/export', [ReportController::class, 'export']);
         Route::get('/reports/preview', [ReportController::class, 'preview']);
     });
-});
+}); 

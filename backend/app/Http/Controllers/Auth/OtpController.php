@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Support\TrustedDeviceManager;
 use App\Models\OtpCode;
 use App\Models\User;
 use App\Notifications\SendOtpCode;
@@ -111,7 +112,7 @@ class OtpController extends Controller
 
         if (! $otp) {
             return response()->json([
-                'success' => false, 
+                'success' => false,
                 'message' => 'No pending verification found. Please log in again.',
                 'data'    => null,
             ], 404);
@@ -151,10 +152,12 @@ class OtpController extends Controller
         $code = Str::random(40);
         Cache::put("auth_exchange:{$code}", $token, now()->addSeconds(60));
 
+        $cookie = TrustedDeviceManager::remember($request, $user);
+
         return response()->json([
             'success' => true,
             'message' => 'OK',
             'data'    => ['exchange_code' => $code],
-        ]);
+        ])->cookie($cookie);
     }
 }

@@ -20,6 +20,7 @@ class RequestController extends Controller
         $validated = $httpRequest->validate([
             'class_id'              => ['required', 'string', 'uuid', 'exists:classes,id'],
             'type'                  => ['required', 'in:absence,late'],
+            'subjects_missed'       => ['required', 'string'], 
             'start_date_of_absence' => ['required', 'date'],
             'end_date_of_absence'   => ['nullable', 'date', 'after_or_equal:start_date_of_absence'],
             'reason'                => ['required', 'string'],
@@ -42,6 +43,7 @@ class RequestController extends Controller
         $excuseRequest = ExcuseRequest::create([
             'enrollment_id'         => $enrollment->id,
             'type'                  => $validated['type'],
+            'subjects_missed'       => $validated['subjects_missed'], 
             'start_date_of_absence' => $validated['start_date_of_absence'],
             'end_date_of_absence'   => $validated['end_date_of_absence'] ?? null,
             'reason'                => $validated['reason'],

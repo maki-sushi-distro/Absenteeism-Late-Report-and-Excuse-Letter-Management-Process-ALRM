@@ -15,7 +15,8 @@ return new class extends Migration
             $table->string('google_id')->nullable()->after('id');
             $table->enum('role', ['administrator', 'program_head', 'instructor', 'student'])->nullable()->after('email');
             $table->uuid('program_id')->nullable()->after('role');
-            $table->enum('status', ['approved', 'pending'])->nullable()->after('program_id');
+            $table->string('school_student_id')->nullable()->unique()->after('program_id');
+            $table->enum('status', ['approved', 'pending'])->nullable()->after('school_student_id');
             $table->string('password')->nullable()->change();
             $table->string('year_level')->nullable();
             $table->string('guardian_name')->nullable();
@@ -23,10 +24,22 @@ return new class extends Migration
         });
     }
 
+    /**
+     * Reverse the migrations.
+     */
     public function down(): void
     {
         Schema::table('users', function (Blueprint $table) {
-            $table->dropColumn(['google_id', 'role', 'program_id', 'status']);
+            $table->dropColumn([
+                'google_id',
+                'role',
+                'program_id',
+                'school_student_id',
+                'status',
+                'year_level',
+                'guardian_name',
+                'contact_number',
+            ]);
             $table->string('password')->nullable(false)->change();
         });
     }

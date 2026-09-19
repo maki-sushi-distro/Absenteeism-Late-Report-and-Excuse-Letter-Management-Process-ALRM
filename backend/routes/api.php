@@ -100,9 +100,9 @@ Route::middleware(['auth:sanctum', 'inactive'])->group(function () {
     */
     Route::prefix('admin')->middleware('role:administrator')->group(function () {
         Route::get('/dashboard', [AdminDashboardController::class, 'index']);
-
-        Route::get('/users', [UserApprovalController::class, 'index']);
+        Route::apiResource('users', UserApprovalController::class)->only(['index', 'store', 'destroy']);
         Route::patch('/users/{user}/role', [UserApprovalController::class, 'updateRole']);
+        Route::patch('/users/{user}/status', [UserApprovalController::class, 'updateStatus']);
 
         Route::apiResource('programs', ProgramController::class);
         Route::apiResource('classes', ClassManagementController::class);
@@ -110,4 +110,4 @@ Route::middleware(['auth:sanctum', 'inactive'])->group(function () {
         Route::get('/reports/export', [ReportController::class, 'export']);
         Route::get('/reports/preview', [ReportController::class, 'preview']);
     });
-}); 
+});

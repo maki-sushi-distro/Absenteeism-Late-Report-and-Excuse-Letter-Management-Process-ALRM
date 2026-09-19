@@ -23,6 +23,7 @@ use Laravel\Sanctum\HasApiTokens;
     'program_id',
     'school_student_id',
     'status',
+    'deactivated_at',
     'year_level',
     'guardian_name',
     'contact_number',
@@ -40,6 +41,7 @@ class User extends Authenticatable
     {
         return [
             'email_verified_at' => 'datetime',
+            'deactivated_at' => 'datetime',
             'password' => 'hashed',
         ];
     }

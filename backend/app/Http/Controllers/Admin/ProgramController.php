@@ -10,6 +10,21 @@ use Illuminate\Validation\Rule;
 
 class ProgramController extends Controller
 {
+    /**
+     * Roles eligible to be set as a Program's program_head_id.
+     *
+     * Deliberately NOT limited to role === 'program_head'. A staff
+     * member who heads a program while still teaching keeps
+     * role = 'instructor' (see RoleMiddleware's program-head override
+     * and ExcuseRequestPolicy::view(), both of which grant Program Head
+     * access via this program_head_id relationship, not the role
+     * column). Literal role = 'program_head' is reserved for a non-
+     * teaching program head; 'instructor' covers the "wears both hats"
+     * case. Both must be accepted here or the Admin can never actually
+     * assign the second, more common case.
+     */
+    private const HEAD_ELIGIBLE_ROLES = ['instructor', 'program_head'];
+
     public function __construct(
         protected AuditLoggerService $auditLogger,
     ) {}
@@ -34,7 +49,7 @@ class ProgramController extends Controller
     {
         $validated = $request->validate([
             'program_name'    => ['required', 'string', 'max:255', 'unique:programs,program_name'],
-            'program_head_id' => ['nullable', 'string', 'uuid', Rule::exists('users', 'id')->where('role', 'program_head')],
+            'program_head_id' => ['nullable', 'string', 'uuid', Rule::exists('users', 'id')->whereIn('role', self::HEAD_ELIGIBLE_ROLES)],
         ]);
 
         $program = Program::create($validated);
@@ -67,7 +82,7 @@ class ProgramController extends Controller
     {
         $validated = $request->validate([
             'program_name'    => ['sometimes', 'string', 'max:255', Rule::unique('programs', 'program_name')->ignore($program->id)],
-            'program_head_id' => ['sometimes', 'nullable', 'string', 'uuid', Rule::exists('users', 'id')->where('role', 'program_head')],
+            'program_head_id' => ['sometimes', 'nullable', 'string', 'uuid', Rule::exists('users', 'id')->whereIn('role', self::HEAD_ELIGIBLE_ROLES)],
         ]);
 
         $program->update($validated);

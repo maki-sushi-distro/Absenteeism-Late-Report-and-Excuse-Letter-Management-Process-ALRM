@@ -12,43 +12,72 @@ use Illuminate\Validation\Rule;
 class UserApprovalController extends Controller
 {
     /**
-     * Roles an Administrator is allowed to assign here.
-     * 'student' is intentionally excluded — students are auto-assigned
-     * and never touched through this controller.
+     * Roles an Administrator can hand-pick when RE-assigning an existing
+     * staff member's role (PATCH .../role). Deliberately excludes
+     * 'student' — a student's role is locked in at first Google login
+     * and is never something an Admin flips through this endpoint.
      */
     private const ASSIGNABLE_ROLES = ['instructor', 'program_head', 'administrator'];
+
+    /**
+     * Roles an Administrator can pre-register a NEW roster entry as
+     * (POST .../users). Unlike ASSIGNABLE_ROLES above, 'student' IS
+     * included here — Admin/Registrar pre-loads the roster (name +
+     * institutional email + role) before that person ever signs in, so
+     * the account resolves to the right role/name on their very first
+     * Google login instead of falling back to defaults.
+     */
+    private const CREATABLE_ROLES = ['student', 'instructor', 'program_head', 'administrator'];
+
+    /**
+     * Institutional email domains, mirrored from AuthController. Kept in
+     * sync manually for now — if these ever drift apart, pre-registration
+     * here and the first-login role-lock in AuthController::callback()
+     * will disagree on what a given email is allowed to be.
+     *
+     * TODO: extract to a shared config/service so there's one source of
+     * truth instead of two copies (see AuthController::STUDENT_DOMAIN /
+     * STAFF_DOMAIN).
+     */
+    private const STUDENT_DOMAIN = 'student.laverdad.edu.ph';
+
+    private const STAFF_DOMAIN = 'laverdad.edu.ph';
 
     public function __construct(
         protected AuditLoggerService $auditLogger,
     ) {}
 
     /**
-     * List all staff accounts (everyone except students), so the Admin
-     * can see current role assignments and pick who to promote/reassign.
-     *
-     * Staff accounts are auto-approved with role=instructor on first
-     * login (see AuthController::callback) — nobody sits in a "pending,
-     * no role yet" state anymore. This list exists so the Admin can find
-     * someone who needs a DIFFERENT role than their instructor default
-     * (e.g. a Program Head, or another Administrator).
+     * List all users (students included — the "All Users" / "Students" /
+     * "Instructors" / etc. tabs in the admin UI all hit this one endpoint
+     * with different filters). Status lifecycle: pending → approved
+     * (first Google login) → inactive (updateStatus()) → deleted
+     * (destroy(), pending/inactive only).
      *
      * GET /api/admin/users
-     * Optional filter: ?role=instructor|program_head|administrator
+     * Optional filters: ?role=student|instructor|program_head|administrator
+     *                    ?status=pending|approved|inactive
      */
     public function index(Request $request): JsonResponse
     {
-        $query = User::query()
-            ->where('role', '!=', 'student')
-            ->whereNotNull('role');
+        $request->validate([
+            'role'   => ['sometimes', 'string', Rule::in(self::CREATABLE_ROLES)],
+            'status' => ['sometimes', 'string', Rule::in(['pending', 'approved', 'inactive'])],
+        ]);
+
+        $query = User::query()->whereNotNull('role');
 
         if ($request->filled('role')) {
-            $request->validate([
-                'role' => ['string', Rule::in(self::ASSIGNABLE_ROLES)],
-            ]);
             $query->where('role', $request->query('role'));
         }
 
-        $users = $query->orderBy('name')->get();
+        if ($request->filled('status')) {
+            $query->where('status', $request->query('status'));
+        }
+        
+        $users = $query->withExists(['headedProgram as heads_program'])
+            ->orderBy('name')
+            ->get();
 
         return response()->json([
             'success' => true,
@@ -58,15 +87,175 @@ class UserApprovalController extends Controller
     }
 
     /**
+     * Pre-register a roster entry — student, instructor, or program
+     * head — before that person has ever signed in with Google.
+     *
+     * ALRM has no password / manual account creation (Google SSO only).
+     * This just reserves the row: when the real person later logs in
+     * with THIS exact institutional email, AuthController::callback()
+     * matches them to it, keeps the role set here (instead of falling
+     * back to the instructor/student domain default), and flips status
+     * from 'pending' to 'approved'.
+     *
+     * POST /api/admin/users
+     */
+    public function store(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'name'  => ['required', 'string', 'max:255'],
+            'email' => ['required', 'email', 'max:255', 'unique:users,email'],
+            'role'  => ['required', 'string', Rule::in(self::CREATABLE_ROLES)],
+        ]);
+
+        $email  = strtolower($validated['email']);
+        $domain = substr(strrchr($email, '@') ?: '', 1);
+
+        $isStudentDomain = $domain === self::STUDENT_DOMAIN;
+        $isStaffDomain   = $domain === self::STAFF_DOMAIN;
+
+        if (! $isStudentDomain && ! $isStaffDomain) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Email must be an institutional address (@'
+                    .self::STUDENT_DOMAIN.' or @'.self::STAFF_DOMAIN.').',
+                'data'    => null,
+            ], 422);
+        }
+
+        $roleIsStudent = $validated['role'] === 'student';
+        if ($roleIsStudent !== $isStudentDomain) {
+            return response()->json([
+                'success' => false,
+                'message' => $isStudentDomain
+                    ? 'This email is on the student domain and can only be pre-registered as student.'
+                    : 'This email is on the staff domain and cannot be pre-registered as student.',
+                'data'    => null,
+            ], 422);
+        }
+
+        $user = User::create([
+            'name'     => $validated['name'],
+            'email'    => $email,
+            'role'     => $validated['role'],
+            'status'   => 'pending',
+            'password' => null,
+        ]);
+
+        $this->auditLogger->log('pre_registered_user:'.$validated['role'], 'users', $user->id);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'User pre-registered. They will be activated automatically on their first Google sign-in.',
+            'data'    => $user,
+        ], 201);
+    }
+
+    /**
+     * Hard-delete a user — ONLY allowed for 'pending' (never-logged-in
+     * roster mistakes) or 'inactive' (already deactivated, e.g. years
+     * after they left) accounts. An 'approved'/active account can never
+     * be deleted directly through this endpoint — it must be deactivated
+     * first via updateStatus(), which is the deliberate speed bump: no
+     * one accidentally hard-deletes a live account carrying enrollments,
+     * requests, or audit history in one click.
+     *
+     * DELETE /api/admin/users/{user}
+     */
+    public function destroy(User $user): JsonResponse
+    {
+        if (! in_array($user->status, ['pending', 'inactive'], true)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Only pending or deactivated accounts can be deleted. Deactivate this user first.',
+                'data'    => null,
+            ], 409);
+        }
+
+        $userId = $user->id;
+        $wasPending = $user->status === 'pending';
+        $user->delete();
+
+        $this->auditLogger->log(
+            $wasPending ? 'deleted_pending_user' : 'deleted_inactive_user',
+            'users',
+            $userId
+        );
+
+        return response()->json([
+            'success' => true,
+            'message' => 'User removed.',
+            'data'    => null,
+        ]);
+    }
+
+    /**
+     * Deactivate or reactivate an 'approved' account — the soft-delete
+     * step. Deactivating sets status='inactive' and stamps
+     * deactivated_at, so the Admin has a real basis for "it's been X
+     * years, safe to hard-delete" later via destroy(). Reactivating
+     * clears deactivated_at and flips status back to 'approved'.
+     *
+     * Deliberately separate from updateRole() — status and role are
+     * independent axes (a deactivated instructor is still an
+     * instructor, just locked out), and mixing them into one endpoint
+     * would make the "can't touch your own access" guard ambiguous
+     * about which axis it's protecting.
+     *
+     * PATCH /api/admin/users/{user}/status
+     * Body: { "status": "inactive" | "approved" }
+     */
+    public function updateStatus(Request $request, User $user): JsonResponse
+    {
+        $validated = $request->validate([
+            'status' => ['required', 'string', Rule::in(['approved', 'inactive'])],
+        ]);
+
+        if ($user->status === 'pending') {
+            return response()->json([
+                'success' => false,
+                'message' => 'This account has not logged in yet (still pending). Delete the roster entry instead if it was a mistake.',
+                'data'    => null,
+            ], 409);
+        }
+
+        if ($user->id === $request->user()->id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'You cannot change your own account status through this endpoint.',
+                'data'    => null,
+            ], 403);
+        }
+
+        $previousStatus = $user->status;
+
+        if ($previousStatus === $validated['status']) {
+            return response()->json([
+                'success' => false,
+                'message' => "User is already '{$validated['status']}'.",
+                'data'    => null,
+            ], 409);
+        }
+
+        $user->status = $validated['status'];
+        $user->deactivated_at = $validated['status'] === 'inactive' ? now() : null;
+        $user->save();
+
+        $this->auditLogger->log(
+            "status_changed:{$previousStatus}->{$validated['status']}",
+            'users',
+            $user->id
+        );
+
+        return response()->json([
+            'success' => true,
+            'message' => $validated['status'] === 'inactive' ? 'User deactivated.' : 'User reactivated.',
+            'data'    => $user,
+        ]);
+    }
+
+    /**
      * Change an existing staff member's role — e.g. promote an
      * instructor to program_head, or grant administrator access.
-     *
-     * This replaces the old "approve a pending user" flow: since staff
-     * accounts are now auto-approved with role=instructor at first
-     * login, there's no pending/unassigned state left to approve.
-     * What's left is reassignment — for staff who wear more than one
-     * hat (per the "instructor who is also a Program Head" case), the
-     * Admin is the one who decides and applies the change here.
      *
      * PATCH /api/admin/users/{user}/role
      */
@@ -76,9 +265,6 @@ class UserApprovalController extends Controller
             'role' => ['required', 'string', Rule::in(self::ASSIGNABLE_ROLES)],
         ]);
 
-        // Guard: this endpoint is for staff only. Students are never
-        // touched here — their role is locked in at first login and
-        // isn't something an Admin reassigns through this flow.
         if ($user->role === 'student' || $user->role === null) {
             return response()->json([
                 'success' => false,
@@ -87,10 +273,6 @@ class UserApprovalController extends Controller
             ], 409);
         }
 
-        // Guard: prevent an admin from changing their own role through
-        // this endpoint — avoids an admin accidentally locking themself
-        // out, and keeps "who changed my access" unambiguous in the
-        // audit log (someone else always has to make that call).
         if ($user->id === $request->user()->id) {
             return response()->json([
                 'success' => false,
@@ -100,9 +282,6 @@ class UserApprovalController extends Controller
         }
 
         $previousRole = $user->role;
-
-        // No-op guard: nothing to do, nothing to log, if the role isn't
-        // actually changing.
         if ($previousRole === $validated['role']) {
             return response()->json([
                 'success' => false,

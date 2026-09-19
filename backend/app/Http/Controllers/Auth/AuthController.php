@@ -22,12 +22,12 @@ class AuthController extends Controller
      *
      * Student domain auto-resolves to 'student'.
      * Staff domain auto-resolves to 'instructor' — this is a FALLBACK
-     * default, not a final answer. Some staff are actually Program Heads
-     * or Administrators, but there's no way to tell that from the email
-     * domain alone. Those cases are handled after the fact: an Admin
-     * changes the user's role via PATCH /api/admin/users/{user}/role
-     * once it's known the account needs something other than the
-     * instructor default. See UserApprovalController::updateRole().
+     * default for accounts NOBODY pre-registered, not a final answer.
+     * Some staff are actually Program Heads or Administrators; those are
+     * either pre-registered with the right role by an Admin before they
+     * ever log in (see UserApprovalController::store()), or reassigned
+     * after the fact via PATCH /api/admin/users/{user}/role
+     * (UserApprovalController::updateRole()).
      */
     private const STUDENT_DOMAIN = 'student.laverdad.edu.ph';
 
@@ -35,8 +35,9 @@ class AuthController extends Controller
 
     /**
      * Default role assigned to a brand-new staff-domain account on first
-     * login. Deliberately the most common/least-privileged staff role —
-     * Admin promotes from here, never demotes from something over-assigned.
+     * login, ONLY when nobody pre-registered them. Deliberately the most
+     * common/least-privileged staff role — Admin promotes from here,
+     * never demotes from something over-assigned.
      */
     private const DEFAULT_STAFF_ROLE = 'instructor';
 
@@ -101,7 +102,7 @@ class AuthController extends Controller
         $user = User::query()->firstOrNew(['email' => $email]);
 
         $isNewUser = ! $user->exists;
-
+        $isFirstLogin = $isNewUser || is_null($user->google_id);
         $user->google_id = $googleUser->getId();
         $user->name = $googleUser->getName() ?: $user->name;
 
@@ -109,12 +110,13 @@ class AuthController extends Controller
             $user->role = $isStudent ? 'student' : self::DEFAULT_STAFF_ROLE;
             $user->status = 'approved';
             $user->password = null;
+        } elseif ($isFirstLogin) {
+            $user->status = 'approved';
+            $user->password = null;
         }
         $user->save();
 
-        // NEW: check kung trusted na itong browser/device
         if (TrustedDeviceManager::isTrusted(request(), $user)) {
-            // Skip OTP — derecho na sa exchange code
             $token = $user->createToken('alrm-spa')->plainTextToken;
             $code = Str::random(40);
             Cache::put("auth_exchange:{$code}", $token, now()->addSeconds(60));

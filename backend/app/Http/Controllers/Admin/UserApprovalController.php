@@ -29,20 +29,6 @@ class UserApprovalController extends Controller
      */
     private const CREATABLE_ROLES = ['student', 'instructor', 'program_head', 'administrator'];
 
-    /**
-     * Institutional email domains, mirrored from AuthController. Kept in
-     * sync manually for now — if these ever drift apart, pre-registration
-     * here and the first-login role-lock in AuthController::callback()
-     * will disagree on what a given email is allowed to be.
-     *
-     * TODO: extract to a shared config/service so there's one source of
-     * truth instead of two copies (see AuthController::STUDENT_DOMAIN /
-     * STAFF_DOMAIN).
-     */
-    private const STUDENT_DOMAIN = 'student.laverdad.edu.ph';
-
-    private const STAFF_DOMAIN = 'laverdad.edu.ph';
-
     public function __construct(
         protected AuditLoggerService $auditLogger,
     ) {}
@@ -50,9 +36,12 @@ class UserApprovalController extends Controller
     /**
      * List all users (students included — the "All Users" / "Students" /
      * "Instructors" / etc. tabs in the admin UI all hit this one endpoint
-     * with different filters). Status lifecycle: pending → approved
-     * (first Google login) → inactive (updateStatus()) → deleted
-     * (destroy(), pending/inactive only).
+     * with different filters). Status lifecycle: pending → approved →
+     * inactive (updateStatus()) → deleted (destroy(), pending/inactive
+     * only). A 'pending' row is one of two things — check google_id to
+     * tell them apart: null = pre-registered by Admin, never logged in
+     * (store()); set = true self-registration awaiting Admin approval
+     * (AuthController::callback()).
      *
      * GET /api/admin/users
      * Optional filters: ?role=student|instructor|program_head|administrator
@@ -74,7 +63,7 @@ class UserApprovalController extends Controller
         if ($request->filled('status')) {
             $query->where('status', $request->query('status'));
         }
-        
+
         $users = $query->withExists(['headedProgram as heads_program'])
             ->orderBy('name')
             ->get();
@@ -110,14 +99,17 @@ class UserApprovalController extends Controller
         $email  = strtolower($validated['email']);
         $domain = substr(strrchr($email, '@') ?: '', 1);
 
-        $isStudentDomain = $domain === self::STUDENT_DOMAIN;
-        $isStaffDomain   = $domain === self::STAFF_DOMAIN;
+        $studentDomain = config('institution.student_domain');
+        $staffDomain = config('institution.staff_domain');
+
+        $isStudentDomain = $domain === $studentDomain;
+        $isStaffDomain   = $domain === $staffDomain;
 
         if (! $isStudentDomain && ! $isStaffDomain) {
             return response()->json([
                 'success' => false,
                 'message' => 'Email must be an institutional address (@'
-                    .self::STUDENT_DOMAIN.' or @'.self::STAFF_DOMAIN.').',
+                    .$studentDomain.' or @'.$staffDomain.').',
                 'data'    => null,
             ], 422);
         }
@@ -189,11 +181,25 @@ class UserApprovalController extends Controller
     }
 
     /**
-     * Deactivate or reactivate an 'approved' account — the soft-delete
-     * step. Deactivating sets status='inactive' and stamps
-     * deactivated_at, so the Admin has a real basis for "it's been X
-     * years, safe to hard-delete" later via destroy(). Reactivating
-     * clears deactivated_at and flips status back to 'approved'.
+     * Approve/reject a self-registration, or deactivate/reactivate an
+     * already-approved account — one endpoint, because both are just
+     * status transitions.
+     *
+     * 'pending' means one of two different things, and this endpoint
+     * only handles one of them:
+     *   - google_id IS NULL  → Admin pre-registered this row
+     *     (store()), nobody has logged in yet. Nothing to approve —
+     *     fix mistakes via destroy(), not here.
+     *   - google_id IS SET   → true self-registration (interview
+     *     requirement: "Self-registration + approval process"). They
+     *     logged in via Google themselves and are waiting on this
+     *     Admin approval step. Reject by deleting (destroy()) instead
+     *     of trying to "deactivate" an account that was never active.
+     *
+     * Deactivating sets status='inactive' and stamps deactivated_at, so
+     * the Admin has a real basis for "it's been X years, safe to
+     * hard-delete" later via destroy(). Reactivating clears
+     * deactivated_at and flips status back to 'approved'.
      *
      * Deliberately separate from updateRole() — status and role are
      * independent axes (a deactivated instructor is still an
@@ -211,11 +217,21 @@ class UserApprovalController extends Controller
         ]);
 
         if ($user->status === 'pending') {
-            return response()->json([
-                'success' => false,
-                'message' => 'This account has not logged in yet (still pending). Delete the roster entry instead if it was a mistake.',
-                'data'    => null,
-            ], 409);
+            if (is_null($user->google_id)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'This account has not logged in yet (still pending). Delete the roster entry instead if it was a mistake.',
+                    'data'    => null,
+                ], 409);
+            }
+
+            if ($validated['status'] !== 'approved') {
+                return response()->json([
+                    'success' => false,
+                    'message' => "A self-registered account awaiting approval can only be approved through this endpoint. Delete it instead to reject the registration.",
+                    'data'    => null,
+                ], 409);
+            }
         }
 
         if ($user->id === $request->user()->id) {
@@ -241,14 +257,22 @@ class UserApprovalController extends Controller
         $user->save();
 
         $this->auditLogger->log(
-            "status_changed:{$previousStatus}->{$validated['status']}",
+            $previousStatus === 'pending'
+                ? 'approved_self_registered_user'
+                : "status_changed:{$previousStatus}->{$validated['status']}",
             'users',
             $user->id
         );
 
+        $message = match (true) {
+            $previousStatus === 'pending' => 'User approved.',
+            $validated['status'] === 'inactive' => 'User deactivated.',
+            default => 'User reactivated.',
+        };
+
         return response()->json([
             'success' => true,
-            'message' => $validated['status'] === 'inactive' ? 'User deactivated.' : 'User reactivated.',
+            'message' => $message,
             'data'    => $user,
         ]);
     }
@@ -282,6 +306,7 @@ class UserApprovalController extends Controller
         }
 
         $previousRole = $user->role;
+
         if ($previousRole === $validated['role']) {
             return response()->json([
                 'success' => false,

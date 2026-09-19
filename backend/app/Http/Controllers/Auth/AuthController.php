@@ -18,26 +18,8 @@ use Laravel\Socialite\Two\InvalidStateException;
 class AuthController extends Controller
 {
     /**
-     * Domains allowed to sign in, mapped to the role they resolve to.
-     *
-     * Student domain auto-resolves to 'student'.
-     * Staff domain auto-resolves to 'instructor' — this is a FALLBACK
-     * default for accounts NOBODY pre-registered, not a final answer.
-     * Some staff are actually Program Heads or Administrators; those are
-     * either pre-registered with the right role by an Admin before they
-     * ever log in (see UserApprovalController::store()), or reassigned
-     * after the fact via PATCH /api/admin/users/{user}/role
-     * (UserApprovalController::updateRole()).
-     */
-    private const STUDENT_DOMAIN = 'student.laverdad.edu.ph';
-
-    private const STAFF_DOMAIN = 'laverdad.edu.ph';
-
-    /**
-     * Default role assigned to a brand-new staff-domain account on first
-     * login, ONLY when nobody pre-registered them. Deliberately the most
-     * common/least-privileged staff role — Admin promotes from here,
-     * never demotes from something over-assigned.
+     * Default role for a brand-new staff-domain account, only when
+     * nobody pre-registered them (UserApprovalController::store()).
      */
     private const DEFAULT_STAFF_ROLE = 'instructor';
 
@@ -54,16 +36,15 @@ class AuthController extends Controller
     }
 
     /**
-     * Step 2 — Google redirects the browser back here with an auth code.
-     * We exchange it for the user's Google profile, validate the domain,
-     * find-or-create the local user, issue a Sanctum token, then redirect
-     * the browser back to the React frontend with the token attached.
+     * Step 2 — Google redirects here with an auth code. We exchange it
+     * for the profile, validate the domain, find-or-create the local
+     * user, issue a Sanctum token, then redirect back to the SPA with
+     * ?token=... (can't return JSON — this is a browser redirect).
      *
-     * This is a full browser redirect (not an AJAX call), so we cannot
-     * return JSON here — nothing on the frontend would be able to read it.
-     * Instead we bounce back to the SPA with ?token=... in the query string;
-     * the frontend grabs it, stores it, then calls GET /api/me to hydrate
-     * the rest of the session.
+     * New users land as status='pending' (self-registration + approval
+     * requirement) — a token is still issued so the frontend can call
+     * GET /api/me and show "awaiting approval". RoleMiddleware is what
+     * actually blocks pending users from role-gated routes.
      *
      * GET /api/auth/google/callback
      */
@@ -91,24 +72,28 @@ class AuthController extends Controller
         $email = strtolower((string) $googleUser->getEmail());
         $domain = substr(strrchr($email, '@') ?: '', 1);
 
-        if (! in_array($domain, [self::STUDENT_DOMAIN, self::STAFF_DOMAIN], true)) {
+        $studentDomain = config('institution.student_domain');
+        $staffDomain = config('institution.staff_domain');
+
+        if (! in_array($domain, [$studentDomain, $staffDomain], true)) {
             return redirect()->away(
                 $frontendUrl . '/login?error=invalid_domain'
             );
         }
 
-        $isStudent = $domain === self::STUDENT_DOMAIN;
+        $isStudent = $domain === $studentDomain;
 
         $user = User::query()->firstOrNew(['email' => $email]);
 
         $isNewUser = ! $user->exists;
         $isFirstLogin = $isNewUser || is_null($user->google_id);
+
         $user->google_id = $googleUser->getId();
         $user->name = $googleUser->getName() ?: $user->name;
 
         if ($isNewUser) {
             $user->role = $isStudent ? 'student' : self::DEFAULT_STAFF_ROLE;
-            $user->status = 'approved';
+            $user->status = 'pending';
             $user->password = null;
         } elseif ($isFirstLogin) {
             $user->status = 'approved';
@@ -134,9 +119,9 @@ class AuthController extends Controller
     }
 
     /**
-     * Step 3 — SPA exchanges the one-time code (from the callback redirect)
-     * for the actual Sanctum token. The code is single-use and expires
-     * after 60 seconds, so a token never sits exposed in the URL/history.
+     * Step 3 — SPA exchanges the one-time code for the real Sanctum
+     * token. Single-use, expires in 60s, so a token never sits exposed
+     * in the URL/history.
      *
      * POST /api/auth/exchange
      */
@@ -180,9 +165,8 @@ class AuthController extends Controller
     }
 
     /**
-     * Return the authenticated user's profile.
-     * Frontend calls this right after grabbing ?token= from the callback
-     * redirect, to hydrate role/status/program without decoding the token.
+     * Authenticated user's profile. Frontend checks `status` here —
+     * 'pending' means show "awaiting approval" instead of the dashboard.
      *
      * GET /api/me
      */

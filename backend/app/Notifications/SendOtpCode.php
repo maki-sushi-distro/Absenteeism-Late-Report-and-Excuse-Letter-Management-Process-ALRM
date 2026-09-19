@@ -12,6 +12,7 @@ class SendOtpCode extends Notification
 
     public function __construct(
         private readonly string $code,
+        private readonly int $expiresInMinutes = 5,
     ) {}
 
     /**
@@ -24,15 +25,19 @@ class SendOtpCode extends Notification
 
     /**
      * Get the mail representation of the notification.
+     *
+     * Uses a fully custom Blade view (resources/views/emails/otp-code.blade.php)
+     * instead of the default Markdown mail template, so we control the
+     * branding, layout, and the school's email signature/footer.
      */
     public function toMail(object $notifiable): MailMessage
     {
         return (new MailMessage)
             ->subject('Your ALRM Verification Code')
-            ->greeting("Hello {$notifiable->name},")
-            ->line('Use the code below to complete your login.')
-            ->line("**{$this->code}**")
-            ->line('This code will expire in 5 minutes.')
-            ->line('If you did not request this code, you can safely ignore this email.');
+            ->view('emails.otp-code', [
+                'name'              => $notifiable->name,
+                'code'              => $this->code,
+                'expiresInMinutes'  => $this->expiresInMinutes,
+            ]);
     }
 }

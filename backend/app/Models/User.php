@@ -115,4 +115,4 @@ class User extends Authenticatable
     {
         return $this->hasMany(AuditLog::class);
     }
-}
+}  

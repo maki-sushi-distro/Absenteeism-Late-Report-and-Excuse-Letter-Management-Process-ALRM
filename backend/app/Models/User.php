@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -20,7 +20,6 @@ use Laravel\Sanctum\HasApiTokens;
     'email',
     'password',
     'role',
-    'program_id',
     'school_student_id',
     'status',
     'deactivated_at',
@@ -53,11 +52,11 @@ class User extends Authenticatable
     */
 
     /**
-     * The program this user (student/instructor) belongs to.
+     * The programs this user (instructor/program head) belongs to.
      */
-    public function program(): BelongsTo
+    public function programs(): BelongsToMany
     {
-        return $this->belongsTo(Program::class);
+        return $this->belongsToMany(Program::class, 'program_user')->withTimestamps();
     }
 
     /**
@@ -115,4 +114,4 @@ class User extends Authenticatable
     {
         return $this->hasMany(AuditLog::class);
     }
-}  
+}

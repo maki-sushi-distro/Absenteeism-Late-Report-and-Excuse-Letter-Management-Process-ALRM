@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable(['program_name', 'program_head_id'])]
@@ -41,10 +42,10 @@ class Program extends Model
     }
 
     /**
-     * All users (students/instructors) belonging to this program.
+     * All users (instructors/program heads) belonging to this program.
      */
-    public function users(): HasMany
+    public function users(): BelongsToMany
     {
-        return $this->hasMany(User::class, 'program_id');
+        return $this->belongsToMany(User::class, 'program_user')->withTimestamps();
     }
 }

@@ -15,7 +15,7 @@ class ProgramPolicy
     {
         return $user->role === 'administrator'
             || $program->program_head_id === $user->id
-            || $program->id === $user->program_id;
+            || $user->programs->contains($program->id);
     }
 
     public function create(User $user): bool

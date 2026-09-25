@@ -39,9 +39,18 @@ class AdminUserSeeder extends Seeder
     private const string SPREADSHEET_ID = '19eJh4R3cWEL5T52-v86z8NVSVvS2MTtg0h99N69N8Qw';
 
     /**
-     * Path to the service account credentials JSON, relative to storage_path().
+     * Path to the service account credentials JSON when running locally,
+     * relative to storage_path(). Not used on Render — see
+     * RENDER_SECRET_CREDENTIALS_PATH and resolveCredentialsPath() below.
      */
     private const string CREDENTIALS_PATH = 'app/google/service-account.json';
+
+    /**
+     * Path to the service account credentials JSON on Render, where it's
+     * mounted read-only from the "Secret Files" dashboard section. Render
+     * exposes every secret file at /etc/secrets/<filename>.
+     */
+    private const string RENDER_SECRET_CREDENTIALS_PATH = '/etc/secrets/service-account.json';
 
     /**
      * Maps each sheet tab name to a `program_name` in the database. We
@@ -142,6 +151,22 @@ class AdminUserSeeder extends Seeder
     }
 
     /**
+     * Resolves the service account credentials path. On Render, the file
+     * is mounted read-only at RENDER_SECRET_CREDENTIALS_PATH via the
+     * "Secret Files" dashboard section, so we use that when it exists.
+     * Locally (or on any other host), we fall back to the file checked
+     * into storage/app/google/ (gitignored).
+     */
+    private function resolveCredentialsPath(): string
+    {
+        if (file_exists(self::RENDER_SECRET_CREDENTIALS_PATH)) {
+            return self::RENDER_SECRET_CREDENTIALS_PATH;
+        }
+
+        return storage_path(self::CREDENTIALS_PATH);
+    }
+
+    /**
      * @return SeedUser[]
      */
     private function fetchInstructorsFromGoogleSheets(): array
@@ -149,7 +174,7 @@ class AdminUserSeeder extends Seeder
         $client = new GoogleClient();
         $client->setApplicationName('AdminUserSeeder');
         $client->setScopes([GoogleSheets::SPREADSHEETS_READONLY]);
-        $client->setAuthConfig(storage_path(self::CREDENTIALS_PATH));
+        $client->setAuthConfig($this->resolveCredentialsPath());
 
         $service = new GoogleSheets($client);
 

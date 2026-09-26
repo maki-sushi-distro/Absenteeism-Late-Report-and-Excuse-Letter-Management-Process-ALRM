@@ -56,7 +56,9 @@ class User extends Authenticatable
      */
     public function programs(): BelongsToMany
     {
-        return $this->belongsToMany(Program::class, 'program_user')->withTimestamps();
+        return $this->belongsToMany(Program::class, 'program_user')
+            ->using(ProgramUser::class)
+            ->withTimestamps();
     }
 
     /**

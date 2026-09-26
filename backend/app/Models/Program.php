@@ -46,6 +46,8 @@ class Program extends Model
      */
     public function users(): BelongsToMany
     {
-        return $this->belongsToMany(User::class, 'program_user')->withTimestamps();
+        return $this->belongsToMany(User::class, 'program_user')
+            ->using(ProgramUser::class)
+            ->withTimestamps();
     }
 }

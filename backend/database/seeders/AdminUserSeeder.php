@@ -9,6 +9,7 @@ use App\Models\User;
 use Google\Client as GoogleClient;
 use Google\Service\Sheets as GoogleSheets;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -52,6 +53,27 @@ class AdminUserSeeder extends Seeder
      * exposes every secret file at /etc/secrets/<filename>.
      */
     private const string RENDER_SECRET_CREDENTIALS_PATH = '/etc/secrets/service-account.json';
+
+    /**
+     * Roles that are considered "managed by the Google Sheet". Any
+     * existing user with one of these roles whose email no longer
+     * appears in the sheet on a given run gets deactivated. Manual
+     * entries (e.g. administrators) are never touched by this logic,
+     * so keep manual-only roles (like Administrator) out of this list.
+     */
+    private const array SHEET_MANAGED_ROLES = [
+        UserRole::ProgramHead->value,
+        UserRole::Instructor->value,
+    ];
+
+    /**
+     * Status value applied when a sheet-managed user disappears from
+     * the sheet. Adjust to match whatever your `status` column actually
+     * uses (check an existing deactivated row if you have one).
+     */
+    private const string DEACTIVATED_STATUS = 'deactivated';
+
+    private const string APPROVED_STATUS = 'approved';
 
     /**
      * Maps each sheet tab name to a `program_name` in the database. We
@@ -102,6 +124,10 @@ class AdminUserSeeder extends Seeder
 
         $sheetUsers = $this->fetchInstructorsFromGoogleSheets();
 
+        $sheetEmails = array_map(fn (SeedUser $u) => $u->email, $sheetUsers);
+
+        $manualEmails = array_map(fn (SeedUser $u) => $u->email, $manualUsers);
+
         $merged = [];
 
         foreach ([...$manualUsers, ...$sheetUsers] as $user) {
@@ -128,9 +154,24 @@ class AdminUserSeeder extends Seeder
             );
         }
 
-        foreach ($merged as $user) {
-            $this->saveUser($user);
-        }
+        DB::transaction(function () use ($merged, $sheetEmails, $manualEmails) {
+            $created = [];
+            $updated = [];
+
+            foreach ($merged as $user) {
+                $wasNew = ! User::query()->where('email', $user->email)->exists();
+                $this->saveUser($user);
+                $wasNew ? $created[] = $user->email : $updated[] = $user->email;
+            }
+
+            $deactivated = $this->deactivateMissingSheetUsers($sheetEmails, $manualEmails);
+
+            Log::info('AdminUserSeeder: run summary', [
+                'created' => $created,
+                'updated' => $updated,
+                'deactivated' => $deactivated,
+            ]);
+        });
     }
 
     /**
@@ -172,15 +213,22 @@ class AdminUserSeeder extends Seeder
             }
 
             try {
-                $range = "'{$tabName}'!A2:C";
+                // Columns: A = role label, B = name, C = (blank), D = email.
+                $range = "'{$tabName}'!A2:D";
                 $response = $service->spreadsheets_values->get(self::SPREADSHEET_ID, $range);
 
                 foreach ($response->getValues() ?? [] as $row) {
                     $roleLabel = trim($row[0] ?? '');
                     $name = trim($row[1] ?? '');
-                    $email = trim($row[2] ?? '');
+                    $email = strtolower(trim($row[3] ?? ''));
 
                     if ($name === '' || $email === '') {
+                        continue;
+                    }
+
+                    if (! $this->hasAllowedDomain($email)) {
+                        Log::warning("AdminUserSeeder: skipped '{$email}' (tab: {$tabName}) — not a recognized institutional domain.");
+
                         continue;
                     }
 
@@ -223,17 +271,67 @@ class AdminUserSeeder extends Seeder
         );
     }
 
+    /**
+     * Same domain check AuthController uses at login — kept here too so
+     * a stray personal email in the sheet never even makes it into the
+     * `users` table, instead of relying only on the login gate to
+     * silently block it later.
+     */
+    private function hasAllowedDomain(string $email): bool
+    {
+        $domain = substr(strrchr($email, '@') ?: '', 1);
+
+        $allowedDomains = array_filter([
+            config('institution.staff_domain'),
+            config('institution.student_domain'),
+        ]);
+
+        return in_array($domain, $allowedDomains, true);
+    }
+
     private function saveUser(SeedUser $user): void
     {
         $model = User::firstOrCreate(
             ['email' => $user->email],
             ['name' => $user->name],
         )->forceFill([
+            'name' => $user->name,
             'role' => $user->role->value,
-            'status' => 'approved',
+            'status' => self::APPROVED_STATUS,
+            'deactivated_at' => null,
         ]);
 
         $model->save();
         $model->programs()->sync($user->programIds);
+    }
+
+    /**
+     * Deactivates any existing sheet-managed user (instructor / program
+     * head) whose email is no longer present in the sheet. Manual
+     * entries and any role outside SHEET_MANAGED_ROLES are never
+     * touched. Returns the list of emails that were deactivated, for
+     * logging.
+     *
+     * @param  string[]  $sheetEmails
+     * @param  string[]  $manualEmails
+     * @return string[]
+     */
+    private function deactivateMissingSheetUsers(array $sheetEmails, array $manualEmails): array
+    {
+        $toDeactivate = User::query()
+            ->whereIn('role', self::SHEET_MANAGED_ROLES)
+            ->whereNotIn('email', $sheetEmails)
+            ->whereNotIn('email', $manualEmails)
+            ->where('status', '!=', self::DEACTIVATED_STATUS)
+            ->get();
+
+        foreach ($toDeactivate as $user) {
+            $user->forceFill([
+                'status' => self::DEACTIVATED_STATUS,
+                'deactivated_at' => now(),
+            ])->save();
+        }
+
+        return $toDeactivate->pluck('email')->all();
     }
 }

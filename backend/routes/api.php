@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Auth\ProfileController;
 use App\Http\Controllers\ProgramHead\FollowupFlagController;
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Student\ClassController;
@@ -52,12 +53,7 @@ Route::prefix('auth')->group(function () {
 Route::middleware(['auth:sanctum', 'inactive'])->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/me', [AuthController::class, 'me']);
-
-    /*
-    |----------------------------------------------------------------
-    | Student Routes
-    |----------------------------------------------------------------
-    */
+    Route::post('/complete-profile', [ProfileController::class, 'completeProfile']); 
     Route::middleware('role:student')->group(function () {
         Route::get('/classes', [ClassController::class, 'index']);
 

@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
@@ -20,6 +21,7 @@ use Laravel\Sanctum\HasApiTokens;
     'email',
     'password',
     'role',
+    'program_id',
     'school_student_id',
     'status',
     'deactivated_at',
@@ -52,7 +54,17 @@ class User extends Authenticatable
     */
 
     /**
-     * The programs this user (instructor/program head) belongs to.
+     * The program this user (student) belongs to — direct FK.
+     * One student, one program.
+     */
+    public function program(): BelongsTo
+    {
+        return $this->belongsTo(Program::class);
+    }
+
+    /**
+     * The programs this user (instructor/program head) belongs to —
+     * many-to-many via pivot. An instructor can teach across programs.
      */
     public function programs(): BelongsToMany
     {

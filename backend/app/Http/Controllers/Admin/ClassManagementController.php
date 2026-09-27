@@ -35,9 +35,12 @@ class ClassManagementController extends Controller
     {
         $validated = $request->validate([
             'subject_name'  => ['required', 'string', 'max:255'],
+            'section'       => ['required', 'string', 'max:50'],
             'instructor_id' => ['required', 'string', 'uuid', Rule::exists('users', 'id')->where('role', 'instructor')],
             'schedule'      => ['required', 'string'],
             'program_id'    => ['required', 'string', 'uuid', 'exists:programs,id'],
+            'semester'      => ['required', 'in:1st,2nd'],
+            'school_year'   => ['required', 'string', 'regex:/^\d{4}-\d{4}$/'],
         ]);
 
         $class = ClassModel::create($validated);
@@ -70,9 +73,12 @@ class ClassManagementController extends Controller
     {
         $validated = $request->validate([
             'subject_name'  => ['sometimes', 'string', 'max:255'],
+            'section'       => ['sometimes', 'string', 'max:50'],
             'instructor_id' => ['sometimes', 'string', 'uuid', Rule::exists('users', 'id')->where('role', 'instructor')],
             'schedule'      => ['sometimes', 'string'],
             'program_id'    => ['sometimes', 'string', 'uuid', 'exists:programs,id'],
+            'semester'      => ['sometimes', 'in:1st,2nd'],
+            'school_year'   => ['sometimes', 'string', 'regex:/^\d{4}-\d{4}$/'],
         ]);
 
         $class->update($validated);

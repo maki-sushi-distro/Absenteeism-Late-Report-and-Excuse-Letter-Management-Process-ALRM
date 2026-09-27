@@ -18,7 +18,7 @@ return new class extends Migration
             $table->string('school_student_id')->nullable()->unique()->after('program_id');
             $table->enum('status', ['approved', 'pending'])->nullable()->after('school_student_id');
             $table->string('password')->nullable()->change();
-            $table->string('year_level')->nullable();
+            $table->enum('year_level', ['1st', '2nd', '3rd', '4th'])->nullable()->after('status');
             $table->string('guardian_name')->nullable();
             $table->string('contact_number')->nullable();
         });

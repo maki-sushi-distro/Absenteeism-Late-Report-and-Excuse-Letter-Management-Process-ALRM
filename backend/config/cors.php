@@ -22,6 +22,10 @@ return [
     'allowed_origins' => array_filter([
         env('FRONTEND_URL'),
         'http://localhost:5173',
+        env('FRONTEND_URL_PROD', 
+        'https://absenteeism-late-report-and-excuse.vercel.app'),
+
+        
     ]),
 
     'allowed_origins_patterns' => [],

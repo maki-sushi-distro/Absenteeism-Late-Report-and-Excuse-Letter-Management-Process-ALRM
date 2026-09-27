@@ -1,6 +1,8 @@
 <?php
 
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Artisan;
 use App\Http\Controllers\Auth\ProfileController;
 use App\Http\Controllers\ProgramHead\FollowupFlagController;
 use App\Http\Controllers\Auth\AuthController;
@@ -16,24 +18,19 @@ use App\Http\Controllers\Admin\ProgramController;
 use App\Http\Controllers\Admin\ClassManagementController;
 use App\Http\Controllers\Admin\ReportController;
 use App\Http\Controllers\Auth\OtpController;
-use App\Http\Controllers\DbTestController;
 
-/*
-|--------------------------------------------------------------------------
-| TEMPORARY — DB / Deploy sanity-check routes (Priority 6)
-|--------------------------------------------------------------------------
-| Not part of the real ALRM feature set. No auth required so they're easy
-| to hit from a browser/Postman right after a deploy. Safe to delete this
-| whole block (and DbTestController.php) once TiDB Cloud + Render are
-| confirmed working end-to-end.
-*/
 
-Route::get('/health', [DbTestController::class, 'health']);
-Route::get('/test/programs', [DbTestController::class, 'index']);
-Route::post('/test/programs', [DbTestController::class, 'store']);
-Route::patch('/test/programs/{program}', [DbTestController::class, 'update']);
-Route::delete('/test/programs/{program}', [DbTestController::class, 'destroy']);
+Route::post('/internal/roster-sync', function (Request $request) {
+    if ($request->header('X-Sync-Secret') !== config('services.roster_sync.secret')) {
+        abort(403);
+    }
 
+    dispatch(function () {
+        Artisan::call('roster:sync');
+    })->afterResponse();
+
+    return response()->json(['success' => true, 'message' => 'Sync started']);
+})->middleware('throttle:10,1');
 /*
 |--------------------------------------------------------------------------
 | Auth Routes (Google OAuth/SSO — README §9/§10, no email/password reg)
@@ -53,7 +50,7 @@ Route::prefix('auth')->group(function () {
 Route::middleware(['auth:sanctum', 'inactive'])->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/me', [AuthController::class, 'me']);
-    Route::post('/complete-profile', [ProfileController::class, 'completeProfile']); 
+    Route::post('/complete-profile', [ProfileController::class, 'completeProfile']);
     Route::middleware('role:student')->group(function () {
         Route::get('/classes', [ClassController::class, 'index']);
 

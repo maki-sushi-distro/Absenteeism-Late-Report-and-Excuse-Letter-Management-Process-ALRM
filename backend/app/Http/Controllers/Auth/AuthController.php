@@ -46,7 +46,7 @@ class AuthController extends Controller
         ]);
 
         $frontendUrl = collect($allowedOrigins)
-            ->first(fn ($url) => $origin && str_starts_with($origin, $url));
+            ->first(fn($url) => $origin && str_starts_with($origin, $url));
 
         $frontendUrl ??= end($allowedOrigins) ?: reset($allowedOrigins);
 
@@ -117,13 +117,14 @@ class AuthController extends Controller
         $isFirstLogin = $isNewUser || is_null($user->google_id);
 
         $user->google_id = $googleUser->getId();
-        $user->name = $googleUser->getName() ?: $user->name;
 
         if ($isNewUser) {
+            $user->name = $googleUser->getName() ?: $user->name;
             $user->role = $isStudent ? 'student' : self::DEFAULT_STAFF_ROLE;
             $user->status = 'pending';
             $user->password = null;
         } elseif ($isFirstLogin) {
+            $user->name = $googleUser->getName() ?: $user->name;
             $user->status = 'approved';
             $user->password = null;
         }

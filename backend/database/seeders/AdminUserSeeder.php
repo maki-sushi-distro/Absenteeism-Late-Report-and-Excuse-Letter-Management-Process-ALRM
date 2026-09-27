@@ -214,13 +214,13 @@ class AdminUserSeeder extends Seeder
 
             try {
                 // Columns: A = role label, B = name, C = (blank), D = email.
-                $range = "'{$tabName}'!A2:D";
+                $range = "'{$tabName}'!A2:C";
                 $response = $service->spreadsheets_values->get(self::SPREADSHEET_ID, $range);
 
                 foreach ($response->getValues() ?? [] as $row) {
                     $roleLabel = trim($row[0] ?? '');
                     $name = trim($row[1] ?? '');
-                    $email = strtolower(trim($row[3] ?? ''));
+                    $email = strtolower(trim($row[2] ?? ''));
 
                     if ($name === '' || $email === '') {
                         continue;

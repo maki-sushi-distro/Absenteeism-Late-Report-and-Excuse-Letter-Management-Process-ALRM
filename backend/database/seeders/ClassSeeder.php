@@ -134,7 +134,15 @@ class ClassSeeder extends Seeder
     ];
 
     private const array HONORIFIC_PREFIXES = [
-        'Mr.', 'Ms.', 'Mrs.', 'Dr.', 'Engr.', 'Atty.', 'Prof.', 'Fr.', 'Sr.',
+        'Mr.',
+        'Ms.',
+        'Mrs.',
+        'Dr.',
+        'Engr.',
+        'Atty.',
+        'Prof.',
+        'Fr.',
+        'Sr.',
     ];
 
     /**
@@ -145,6 +153,10 @@ class ClassSeeder extends Seeder
      * genuinely different people's names.
      */
     private const float FUZZY_MATCH_THRESHOLD = 88.0;
+
+    private const array ADDITIONAL_INSTRUCTOR_EMAILS = [
+        'jaderiel.abuela@laverdad.edu.ph',
+    ];
 
     public function run(): void
     {
@@ -222,7 +234,7 @@ class ClassSeeder extends Seeder
                     [
                         'instructor_id' => $instructorId,
                         'section' => $this->buildSectionLabel($entry->programAbbreviation, $entry->yearLevel),
-                        'schedule' => array_map(fn (MeetingSlot $s) => $s->toArray(), $entry->slots),
+                        'schedule' => array_map(fn(MeetingSlot $s) => $s->toArray(), $entry->slots),
                     ]
                 );
 
@@ -242,13 +254,13 @@ class ClassSeeder extends Seeder
                 $suggestion = $this->describeClosestSuggestion($name, $instructorMap);
                 $suffix = $suggestion !== null ? " — did you mean \"{$suggestion['name']}\" ({$suggestion['score']}% similar)?" : '';
 
-                $lines[] = "  - \"{$name}\" (subjects: ".implode(', ', array_unique($subjects)).')'.$suffix;
+                $lines[] = "  - \"{$name}\" (subjects: " . implode(', ', array_unique($subjects)) . ')' . $suffix;
             }
 
             throw new \RuntimeException(
-                "ClassSeeder: the following instructor names in the schedule could not be matched to any user in the `users` table (roles: instructor, program_head). ".
-                "Fix the roster sheet or the schedule sheet's spelling, then re-run:\n".
-                implode("\n", $lines)
+                "ClassSeeder: the following instructor names in the schedule could not be matched to any user in the `users` table (roles: instructor, program_head). " .
+                    "Fix the roster sheet or the schedule sheet's spelling, then re-run:\n" .
+                    implode("\n", $lines)
             );
         }
     }
@@ -317,7 +329,7 @@ class ClassSeeder extends Seeder
             $semLine = trim((string) ($values[$startRow + 1][1] ?? ''));
 
             if (! preg_match('/(1st|2nd|3rd|4th)\s*Semester,\s*A\.Y\.\s*(\d{4}-\d{4})/i', $semLine, $sm)) {
-                Log::warning("ClassSeeder ({$programName}): could not parse semester/school_year near row ".($startRow + 2).', skipping block.');
+                Log::warning("ClassSeeder ({$programName}): could not parse semester/school_year near row " . ($startRow + 2) . ', skipping block.');
 
                 continue;
             }
@@ -403,7 +415,7 @@ class ClassSeeder extends Seeder
 
     private function isSkippable(string $subject, string $instructor): bool
     {
-        $haystack = mb_strtolower($subject.' '.$instructor);
+        $haystack = mb_strtolower($subject . ' ' . $instructor);
 
         foreach (self::SKIP_KEYWORDS as $keyword) {
             if (str_contains($haystack, $keyword)) {
@@ -425,7 +437,7 @@ class ClassSeeder extends Seeder
     {
         $yearNumber = preg_replace('/\D/', '', $yearLevel);
 
-        return trim($abbreviation.' '.$yearNumber);
+        return trim($abbreviation . ' ' . $yearNumber);
     }
 
     private function normalizeTime(string $time): string
@@ -441,9 +453,12 @@ class ClassSeeder extends Seeder
     private function buildInstructorNameMap(): array
     {
         return User::query()
-            ->whereIn('role', ['instructor', 'program_head'])
+            ->where(function ($query) {
+                $query->whereIn('role', ['instructor', 'program_head'])
+                    ->orWhereIn('email', self::ADDITIONAL_INSTRUCTOR_EMAILS);
+            })
             ->get(['id', 'name'])
-            ->mapWithKeys(fn (User $u) => [$this->normalizeName($u->name) => $u->id])
+            ->mapWithKeys(fn(User $u) => [$this->normalizeName($u->name) => $u->id])
             ->all();
     }
 
@@ -452,12 +467,14 @@ class ClassSeeder extends Seeder
         $name = trim($name);
 
         foreach (self::HONORIFIC_PREFIXES as $prefix) {
-            if (stripos($name, $prefix.' ') === 0) {
+            if (stripos($name, $prefix . ' ') === 0) {
                 $name = trim(substr($name, strlen($prefix)));
-
                 break;
             }
         }
+
+        // Strip trailing professional credentials, e.g. ", MIT", ", MBA", ", RSW".
+        $name = preg_replace('/,\s*[A-Za-z.]+$/', '', $name);
 
         return mb_strtolower(preg_replace('/\s+/', ' ', $name));
     }

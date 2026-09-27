@@ -3,6 +3,9 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Models\ClassModel;
+use App\Models\Enrollment;
+use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -44,5 +47,31 @@ class ProfileController extends Controller
             'message' => 'Profile completed.',
             'data'    => $user->fresh('program', 'programs'),
         ]);
+    }
+
+    /**
+     * Auto-enroll a student to every class that matches their
+     * program + year_level for the current semester/school_year.
+     */
+    protected function autoEnrollStudent(User $user, string $programId, string $yearLevel): void
+    {
+        $matchingClasses = ClassModel::query()
+            ->where('program_id', $programId)
+            ->where('year_level', $yearLevel)
+            ->where('semester', config('academic.current_semester'))
+            ->where('school_year', config('academic.current_school_year'))
+            ->get();
+
+        foreach ($matchingClasses as $class) {
+            Enrollment::firstOrCreate(
+                [
+                    'student_id' => $user->id,
+                    'class_id'   => $class->id,
+                ],
+                [
+                    'year_level' => $yearLevel, 
+                ]
+            );
+        }
     }
 }

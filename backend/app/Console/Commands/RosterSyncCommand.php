@@ -6,6 +6,7 @@ namespace App\Console\Commands;
 
 use Database\Seeders\AdminUserSeeder;
 use Database\Seeders\ClassSeeder;
+use Database\Seeders\ProgramSeeder;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
 
@@ -17,6 +18,17 @@ class RosterSyncCommand extends Command
 
     public function handle(): int
     {
+        $this->info('Syncing programs...');
+
+        try {
+            (new ProgramSeeder())->run();
+        } catch (\Throwable $e) {
+            $this->error('ProgramSeeder failed: '.$e->getMessage());
+            Log::error('roster:sync — ProgramSeeder failed', ['error' => $e->getMessage()]);
+
+            return self::FAILURE;
+        }
+
         $this->info('Syncing users from roster sheet...');
 
         try {

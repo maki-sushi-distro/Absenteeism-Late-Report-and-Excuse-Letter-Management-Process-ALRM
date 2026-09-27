@@ -89,8 +89,10 @@ class AdminUserSeeder extends Seeder
     private const array TAB_TO_PROGRAM_NAME = [
         'GEN ED'   => 'General Education',
         'BSSW'     => 'Bachelor of Science in Social Work',
-        'BSABSAIS' => 'Bachelor of Science in Accountancy',
-        'BSISACT'  => 'Bachelor of Science in Information System',
+        'BSA'      => 'Bachelor of Science in Accountancy',
+        'BSAIS'    => 'Bachelor of Science in Accounting Information System',
+        'BSIS'     => 'Bachelor of Science in Information System',
+        'ACT'      => 'Associate in Computer Technology',
         'BAB'      => 'Bachelor of Arts in Broadcasting',
     ];
 
@@ -163,6 +165,8 @@ class AdminUserSeeder extends Seeder
                 $this->saveUser($user);
                 $wasNew ? $created[] = $user->email : $updated[] = $user->email;
             }
+
+            $this->syncProgramHeads($merged); // NEW
 
             $deactivated = $this->deactivateMissingSheetUsers($sheetEmails, $manualEmails);
 
@@ -314,7 +318,7 @@ class AdminUserSeeder extends Seeder
         if ($isNew) {
             $model = new User(['email' => $user->email]);
         }
-        
+
         $hasLoggedInWithGoogle = ! $isNew && $model->google_id !== null;
 
         $model->forceFill([
@@ -322,10 +326,45 @@ class AdminUserSeeder extends Seeder
             'role' => $user->role->value,
             'status' => self::APPROVED_STATUS,
             'deactivated_at' => null,
+            'program_id' => $user->programIds[0] ?? null,
         ]);
 
         $model->save();
         $model->programs()->sync($user->programIds);
+    }
+
+    private function syncProgramHeads(array $merged): void
+    {
+        // programId => userId, built fresh from the current run only.
+        $headByProgram = [];
+
+        foreach ($merged as $user) {
+            if ($user->role !== UserRole::ProgramHead) {
+                continue;
+            }
+
+            $model = User::query()->where('email', $user->email)->first();
+
+            if ($model === null) {
+                continue;
+            }
+
+            foreach ($user->programIds as $programId) {
+                $headByProgram[$programId] = $model->id;
+            }
+        }
+
+        foreach (self::TAB_TO_PROGRAM_NAME as $programName) {
+            $program = Program::query()->firstWhere('program_name', $programName);
+
+            if ($program === null) {
+                continue;
+            }
+
+            $program->forceFill([
+                'program_head_id' => $headByProgram[$program->id] ?? null,
+            ])->save();
+        }
     }
 
     /**

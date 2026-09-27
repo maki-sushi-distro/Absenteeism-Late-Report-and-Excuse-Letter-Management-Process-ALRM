@@ -25,6 +25,7 @@ class ProfileController extends Controller
             'program_id'        => ['required', 'string', 'uuid', 'exists:programs,id'],
             'school_student_id' => ['required_if:role,student', 'nullable', 'string', 'max:50'],
             'year_level'        => ['required_if:role,student', 'nullable', 'in:1st,2nd,3rd,4th'],
+            'role' => ['prohibited'],
         ]);
 
         if ($user->role === 'student') {

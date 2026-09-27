@@ -124,9 +124,9 @@ class AdminUserSeeder extends Seeder
 
         $sheetUsers = $this->fetchInstructorsFromGoogleSheets();
 
-        $sheetEmails = array_map(fn (SeedUser $u) => $u->email, $sheetUsers);
+        $sheetEmails = array_map(fn(SeedUser $u) => $u->email, $sheetUsers);
 
-        $manualEmails = array_map(fn (SeedUser $u) => $u->email, $manualUsers);
+        $manualEmails = array_map(fn(SeedUser $u) => $u->email, $manualUsers);
 
         $merged = [];
 
@@ -189,6 +189,23 @@ class AdminUserSeeder extends Seeder
 
         return storage_path(self::CREDENTIALS_PATH);
     }
+    
+    private function resolveCredentials(): string|array
+    {
+        $json = env('GOOGLE_SERVICE_ACCOUNT_JSON');
+
+        if ($json) {
+            $decoded = json_decode($json, true);
+
+            if (json_last_error() === JSON_ERROR_NONE) {
+                return $decoded;
+            }
+
+            Log::warning('GOOGLE_SERVICE_ACCOUNT_JSON env var is set but is not valid JSON — falling back to file path.');
+        }
+
+        return $this->resolveCredentialsPath();
+    }
 
     /**
      * @return SeedUser[]
@@ -198,7 +215,7 @@ class AdminUserSeeder extends Seeder
         $client = new GoogleClient();
         $client->setApplicationName('AdminUserSeeder');
         $client->setScopes([GoogleSheets::SPREADSHEETS_READONLY]);
-        $client->setAuthConfig($this->resolveCredentialsPath());
+        $client->setAuthConfig($this->resolveCredentials());
 
         $service = new GoogleSheets($client);
 
@@ -260,7 +277,7 @@ class AdminUserSeeder extends Seeder
         }
 
         return array_map(
-            fn (string $email, array $data) => new SeedUser(
+            fn(string $email, array $data) => new SeedUser(
                 name: $data['name'],
                 email: $email,
                 role: $data['role'],

@@ -270,10 +270,11 @@ class ClassSeeder extends Seeder
         $client = new GoogleClient();
         $client->setApplicationName('ClassSeeder');
         $client->setScopes([GoogleSheets::SPREADSHEETS_READONLY]);
-        $client->setAuthConfig($this->resolveCredentialsPath());
+        $client->setAuthConfig($this->resolveCredentials());
 
         return new GoogleSheets($client);
     }
+
 
     private function resolveCredentialsPath(): string
     {
@@ -282,6 +283,23 @@ class ClassSeeder extends Seeder
         }
 
         return storage_path(self::CREDENTIALS_PATH);
+    }
+    
+    private function resolveCredentials(): string|array
+    {
+        $json = env('GOOGLE_SERVICE_ACCOUNT_JSON');
+
+        if ($json) {
+            $decoded = json_decode($json, true);
+
+            if (json_last_error() === JSON_ERROR_NONE) {
+                return $decoded;
+            }
+
+            Log::warning('GOOGLE_SERVICE_ACCOUNT_JSON env var is set but is not valid JSON — falling back to file path.');
+        }
+
+        return $this->resolveCredentialsPath();
     }
 
     /**

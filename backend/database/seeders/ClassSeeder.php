@@ -53,6 +53,7 @@ final class ParsedClass
     public function __construct(
         public readonly string $subjectName,
         public readonly string $programName,
+        public readonly string $programAbbreviation,
         public readonly string $yearLevel,
         public readonly string $semester,
         public readonly string $schoolYear,
@@ -136,6 +137,15 @@ class ClassSeeder extends Seeder
         'Mr.', 'Ms.', 'Mrs.', 'Dr.', 'Engr.', 'Atty.', 'Prof.', 'Fr.', 'Sr.',
     ];
 
+    /**
+     * Minimum similar_text() percentage for a fuzzy instructor-name
+     * match to be accepted automatically. Tuned to catch missing
+     * spaces / capitalization / stray punctuation differences while
+     * staying below the similarity typically seen between two
+     * genuinely different people's names.
+     */
+    private const float FUZZY_MATCH_THRESHOLD = 88.0;
+
     public function run(): void
     {
         $service = $this->makeSheetsService();
@@ -152,7 +162,7 @@ class ClassSeeder extends Seeder
                 continue;
             }
 
-            $this->parseTab($values, $programName, $parsed);
+            $this->parseTab($values, $tabName, $programName, $parsed);
         }
 
         $instructorMap = $this->buildInstructorNameMap();
@@ -180,7 +190,16 @@ class ClassSeeder extends Seeder
                     if (isset($instructorMap[$normalized])) {
                         $instructorId = $instructorMap[$normalized];
                     } else {
-                        $unmatchedInstructors[$entry->instructorName][] = $entry->subjectName;
+                        $fuzzy = $this->findClosestInstructorMatch($normalized, $instructorMap);
+
+                        if ($fuzzy !== null) {
+                            [$matchedName, $matchedId, $score] = $fuzzy;
+                            $instructorId = $matchedId;
+
+                            Log::warning("ClassSeeder: fuzzy-matched instructor '{$entry->instructorName}' to '{$matchedName}' ({$score}% similarity) for subject '{$entry->subjectName}'. Verify this is correct.");
+                        } else {
+                            $unmatchedInstructors[$entry->instructorName][] = $entry->subjectName;
+                        }
                     }
                 }
 
@@ -202,7 +221,7 @@ class ClassSeeder extends Seeder
                     ],
                     [
                         'instructor_id' => $instructorId,
-                        'section' => null,
+                        'section' => $this->buildSectionLabel($entry->programAbbreviation, $entry->yearLevel),
                         'schedule' => array_map(fn (MeetingSlot $s) => $s->toArray(), $entry->slots),
                     ]
                 );
@@ -220,7 +239,10 @@ class ClassSeeder extends Seeder
         if (! empty($unmatchedInstructors)) {
             $lines = [];
             foreach ($unmatchedInstructors as $name => $subjects) {
-                $lines[] = "  - \"{$name}\" (subjects: ".implode(', ', array_unique($subjects)).')';
+                $suggestion = $this->describeClosestSuggestion($name, $instructorMap);
+                $suffix = $suggestion !== null ? " — did you mean \"{$suggestion['name']}\" ({$suggestion['score']}% similar)?" : '';
+
+                $lines[] = "  - \"{$name}\" (subjects: ".implode(', ', array_unique($subjects)).')'.$suffix;
             }
 
             throw new \RuntimeException(
@@ -274,7 +296,7 @@ class ClassSeeder extends Seeder
      * @param  array<int, array<int, string|null>>  $values
      * @param  array<string, ParsedClass>  $parsed
      */
-    private function parseTab(array $values, string $programName, array &$parsed): void
+    private function parseTab(array $values, string $tabName, string $programName, array &$parsed): void
     {
         $rowCount = count($values);
 
@@ -307,7 +329,7 @@ class ClassSeeder extends Seeder
             // header; actual data starts the row after that.
             $dataStart = $startRow + 3;
 
-            $this->parseBlock($values, $dataStart, $endRow, $programName, $block['yearLevel'], $semester, $schoolYear, $parsed);
+            $this->parseBlock($values, $dataStart, $endRow, $tabName, $programName, $block['yearLevel'], $semester, $schoolYear, $parsed);
         }
     }
 
@@ -324,6 +346,7 @@ class ClassSeeder extends Seeder
         array $values,
         int $dataStart,
         int $dataEnd,
+        string $tabName,
         string $programName,
         string $yearLevel,
         string $semester,
@@ -353,7 +376,7 @@ class ClassSeeder extends Seeder
                     continue;
                 }
 
-                $entry = new ParsedClass($subject, $programName, $yearLevel, $semester, $schoolYear);
+                $entry = new ParsedClass($subject, $programName, $tabName, $yearLevel, $semester, $schoolYear);
                 $key = $entry->key();
 
                 if (! isset($parsed[$key])) {
@@ -391,6 +414,20 @@ class ClassSeeder extends Seeder
         return false;
     }
 
+    /**
+     * Builds a placeholder section label from the program's short tab
+     * abbreviation (e.g. "BSSW") and the year level (e.g. "1st"),
+     * producing something like "BSSW 1". The schedule sheet has no
+     * real section data — this just gives every class a readable,
+     * non-null value until actual sectioning is implemented.
+     */
+    private function buildSectionLabel(string $abbreviation, string $yearLevel): string
+    {
+        $yearNumber = preg_replace('/\D/', '', $yearLevel);
+
+        return trim($abbreviation.' '.$yearNumber);
+    }
+
     private function normalizeTime(string $time): string
     {
         [$h, $m] = array_pad(explode(':', $time), 2, '00');
@@ -423,5 +460,79 @@ class ClassSeeder extends Seeder
         }
 
         return mb_strtolower(preg_replace('/\s+/', ' ', $name));
+    }
+
+    /**
+     * Finds the closest instructor name match by whole-string
+     * similarity, used only as a fallback when the exact normalized
+     * match fails (e.g. missing space after an honorific,
+     * inconsistent capitalization, a stray period).
+     *
+     * Deliberately conservative: returns null (no match) unless a
+     * candidate clears FUZZY_MATCH_THRESHOLD. Genuinely different
+     * names — different surname, married-name mismatches, etc. —
+     * should NOT be silently auto-matched; those need a human to
+     * reconcile the source sheets.
+     *
+     * @param  array<string, string>  $instructorMap  normalized name => user UUID
+     * @return array{0: string, 1: string, 2: float}|null  [matched normalized name, user id, similarity %]
+     */
+    private function findClosestInstructorMatch(string $normalizedName, array $instructorMap): ?array
+    {
+        $bestName = null;
+        $bestId = null;
+        $bestScore = 0.0;
+
+        foreach ($instructorMap as $candidateName => $candidateId) {
+            similar_text($normalizedName, $candidateName, $percent);
+
+            if ($percent > $bestScore) {
+                $bestScore = $percent;
+                $bestName = $candidateName;
+                $bestId = $candidateId;
+            }
+        }
+
+        if ($bestName !== null && $bestScore >= self::FUZZY_MATCH_THRESHOLD) {
+            return [$bestName, $bestId, round($bestScore, 1)];
+        }
+
+        return null;
+    }
+
+    /**
+     * Like findClosestInstructorMatch(), but always returns the best
+     * candidate (regardless of threshold) so the "unmatched
+     * instructors" error can suggest a likely intended match for a
+     * human to confirm. Never used to auto-assign.
+     *
+     * @param  array<string, string>  $instructorMap  normalized name => user UUID
+     * @return array{name: string, score: float}|null
+     */
+    private function describeClosestSuggestion(string $rawName, array $instructorMap): ?array
+    {
+        if (empty($instructorMap)) {
+            return null;
+        }
+
+        $normalized = $this->normalizeName($rawName);
+
+        $bestName = null;
+        $bestScore = 0.0;
+
+        foreach (array_keys($instructorMap) as $candidateName) {
+            similar_text($normalized, $candidateName, $percent);
+
+            if ($percent > $bestScore) {
+                $bestScore = $percent;
+                $bestName = $candidateName;
+            }
+        }
+
+        if ($bestName === null) {
+            return null;
+        }
+
+        return ['name' => $bestName, 'score' => round($bestScore, 1)];
     }
 }

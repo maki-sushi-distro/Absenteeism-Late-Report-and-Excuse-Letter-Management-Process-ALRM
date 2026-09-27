@@ -26,12 +26,33 @@ class AuthController extends Controller
     /**
      * Step 1 — Send the user's browser to Google's consent screen.
      *
+     * Accepts an `origin` query param (the frontend's own
+     * window.location.origin) so we know where to send the user back
+     * to in callback() — this lets both localhost and the deployed
+     * Vercel frontend use the same backend without hardcoding one URL.
+     * The chosen origin is base64-encoded and passed through Google's
+     * `state` param, which Google returns to us untouched.
+     *
      * GET /api/auth/google/redirect
      */
-    public function redirect(): RedirectResponse
+    public function redirect(Request $request): RedirectResponse
     {
+        $origin = $request->query('origin')
+            ?? $request->headers->get('referer');
+
+        $allowedOrigins = array_filter([
+            rtrim((string) env('FRONTEND_URL', 'http://localhost:5173'), '/'),
+            rtrim((string) env('FRONTEND_URL_PROD'), '/'),
+        ]);
+
+        $frontendUrl = collect($allowedOrigins)
+            ->first(fn ($url) => $origin && str_starts_with($origin, $url));
+
+        $frontendUrl ??= end($allowedOrigins) ?: reset($allowedOrigins);
+
         return Socialite::driver('google')
             ->stateless()
+            ->with(['state' => base64_encode($frontendUrl)])
             ->redirect();
     }
 
@@ -40,6 +61,10 @@ class AuthController extends Controller
      * for the profile, validate the domain, find-or-create the local
      * user, issue a Sanctum token, then redirect back to the SPA with
      * ?token=... (can't return JSON — this is a browser redirect).
+     *
+     * The `state` param carries the frontend origin we encoded in
+     * redirect(), so we always bounce the user back to whichever
+     * frontend (localhost or Vercel) they started from.
      *
      * New users land as status='pending' (self-registration + approval
      * requirement) — a token is still issued so the frontend can call
@@ -55,7 +80,10 @@ class AuthController extends Controller
             'length' => strlen((string) request()->query('code')),
         ]);
 
-        $frontendUrl = rtrim((string) config('app.frontend_url', env('FRONTEND_URL')), '/');
+        $state = request()->query('state');
+        $frontendUrl = $state
+            ? rtrim((string) base64_decode($state), '/')
+            : rtrim((string) env('FRONTEND_URL_PROD', env('FRONTEND_URL')), '/');
 
         try {
             $googleUser = Socialite::driver('google')

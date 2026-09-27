@@ -64,6 +64,8 @@ Route::middleware(['auth:sanctum', 'inactive'])->group(function () {
         Route::post('/requests', [RequestController::class, 'store']);
         Route::get('/requests', [RequestController::class, 'index']);
         Route::get('/requests/{request}', [RequestController::class, 'show']);
+        Route::patch('/requests/{request}', [RequestController::class, 'update']);   // ← DAGDAG
+        Route::delete('/requests/{request}', [RequestController::class, 'destroy']); // ← DAGDAG
 
         Route::get('/attendance/summary', [AttendanceController::class, 'summary']);
     });

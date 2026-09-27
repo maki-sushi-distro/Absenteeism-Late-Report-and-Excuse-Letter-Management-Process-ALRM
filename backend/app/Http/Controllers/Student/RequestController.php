@@ -11,6 +11,24 @@ use Illuminate\Support\Facades\Auth;
 class RequestController extends Controller
 {
     /**
+     * TODO (Future Feature): Draft Requests
+     *
+     * Approach: Option B — Backend-persisted draft
+     *
+     * Kailangang gawin paglaon:
+     * 1. Dagdagan ng 'draft' sa status enum ng requests table
+     *    (kasabay o hiwalay na migration mula sa 'cancelled' na kasalukuyang ginawa)
+     * 2. Bagong endpoint: POST /requests/draft — save nang walang strict validation
+     * 3. Bagong endpoint: PATCH /requests/{request}/submit — i-finalize ang draft,
+     *    dito na lang mag-a-apply ang buong/strict validation rules
+     *    (kagaya ng nasa store() ngayon)
+     * 4. I-relax ang validation kapag naka-draft (hindi required lahat ng fields)
+     * 5. I-update din ang ExcuseRequestPolicy — sino ba pwedeng mag-edit/mag-view
+     *    ng sariling drafts
+     * 6. Route additions sa api.php (student group)
+     */
+    
+    /**
      * Store a new excuse/late request.
      * Enrollment is resolved from the authenticated student + class_id —
      * never trust enrollment_id from the client (see ExcuseRequest model doc).
@@ -18,14 +36,15 @@ class RequestController extends Controller
     public function store(HttpRequest $httpRequest)
     {
         $validated = $httpRequest->validate([
-            'class_id'              => ['required', 'string', 'uuid', 'exists:classes,id'],
-            'type'                  => ['required', 'in:absence,late'],
-            'subjects_missed'       => ['required', 'string'], 
-            'start_date_of_absence' => ['required', 'date'],
+            'class_id'        => ['required', 'string', 'uuid', 'exists:classes,id'],
+            'type'            => ['required', 'in:absence,late'],
+            'subjects_missed' => ['required', 'string'],
+            'minutes_late'          => ['required_if:type,late', 'nullable', 'integer', 'min:1'],
+            'start_date_of_absence' => ['required_if:type,absence', 'nullable', 'date'],
             'end_date_of_absence'   => ['nullable', 'date', 'after_or_equal:start_date_of_absence'],
-            'reason'                => ['required', 'string'],
-            'evidence_file_url'     => ['nullable', 'string'],
-            'evidence_type'         => ['nullable', 'string'],
+            'reason'            => ['required', 'string'],
+            'evidence_file_url' => ['nullable', 'string'],
+            'evidence_type'     => ['nullable', 'string'],
         ]);
 
         $enrollment = Enrollment::where('student_id', Auth::id())
@@ -43,8 +62,9 @@ class RequestController extends Controller
         $excuseRequest = ExcuseRequest::create([
             'enrollment_id'         => $enrollment->id,
             'type'                  => $validated['type'],
-            'subjects_missed'       => $validated['subjects_missed'], 
-            'start_date_of_absence' => $validated['start_date_of_absence'],
+            'subjects_missed'       => $validated['subjects_missed'],
+            'minutes_late'          => $validated['minutes_late'] ?? null,
+            'start_date_of_absence' => $validated['start_date_of_absence'] ?? null,
             'end_date_of_absence'   => $validated['end_date_of_absence'] ?? null,
             'reason'                => $validated['reason'],
             'evidence_file_url'     => $validated['evidence_file_url'] ?? null,
@@ -88,6 +108,64 @@ class RequestController extends Controller
             'success' => true,
             'message' => null,
             'data'    => $request->load('enrollment.class', 'followupFlag'),
+        ]);
+    }
+
+    /**
+     * Update a request — only allowed while status is still 'pending'.
+     */
+    public function update(HttpRequest $httpRequest, ExcuseRequest $request)
+    {
+        $this->authorize('update', $request);
+
+        if ($request->status !== 'pending') {
+            return response()->json([
+                'success' => false,
+                'message' => 'This request has already been reviewed and can no longer be edited.',
+                'data'    => null,
+            ], 422);
+        }
+
+
+        $validated = $httpRequest->validate([
+            'type'                  => ['required', 'in:absence,late'],
+            'subjects_missed'       => ['required', 'string'],
+            'minutes_late'          => ['required_if:type,late', 'nullable', 'integer', 'min:1'],
+            'start_date_of_absence' => ['required_if:type,absence', 'nullable', 'date'],
+            'end_date_of_absence'   => ['nullable', 'date', 'after_or_equal:start_date_of_absence'],
+            'reason'                => ['required', 'string', 'max:500'],
+            'evidence_file_url'     => ['nullable', 'string'],
+            'evidence_type'         => ['nullable', 'string'],
+        ]);
+
+        $request->update($validated);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Request updated.',
+            'data'    => $request->fresh(),
+        ]);
+    }
+
+
+    public function destroy(ExcuseRequest $request)
+    {
+        $this->authorize('delete', $request);
+
+        if ($request->status !== 'pending') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Only pending requests can be cancelled.',
+                'data'    => null,
+            ], 422);
+        }
+
+        $request->update(['status' => 'cancelled']);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Request cancelled.',
+            'data'    => $request->fresh(),
         ]);
     }
 }

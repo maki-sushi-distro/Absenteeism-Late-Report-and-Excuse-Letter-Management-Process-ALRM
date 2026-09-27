@@ -13,7 +13,8 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 #[Fillable([
     'enrollment_id',
     'type',
-    'subjects_missed', 
+    'subjects_missed',
+    'minutes_late',
     'start_date_of_absence',
     'end_date_of_absence',
     'reason',

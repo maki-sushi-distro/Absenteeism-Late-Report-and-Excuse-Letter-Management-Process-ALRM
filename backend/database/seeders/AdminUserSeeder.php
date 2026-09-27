@@ -189,7 +189,7 @@ class AdminUserSeeder extends Seeder
 
         return storage_path(self::CREDENTIALS_PATH);
     }
-    
+
     private function resolveCredentials(): string|array
     {
         $json = env('GOOGLE_SERVICE_ACCOUNT_JSON');
@@ -308,11 +308,17 @@ class AdminUserSeeder extends Seeder
 
     private function saveUser(SeedUser $user): void
     {
-        $model = User::firstOrCreate(
-            ['email' => $user->email],
-            ['name' => $user->name],
-        )->forceFill([
-            'name' => $user->name,
+        $model = User::query()->where('email', $user->email)->first();
+        $isNew = $model === null;
+
+        if ($isNew) {
+            $model = new User(['email' => $user->email]);
+        }
+        
+        $hasLoggedInWithGoogle = ! $isNew && $model->google_id !== null;
+
+        $model->forceFill([
+            'name' => $hasLoggedInWithGoogle ? $model->name : $user->name,
             'role' => $user->role->value,
             'status' => self::APPROVED_STATUS,
             'deactivated_at' => null,

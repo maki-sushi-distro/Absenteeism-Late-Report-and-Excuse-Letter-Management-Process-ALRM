@@ -21,6 +21,10 @@ class ClassModel extends Model
     // 'class' is a reserved word in PHP — table name must be explicit
     protected $table = 'classes';
 
+    protected $casts = [
+        'schedule' => 'array',
+    ];
+
     /*
     |--------------------------------------------------------------------------
     | Relationships

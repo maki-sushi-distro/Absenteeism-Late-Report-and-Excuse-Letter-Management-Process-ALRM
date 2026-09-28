@@ -7,6 +7,7 @@ import { useAuth } from '../context/AuthContext';
 import { getPendingOtpToken, getPendingOtpUserId } from '../api/otp';
 import { needsProfileSetup } from '../lib/profileSetup';
 import { roleMatches } from '../lib/roles';
+import HttpErrorPage from '../pages/HttpErrorPage';
 
 function AuthenticatedPage({ user, children }) {
   const { pathname, search, hash } = useLocation();
@@ -37,7 +38,7 @@ export function ProtectedRoute({
     return <Navigate to="/complete-profile" replace />;
   }
   if (allowedRoles?.length && !roleMatches(user.role, allowedRoles)) {
-    return <Navigate to="/dashboard" replace />;
+    return <HttpErrorPage status={403} />;
   }
 
   if (location.pathname === '/') {

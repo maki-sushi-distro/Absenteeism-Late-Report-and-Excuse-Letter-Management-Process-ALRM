@@ -16,6 +16,8 @@ import Settings from "./pages/auth/Settings";
 import InstructorPlaceholderPage from "./pages/auth/instructor/InstructorPlaceholderPage";
 import StudentPlaceholderPage from "./pages/auth/student/StudentPlaceholderPage";
 import StudentRequestForm from "./pages/auth/student/StudentRequestForm";
+import AppErrorBoundary from "./components/AppErrorBoundary";
+import HttpErrorPage from "./pages/HttpErrorPage";
 import "./App.css";
 
 function App() {
@@ -23,7 +25,8 @@ function App() {
     <BrowserRouter>
       <ThemeProvider>
         <AuthProvider>
-          <Routes>
+          <AppErrorBoundary>
+            <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/auth/callback" element={<AuthCallback />} />
           <Route path="/verify-otp" element={<OtpVerification />} />
@@ -141,7 +144,15 @@ function App() {
               </ProtectedRoute>
             }
           />
-          </Routes>
+              <Route path="/400" element={<HttpErrorPage status={400} />} />
+              <Route path="/401" element={<HttpErrorPage status={401} />} />
+              <Route path="/403" element={<HttpErrorPage status={403} />} />
+              <Route path="/404" element={<HttpErrorPage status={404} />} />
+              <Route path="/500" element={<HttpErrorPage status={500} />} />
+              <Route path="/503" element={<HttpErrorPage status={503} />} />
+              <Route path="*" element={<HttpErrorPage status={404} />} />
+            </Routes>
+          </AppErrorBoundary>
         </AuthProvider>
       </ThemeProvider>
     </BrowserRouter>

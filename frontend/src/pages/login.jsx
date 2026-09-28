@@ -1,4 +1,8 @@
 import { Button } from "@/components/ui/button";
+import { Navigate } from "react-router-dom";
+import SessionStatus from "@/components/SessionStatus";
+import { useAuth } from "@/context/AuthContext";
+import { getPostLoginPath } from "@/api/authSecurity";
 import {
   Card,
   CardDescription,
@@ -44,6 +48,11 @@ function SchoolSeal() {
 }
 
 function Login() {
+  const { user, loading, sessionError } = useAuth();
+
+  if (!user && (loading || sessionError)) return <SessionStatus />;
+  if (user) return <Navigate to={getPostLoginPath(user)} replace />;
+
   function handleGoogleLogin() {
     window.location.href = googleLoginUrl();
   }

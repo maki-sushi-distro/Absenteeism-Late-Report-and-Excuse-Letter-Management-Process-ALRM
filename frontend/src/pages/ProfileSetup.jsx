@@ -125,6 +125,8 @@ function ProfileSetup() {
   const navigate = useNavigate();
   const { refreshUser, user } = useAuth();
   const roleOptions = getProfileSetupRoleOptions(user?.email);
+  const isStudentRoleLocked =
+    roleOptions.length === 1 && roleOptions[0].value === "student";
   const storedSetup = useMemo(() => getStoredProfileSetup(user), [user]);
   const parsedName = useMemo(() => splitVerifiedName(user?.name), [user?.name]);
   const [programs, setPrograms] = useState([]);
@@ -154,15 +156,6 @@ function ProfileSetup() {
         : fullYearOptions,
     [selectedProgram],
   );
-
-  useEffect(() => {
-    setForm({
-      role: getProfileSetupRole(user?.email, user?.role, storedSetup?.role),
-      programId: user?.program_id || storedSetup?.program_id || "",
-      studentNumber: storedSetup?.student_number || user?.student_number || "",
-      yearLevel: user?.year_level || storedSetup?.year_level || "",
-    });
-  }, [storedSetup, user]);
 
   useEffect(() => {
     if (user && isProfileSetupComplete(user)) {
@@ -352,22 +345,32 @@ function ProfileSetup() {
             <div className="grid gap-4 md:grid-cols-2">
               <div className="grid gap-2">
                 <Label htmlFor="setup-role">Role</Label>
-                <select
-                  id="setup-role"
-                  value={form.role}
-                  onChange={(event) => updateField("role", event.target.value)}
-                  disabled={roleOptions.length <= 1 || submitting}
-                  aria-invalid={Boolean(errors.role)}
-                  aria-describedby="setup-role-description"
-                  className="h-10 rounded-[5px] border border-slate-300 bg-white px-3 text-sm font-medium text-slate-900 shadow-none outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:bg-slate-100 aria-invalid:border-destructive"
-                >
-                  {roleOptions.length !== 1 && <option value="">Select role</option>}
-                  {roleOptions.map((role) => (
-                    <option key={role.value} value={role.value}>
-                      {role.label}
-                    </option>
-                  ))}
-                </select>
+                {isStudentRoleLocked ? (
+                  <Input
+                    id="setup-role"
+                    readOnly
+                    value="Student"
+                    aria-describedby="setup-role-description"
+                    className="h-10 cursor-default rounded-[5px] border-slate-300 bg-slate-50 text-sm font-medium text-slate-700 shadow-none"
+                  />
+                ) : (
+                  <select
+                    id="setup-role"
+                    value={form.role}
+                    onChange={(event) => updateField("role", event.target.value)}
+                    disabled={!roleOptions.length || submitting}
+                    aria-invalid={Boolean(errors.role)}
+                    aria-describedby="setup-role-description"
+                    className="h-10 rounded-[5px] border border-slate-300 bg-white px-3 text-sm font-medium text-slate-900 shadow-none outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:bg-slate-100 aria-invalid:border-destructive"
+                  >
+                    <option value="">Select role</option>
+                    {roleOptions.map((role) => (
+                      <option key={role.value} value={role.value}>
+                        {role.label}
+                      </option>
+                    ))}
+                  </select>
+                )}
                 <div id="setup-role-description">
                   <FieldError
                     message={

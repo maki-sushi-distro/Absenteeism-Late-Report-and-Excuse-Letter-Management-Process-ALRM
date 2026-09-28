@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { AlertCircle, CheckCircle2, KeyRound, Mail } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { markTrustedOtpDevice } from "@/api/authSecurity";
+import { getPostLoginPath } from "@/api/authSecurity";
+import SessionStatus from "@/components/SessionStatus";
 import { googleLoginUrl } from "@/api/client";
 import {
   Card,
@@ -17,7 +18,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
 import { useAuth } from "@/context/AuthContext";
-import { needsProfileSetup } from "@/lib/profileSetup";
 import {
   clearPendingOtp,
   exchangeOtpCode,
@@ -43,9 +43,18 @@ function formatCountdown(seconds) {
 }
 
 function OtpVerification() {
+  const { user, loading, sessionError } = useAuth();
+
+  if (!user && (loading || sessionError)) return <SessionStatus />;
+  if (user) return <Navigate to={getPostLoginPath(user)} replace />;
+
+  return <OtpVerificationForm />;
+}
+
+function OtpVerificationForm() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { loginWithToken } = useAuth();
+  const { loginWithToken, logout } = useAuth();
   const [code, setCode] = useState("");
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
@@ -211,7 +220,7 @@ function OtpVerification() {
         email: pendingEmail,
         code,
       });
-      let verifiedToken = getOtpTokenFromResponse(response, pendingToken);
+      let verifiedToken = getOtpTokenFromResponse(response);
 
       if (!verifiedToken) {
         const exchangeCode = getExchangeCodeFromResponse(response);
@@ -229,12 +238,8 @@ function OtpVerification() {
       }
 
       const verifiedUser = await loginWithToken(verifiedToken);
-      markTrustedOtpDevice({
-        userId: verifiedUser?.id || pendingUserId,
-        email: verifiedUser?.email || pendingEmail,
-      });
       clearPendingOtp();
-      navigate(needsProfileSetup(verifiedUser) ? "/complete-profile" : "/", {
+      navigate(getPostLoginPath(verifiedUser), {
         replace: true,
       });
     } catch (verifyError) {
@@ -247,8 +252,8 @@ function OtpVerification() {
     }
   }
 
-  function handleBackToLogin() {
-    clearPendingOtp();
+  async function handleBackToLogin() {
+    await logout();
     window.location.href = googleLoginUrl({ prompt: "select_account" });
   }
 

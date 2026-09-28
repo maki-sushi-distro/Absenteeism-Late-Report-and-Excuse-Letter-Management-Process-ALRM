@@ -1,6 +1,41 @@
-import { normalizeRole } from "./roles";
+import { normalizeRole } from "./roles.js";
 
 const PROFILE_SETUP_PREFIX = "alrm_profile_setup:";
+
+export function getProfileSetupRoleOptions(email) {
+  const domain = String(email || "")
+    .trim()
+    .toLowerCase()
+    .match(/^[^\s@]+@([^\s@]+)$/)?.[1];
+
+  if (domain === "student.laverdad.edu.ph") {
+    return [{ label: "Student", value: "student" }];
+  }
+
+  if (domain === "laverdad.edu.ph") {
+    return [
+      { label: "Instructor", value: "instructor" },
+      { label: "Program Head", value: "program_head" },
+    ];
+  }
+
+  return [];
+}
+
+export function getProfileSetupRole(email, ...roles) {
+  const options = getProfileSetupRoleOptions(email);
+
+  if (options.length === 1) return options[0].value;
+
+  for (const role of roles) {
+    const option = options.find(
+      ({ value }) => normalizeRole(value) === normalizeRole(role),
+    );
+    if (option) return option.value;
+  }
+
+  return "";
+}
 
 function setupKey(user) {
   return `${PROFILE_SETUP_PREFIX}${user?.id || user?.email || "unknown"}`;

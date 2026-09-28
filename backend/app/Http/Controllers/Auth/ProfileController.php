@@ -5,13 +5,30 @@ namespace App\Http\Controllers\Auth;
 use App\Http\Controllers\Controller;
 use App\Models\ClassModel;
 use App\Models\Enrollment;
+use App\Models\Program;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
 
 class ProfileController extends Controller
 {
+    /**
+     * List of programs for the complete-profile dropdown.
+     * Shows program_name to the user; the id is what gets submitted.
+     *
+     * GET /api/complete-profile/programs
+     */
+    public function programs(): JsonResponse
+    {
+        return response()->json([
+            'success' => true,
+            'data'    => Program::query()
+                ->where('program_name', '!=', 'General Education')
+                ->orderBy('program_name')
+                ->get(['id', 'program_name']),
+        ]);
+    }
+
     /**
      * Complete the authenticated user's profile after their first
      * Google OAuth login. Required before dashboard access when the
@@ -28,7 +45,7 @@ class ProfileController extends Controller
             'program_id'        => ['required', 'string', 'uuid', 'exists:programs,id'],
             'school_student_id' => ['required_if:role,student', 'nullable', 'string', 'max:50'],
             'year_level'        => ['required_if:role,student', 'nullable', 'in:1st,2nd,3rd,4th'],
-            'role' => ['prohibited'],
+            'role'              => ['prohibited'],
         ]);
 
         if ($user->role === 'student') {
@@ -37,6 +54,12 @@ class ProfileController extends Controller
                 'school_student_id' => $validated['school_student_id'] ?? null,
                 'year_level'        => $validated['year_level'] ?? null,
             ]);
+
+            $this->autoEnrollStudent(
+                $user,
+                $validated['program_id'],
+                $validated['year_level'],
+            );
         } else {
             // instructor / program_head / administrator — many-to-many
             $user->programs()->syncWithoutDetaching([$validated['program_id']]);
@@ -69,7 +92,7 @@ class ProfileController extends Controller
                     'class_id'   => $class->id,
                 ],
                 [
-                    'year_level' => $yearLevel, 
+                    'year_level' => $yearLevel,
                 ]
             );
         }

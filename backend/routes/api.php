@@ -50,6 +50,7 @@ Route::prefix('auth')->group(function () {
 Route::middleware(['auth:sanctum', 'inactive'])->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/me', [AuthController::class, 'me']);
+    Route::get('/complete-profile/programs', [ProfileController::class, 'programs']);
     Route::post('/complete-profile', [ProfileController::class, 'completeProfile']);
     Route::middleware('role:student')->group(function () {
         Route::get('/classes', [ClassController::class, 'index']);
@@ -57,8 +58,8 @@ Route::middleware(['auth:sanctum', 'inactive'])->group(function () {
         Route::post('/requests', [RequestController::class, 'store']);
         Route::get('/requests', [RequestController::class, 'index']);
         Route::get('/requests/{request}', [RequestController::class, 'show']);
-        Route::patch('/requests/{request}', [RequestController::class, 'update']);   // ← DAGDAG
-        Route::delete('/requests/{request}', [RequestController::class, 'destroy']); // ← DAGDAG
+        Route::patch('/requests/{request}', [RequestController::class, 'update']);   
+        Route::delete('/requests/{request}', [RequestController::class, 'destroy']); 
 
         Route::get('/attendance/summary', [AttendanceController::class, 'summary']);
     });

@@ -16,6 +16,8 @@ import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
 import { useAuth } from "@/context/AuthContext";
 import {
+  getProfileSetupRole,
+  getProfileSetupRoleOptions,
   getStoredProfileSetup,
   isProfileSetupComplete,
   splitVerifiedName,
@@ -23,12 +25,6 @@ import {
 } from "@/lib/profileSetup";
 import { normalizeRole } from "@/lib/roles";
 import lvLogo from "@/assets/LV_Logo.png";
-
-const roleOptions = [
-  { label: "Student", value: "student" },
-  { label: "Instructor", value: "instructor" },
-  { label: "Program", value: "program_head" },
-];
 
 const defaultPrograms = [
   {
@@ -128,6 +124,7 @@ function FieldError({ message }) {
 function ProfileSetup() {
   const navigate = useNavigate();
   const { refreshUser, user } = useAuth();
+  const roleOptions = getProfileSetupRoleOptions(user?.email);
   const storedSetup = useMemo(() => getStoredProfileSetup(user), [user]);
   const parsedName = useMemo(() => splitVerifiedName(user?.name), [user?.name]);
   const [programs, setPrograms] = useState([]);
@@ -137,7 +134,7 @@ function ProfileSetup() {
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const [form, setForm] = useState({
-    role: normalizeRole(user?.role) === "program" ? "program_head" : user?.role || storedSetup?.role || "",
+    role: getProfileSetupRole(user?.email, user?.role, storedSetup?.role),
     programId: user?.program_id || storedSetup?.program_id || "",
     studentNumber: storedSetup?.student_number || user?.student_number || "",
     yearLevel: user?.year_level || storedSetup?.year_level || "",
@@ -160,10 +157,7 @@ function ProfileSetup() {
 
   useEffect(() => {
     setForm({
-      role:
-        normalizeRole(user?.role) === "program"
-          ? "program_head"
-          : user?.role || storedSetup?.role || "",
+      role: getProfileSetupRole(user?.email, user?.role, storedSetup?.role),
       programId: user?.program_id || storedSetup?.program_id || "",
       studentNumber: storedSetup?.student_number || user?.student_number || "",
       yearLevel: user?.year_level || storedSetup?.year_level || "",
@@ -232,7 +226,11 @@ function ProfileSetup() {
     const nextErrors = {};
     const selectedRole = normalizeRole(form.role);
 
-    if (!form.role) nextErrors.role = "Select your role.";
+    if (!roleOptions.some(({ value }) => value === form.role)) {
+      nextErrors.role = roleOptions.length
+        ? "Select a role available for your verified email."
+        : "A verified La Verdad student or staff email is required.";
+    }
     if (!form.programId) nextErrors.programId = "Select your program.";
     if (selectedRole === "student" && !form.studentNumber.trim()) {
       nextErrors.studentNumber = "Enter your student ID.";
@@ -358,16 +356,28 @@ function ProfileSetup() {
                   id="setup-role"
                   value={form.role}
                   onChange={(event) => updateField("role", event.target.value)}
-                  className="h-10 rounded-[5px] border border-slate-300 bg-white px-3 text-sm font-medium text-slate-900 shadow-none outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                  disabled={roleOptions.length <= 1 || submitting}
+                  aria-invalid={Boolean(errors.role)}
+                  aria-describedby="setup-role-description"
+                  className="h-10 rounded-[5px] border border-slate-300 bg-white px-3 text-sm font-medium text-slate-900 shadow-none outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:bg-slate-100 aria-invalid:border-destructive"
                 >
-                  <option value="">Select role</option>
+                  {roleOptions.length !== 1 && <option value="">Select role</option>}
                   {roleOptions.map((role) => (
                     <option key={role.value} value={role.value}>
                       {role.label}
                     </option>
                   ))}
                 </select>
-                <FieldError message={errors.role} />
+                <div id="setup-role-description">
+                  <FieldError
+                    message={
+                      errors.role ||
+                      (!roleOptions.length
+                        ? "A verified La Verdad student or staff email is required."
+                        : "")
+                    }
+                  />
+                </div>
               </div>
 
               <div className="grid gap-2">
@@ -442,7 +452,7 @@ function ProfileSetup() {
             <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
               <Button
                 type="submit"
-                disabled={submitting}
+                disabled={submitting || !roleOptions.length}
                 className="h-10 rounded-[5px] bg-[#0b4bd3] px-5 font-bold text-white hover:bg-[#083da9]"
               >
                 {submitting && <Spinner className="mr-2" />}

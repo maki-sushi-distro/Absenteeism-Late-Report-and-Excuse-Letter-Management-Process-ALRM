@@ -1,94 +1,82 @@
-// src/context/AuthContext.jsx
-import { createContext, useContext, useEffect, useState } from 'react';
-import { apiFetch, setToken } from '../api/client';
-import {
-  activateBrowserSession,
-  clearActiveBrowserSession,
-  isCurrentBrowserSessionActive,
-  markTrustedOtpDevice,
-  subscribeToActiveSessionChanges,
-} from '../api/authSecurity';
+import { createContext, useCallback, useContext, useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { apiFetch, getToken, setToken, subscribeToTokenChanges } from '../api/client';
+import { clearPendingOtp } from '../api/otp';
+import { getSessionUser } from '../api/session';
 
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const token = useSyncExternalStore(subscribeToTokenChanges, getToken, () => null);
+  const [session, setSession] = useState({ token: null, user: null, error: '', loading: false });
+  const requestVersion = useRef(0);
 
-  async function loadUser() {
-    const token = localStorage.getItem('auth_token');
-    if (!token) {
-      setUser(null);
-      setLoading(false);
-      return;
-    }
+  const loadUser = useCallback((nextToken) => {
+    const version = ++requestVersion.current;
+    if (!nextToken) return Promise.resolve(null);
 
-    if (!isCurrentBrowserSessionActive()) {
-      setToken(null);
-      setUser(null);
-      setLoading(false);
+    return getSessionUser(nextToken).then((user) => {
+      if (getToken() !== nextToken) return null;
+
+      if (version === requestVersion.current) {
+        clearPendingOtp();
+        setSession({ token: nextToken, user, error: '', loading: false });
+      }
+      return user;
+    }, () => {
+      if (getToken() === nextToken && version === requestVersion.current) {
+        setSession((current) => ({
+          token: nextToken,
+          user: current.token === nextToken ? current.user : null,
+          error: 'We could not reach your account. Your saved session has been kept. Please try again.',
+          loading: false,
+        }));
+      }
       return null;
-    }
-
-    try {
-      const res = await apiFetch('/api/me');
-      if (res.ok) {
-        const { data } = await res.json();
-        setUser(data);
-        return data;
-      } else {
-        setUser(null);
-      }
-    } catch {
-      setUser(null);
-    } finally {
-      setLoading(false);
-    }
-
-    return null;
-  }
-
-  useEffect(() => {
-    loadUser();
-  }, []);
-
-  useEffect(() => {
-    return subscribeToActiveSessionChanges(() => {
-      if (!isCurrentBrowserSessionActive()) {
-        setToken(null);
-        setUser(null);
-      }
     });
   }, []);
 
-  async function loginWithToken(token) {
-    setToken(token);
-    activateBrowserSession();
-    return await loadUser();
+  useEffect(() => {
+    if (token) loadUser(token);
+    return () => { requestVersion.current += 1; };
+  }, [loadUser, token]);
+
+  async function refreshUser() {
+    setSession((current) => ({ ...current, loading: true, error: '' }));
+    return loadUser(getToken());
+  }
+
+  async function loginWithToken(nextToken) {
+    if (!nextToken) throw new Error('Missing login token.');
+    setToken(nextToken);
+    const user = await loadUser(nextToken);
+    if (!user) throw new Error('Unable to confirm your session. Please try again.');
+    clearPendingOtp();
+    return user;
   }
 
   async function logout() {
-    if (user) {
-      markTrustedOtpDevice({
-        userId: user.id,
-        email: user.email,
-      });
-    }
-
-    try {
-      await apiFetch('/api/logout', { method: 'POST' });
-    } catch {
-      // ignore network errors on logout — clear local state regardless
-    }
+    const request = apiFetch('/api/logout', {
+      method: 'POST',
+      signal: AbortSignal.timeout(10000),
+    });
+    requestVersion.current += 1;
     setToken(null);
-    setUser(null);
-    clearActiveBrowserSession();
+    clearPendingOtp();
+    setSession({ token: null, user: null, error: '', loading: false });
+    try {
+      await request;
+    } catch {
+      // The local session is already cleared if the server is unavailable.
+    }
   }
 
+  const currentSession = Boolean(token) && session.token === token;
+  const user = currentSession ? session.user : null;
+  const loading = Boolean(token) && (!currentSession || session.loading);
+  const sessionError = currentSession ? session.error : '';
+
   return (
-    <AuthContext.Provider
-      value={{ user, loading, loginWithToken, logout, refreshUser: loadUser }}
-    >
+    <AuthContext.Provider value={{ user, loading, sessionError, loginWithToken, logout, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

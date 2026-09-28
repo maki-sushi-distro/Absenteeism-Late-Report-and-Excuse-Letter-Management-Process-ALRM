@@ -1,4 +1,4 @@
-import { apiFetch } from "./client";
+import { apiFetch } from "./client.js";
 
 async function readJson(res) {
   try {
@@ -47,20 +47,36 @@ function listFrom(body) {
 }
 
 export async function getProfileSetupPrograms() {
-  const primary = await apiFetch("/api/admin/programs");
+  const endpoints = ["/api/programs", "/api/test/programs"];
+  let lastError = null;
 
-  if (primary.ok) {
-    return listFrom(await primary.json());
+  for (const endpoint of endpoints) {
+    const response = await apiFetch(endpoint);
+
+    if (response.ok) {
+      const programs = listFrom(await response.json());
+
+      if (programs.length === 0) {
+        throw new Error("The backend program list is empty.");
+      }
+
+      return programs;
+    }
+
+    try {
+      await expectJson(response);
+    } catch (error) {
+      lastError = error;
+    }
+
+    if (![404, 405].includes(response.status)) break;
   }
 
-  if (![403, 404, 405].includes(primary.status)) {
-    await expectJson(primary);
-  }
-
-  const fallback = await apiFetch("/api/test/programs");
-  const body = await expectJson(fallback);
-
-  return listFrom(body);
+  throw new Error(
+    lastError?.status === 404
+      ? "The backend does not expose a program-list endpoint for profile setup."
+      : lastError?.message || "Unable to load programs from the backend.",
+  );
 }
 
 export async function saveProfileSetup(payload) {

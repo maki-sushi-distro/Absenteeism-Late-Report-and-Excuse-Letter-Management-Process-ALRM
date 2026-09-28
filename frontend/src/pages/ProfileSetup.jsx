@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { AlertCircle, CheckCircle2, UserRound } from "lucide-react";
+import { AlertCircle, CheckCircle2, RefreshCw, UserRound } from "lucide-react";
 import { getProfileSetupPrograms, saveProfileSetup } from "@/api/profileSetup";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -26,33 +26,6 @@ import {
 import { normalizeRole } from "@/lib/roles";
 import lvLogo from "@/assets/LV_Logo.png";
 
-const defaultPrograms = [
-  {
-    id: "bs-information-systems",
-    program_name: "BS in Information Systems",
-  },
-  {
-    id: "bs-accountancy",
-    program_name: "BS in Accountancy",
-  },
-  {
-    id: "bs-accountancy-information-systems",
-    program_name: "BS in Accountancy Information Systems",
-  },
-  {
-    id: "bs-social-work",
-    program_name: "BS in Social Work",
-  },
-  {
-    id: "ba-broadcasting",
-    program_name: "BA in Broadcasting",
-  },
-  {
-    id: "associate-computer-technology",
-    program_name: "Associate in Computer Technology",
-  },
-];
-
 const fullYearOptions = ["1st Year", "2nd Year", "3rd Year", "4th Year"];
 const associateYearOptions = ["1st Year", "2nd Year"];
 
@@ -77,17 +50,8 @@ function normalizedProgramName(program) {
   return programLabel(program).trim().toLowerCase();
 }
 
-function mergePrograms(apiPrograms) {
-  const programs = [...apiPrograms];
-  const seen = new Set(apiPrograms.map((program) => normalizedProgramName(program)));
-
-  defaultPrograms.forEach((program) => {
-    if (!seen.has(normalizedProgramName(program))) {
-      programs.push(program);
-    }
-  });
-
-  return programs.sort((first, second) =>
+function sortPrograms(programs) {
+  return [...programs].sort((first, second) =>
     programLabel(first).localeCompare(programLabel(second)),
   );
 }
@@ -132,6 +96,7 @@ function ProfileSetup() {
   const [programs, setPrograms] = useState([]);
   const [programsLoading, setProgramsLoading] = useState(true);
   const [programsError, setProgramsError] = useState("");
+  const [programsRequestKey, setProgramsRequestKey] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
@@ -172,12 +137,12 @@ function ProfileSetup() {
 
       try {
         const data = await getProfileSetupPrograms();
-        if (alive) setPrograms(mergePrograms(data));
+        if (alive) setPrograms(sortPrograms(data));
       } catch (loadError) {
         if (alive) {
-          setPrograms(defaultPrograms);
+          setPrograms([]);
           setProgramsError(
-            loadError?.message || "Unable to load program options.",
+            loadError?.message || "Unable to load programs from the backend.",
           );
         }
       } finally {
@@ -190,7 +155,7 @@ function ProfileSetup() {
     return () => {
       alive = false;
     };
-  }, []);
+  }, [programsRequestKey]);
 
   function updateField(name, value) {
     setForm((current) => {
@@ -391,11 +356,15 @@ function ProfileSetup() {
                   onChange={(event) =>
                     updateField("programId", event.target.value)
                   }
-                  disabled={programsLoading}
+                  disabled={programsLoading || Boolean(programsError)}
                   className="h-10 rounded-[5px] border border-slate-300 bg-white px-3 text-sm font-medium text-slate-900 shadow-none outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:bg-slate-100"
                 >
                   <option value="">
-                    {programsLoading ? "Loading programs..." : "Select program"}
+                    {programsLoading
+                      ? "Loading programs..."
+                      : programsError
+                        ? "Programs unavailable"
+                        : "Select program"}
                   </option>
                   {programs.map((program) => (
                     <option key={programId(program)} value={programId(program)}>
@@ -404,9 +373,21 @@ function ProfileSetup() {
                   ))}
                 </select>
                 {programsError && !errors.programId && (
-                  <p className="text-xs text-amber-700">
-                    Using default program options because the backend list is unavailable.
-                  </p>
+                  <div className="flex flex-wrap items-center gap-2 text-xs text-red-600">
+                    <span>{programsError}</span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() =>
+                        setProgramsRequestKey((current) => current + 1)
+                      }
+                      className="h-7 rounded-[5px] px-2 font-bold text-[#0b4bd3]"
+                    >
+                      <RefreshCw className="size-3.5" />
+                      Retry
+                    </Button>
+                  </div>
                 )}
                 <FieldError message={errors.programId} />
               </div>

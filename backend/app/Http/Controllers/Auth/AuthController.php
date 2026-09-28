@@ -3,106 +3,178 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Auth\OtpController;
+use App\Support\TrustedDeviceManager;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use Laravel\Socialite\Facades\Socialite;
 use Laravel\Socialite\Two\InvalidStateException;
 
 class AuthController extends Controller
 {
     /**
-     * Domains allowed to sign in, mapped to the role they resolve to.
-     * Student domain auto-resolves to 'student'; staff domain resolves
-     * to null (role assigned later by Admin) per README §9 / ALRM.md §2.
+     * Default role for a brand-new staff-domain account, only when
+     * nobody pre-registered them (UserApprovalController::store()).
      */
-    private const STUDENT_DOMAIN = 'student.laverdad.edu.ph';
-
-    private const STAFF_DOMAIN = 'laverdad.edu.ph';
+    private const DEFAULT_STAFF_ROLE = 'instructor';
 
     /**
      * Step 1 — Send the user's browser to Google's consent screen.
      *
+     * Accepts an `origin` query param (the frontend's own
+     * window.location.origin) so we know where to send the user back
+     * to in callback() — this lets both localhost and the deployed
+     * Vercel frontend use the same backend without hardcoding one URL.
+     * The chosen origin is base64-encoded and passed through Google's
+     * `state` param, which Google returns to us untouched.
+     *
      * GET /api/auth/google/redirect
      */
-    public function redirect(): RedirectResponse
+    public function redirect(Request $request): RedirectResponse
     {
+        $origin = $request->query('origin')
+            ?? $request->headers->get('referer');
+
+        $allowedOrigins = array_filter([
+            rtrim((string) env('FRONTEND_URL', 'http://localhost:5173'), '/'),
+            rtrim((string) env('FRONTEND_URL_PROD'), '/'),
+        ]);
+
+        $frontendUrl = collect($allowedOrigins)
+            ->first(fn($url) => $origin && str_starts_with($origin, $url));
+
+        $frontendUrl ??= end($allowedOrigins) ?: reset($allowedOrigins);
+
         return Socialite::driver('google')
             ->stateless()
+            ->with(['state' => base64_encode($frontendUrl)])
             ->redirect();
     }
 
     /**
-     * Step 2 — Google redirects the browser back here with an auth code.
-     * We exchange it for the user's Google profile, validate the domain,
-     * find-or-create the local user, issue a Sanctum token, then redirect
-     * the browser back to the React frontend with the token attached.
+     * Step 2 — Google redirects here with an auth code. We exchange it
+     * for the profile, validate the domain, find-or-create the local
+     * user, issue a Sanctum token, then redirect back to the SPA with
+     * ?token=... (can't return JSON — this is a browser redirect).
      *
-     * This is a full browser redirect (not an AJAX call), so we cannot
-     * return JSON here — nothing on the frontend would be able to read it.
-     * Instead we bounce back to the SPA with ?token=... in the query string;
-     * the frontend grabs it, stores it, then calls GET /api/me to hydrate
-     * the rest of the session.
+     * The `state` param carries the frontend origin we encoded in
+     * redirect(), so we always bounce the user back to whichever
+     * frontend (localhost or Vercel) they started from.
+     *
+     * New users land as status='pending' (self-registration + approval
+     * requirement) — a token is still issued so the frontend can call
+     * GET /api/me and show "awaiting approval". RoleMiddleware is what
+     * actually blocks pending users from role-gated routes.
      *
      * GET /api/auth/google/callback
      */
     public function callback(): RedirectResponse
     {
-        $frontendUrl = rtrim((string) config('app.frontend_url', env('FRONTEND_URL')), '/');
+        Log::debug('Raw code received', [
+            'code' => request()->query('code'),
+            'length' => strlen((string) request()->query('code')),
+        ]);
+
+        $state = request()->query('state');
+        $frontendUrl = $state
+            ? rtrim((string) base64_decode($state), '/')
+            : rtrim((string) env('FRONTEND_URL_PROD', env('FRONTEND_URL')), '/');
 
         try {
             $googleUser = Socialite::driver('google')
                 ->stateless()
                 ->user();
-        } catch (InvalidStateException|\Throwable $e) {
+        } catch (InvalidStateException | \Throwable $e) {
             Log::warning('Google OAuth callback failed', ['error' => $e->getMessage()]);
 
             return redirect()->away(
-                $frontendUrl.'/login?error=oauth_failed'
+                $frontendUrl . '/login?error=oauth_failed'
             );
         }
 
         $email = strtolower((string) $googleUser->getEmail());
         $domain = substr(strrchr($email, '@') ?: '', 1);
 
-        // Reject anything outside both institutional domains, even if
-        // Google auth itself succeeded — per README §9 / ALRM.md §2.
-        if (! in_array($domain, [self::STUDENT_DOMAIN, self::STAFF_DOMAIN], true)) {
+        $studentDomain = config('institution.student_domain');
+        $staffDomain = config('institution.staff_domain');
+
+        if (! in_array($domain, [$studentDomain, $staffDomain], true)) {
             return redirect()->away(
-                $frontendUrl.'/login?error=invalid_domain'
+                $frontendUrl . '/login?error=invalid_domain'
             );
         }
 
-        $isStudent = $domain === self::STUDENT_DOMAIN;
+        $isStudent = $domain === $studentDomain;
 
         $user = User::query()->firstOrNew(['email' => $email]);
 
         $isNewUser = ! $user->exists;
+        $isFirstLogin = $isNewUser || is_null($user->google_id);
 
         $user->google_id = $googleUser->getId();
-        $user->name = $googleUser->getName() ?: $user->name;
 
         if ($isNewUser) {
-            // Student email → auto-approved, role locked in immediately.
-            // Staff email → pending, Admin assigns the specific role later.
-            $user->role = $isStudent ? 'student' : null;
-            $user->status = $isStudent ? 'approved' : 'pending';
+            $user->name = $googleUser->getName() ?: $user->name;
+            $user->role = $isStudent ? 'student' : self::DEFAULT_STAFF_ROLE;
+            $user->status = 'pending';
+            $user->password = null;
+        } elseif ($isFirstLogin) {
+            $user->name = $googleUser->getName() ?: $user->name;
+            $user->status = 'approved';
             $user->password = null;
         }
-
         $user->save();
 
-        // Revoke old tokens for this user before issuing a new one, so a
-        // re-login doesn't silently pile up valid tokens over time.
-        $user->tokens()->delete();
+        if (TrustedDeviceManager::isTrusted(request(), $user)) {
+            $token = $user->createToken('alrm-spa')->plainTextToken;
+            $code = Str::random(40);
+            Cache::put("auth_exchange:{$code}", $token, now()->addSeconds(60));
 
-        $token = $user->createToken('alrm-spa')->plainTextToken;
+            return redirect()->away(
+                $frontendUrl . '/auth/callback?code=' . urlencode($code)
+            );
+        }
+
+        OtpController::issue($user);
 
         return redirect()->away(
-            $frontendUrl.'/auth/callback?token='.urlencode($token)
+            $frontendUrl . '/auth/otp?user_id=' . urlencode($user->id)
         );
+    }
+
+    /**
+     * Step 3 — SPA exchanges the one-time code for the real Sanctum
+     * token. Single-use, expires in 60s, so a token never sits exposed
+     * in the URL/history.
+     *
+     * POST /api/auth/exchange
+     */
+    public function exchange(Request $request): JsonResponse
+    {
+        $request->validate([
+            'code' => 'required|string',
+        ]);
+
+        $token = Cache::pull("auth_exchange:{$request->string('code')}");
+
+        if (! $token) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid or expired code.',
+                'data'    => null,
+            ], 401);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'OK',
+            'data'    => ['token' => $token],
+        ]);
     }
 
     /**
@@ -122,9 +194,8 @@ class AuthController extends Controller
     }
 
     /**
-     * Return the authenticated user's profile.
-     * Frontend calls this right after grabbing ?token= from the callback
-     * redirect, to hydrate role/status/program without decoding the token.
+     * Authenticated user's profile. Frontend checks `status` here —
+     * 'pending' means show "awaiting approval" instead of the dashboard.
      *
      * GET /api/me
      */

@@ -5,8 +5,10 @@ namespace App\Models;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -20,7 +22,9 @@ use Laravel\Sanctum\HasApiTokens;
     'password',
     'role',
     'program_id',
+    'school_student_id',
     'status',
+    'deactivated_at',
     'year_level',
     'guardian_name',
     'contact_number',
@@ -29,12 +33,16 @@ use Laravel\Sanctum\HasApiTokens;
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, Notifiable, HasApiTokens;
+    use HasFactory, Notifiable, HasApiTokens, HasUuids;
+
+    protected $keyType = 'string';
+    public $incrementing = false;
 
     protected function casts(): array
     {
         return [
             'email_verified_at' => 'datetime',
+            'deactivated_at' => 'datetime',
             'password' => 'hashed',
         ];
     }
@@ -46,11 +54,23 @@ class User extends Authenticatable
     */
 
     /**
-     * The program this user (student/instructor) belongs to.
+     * The program this user (student) belongs to — direct FK.
+     * One student, one program.
      */
     public function program(): BelongsTo
     {
         return $this->belongsTo(Program::class);
+    }
+
+    /**
+     * The programs this user (instructor/program head) belongs to —
+     * many-to-many via pivot. An instructor can teach across programs.
+     */
+    public function programs(): BelongsToMany
+    {
+        return $this->belongsToMany(Program::class, 'program_user')
+            ->using(ProgramUser::class)
+            ->withTimestamps();
     }
 
     /**

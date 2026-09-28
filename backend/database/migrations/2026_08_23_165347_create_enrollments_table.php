@@ -12,9 +12,10 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('enrollments', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('student_id')->constrained('users')->cascadeOnDelete();
-            $table->foreignId('class_id')->constrained('classes')->cascadeOnDelete();
+            $table->uuid('id')->primary();
+            $table->foreignUuid('student_id')->constrained('users')->cascadeOnDelete();
+            $table->foreignUuid('class_id')->constrained('classes')->cascadeOnDelete();
+            $table->enum('year_level', ['1st', '2nd', '3rd', '4th']);
             $table->timestamps();
         });
     }

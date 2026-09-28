@@ -67,7 +67,9 @@ class ExcuseRequestPolicy
      */
     public function update(User $user, ExcuseRequest $excuseRequest): bool
     {
-        return false;
+        return $user->role === 'student'
+            && $excuseRequest->enrollment->student_id === $user->id
+            && $excuseRequest->status === 'pending';
     }
 
     /**
@@ -75,7 +77,7 @@ class ExcuseRequestPolicy
      */
     public function delete(User $user, ExcuseRequest $excuseRequest): bool
     {
-        return false;
+        return $this->update($user, $excuseRequest);
     }
 
     /**

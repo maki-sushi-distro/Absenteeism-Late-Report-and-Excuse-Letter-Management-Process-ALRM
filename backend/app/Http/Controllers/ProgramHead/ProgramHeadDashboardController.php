@@ -6,8 +6,10 @@ use App\Http\Controllers\Controller;
 use App\Models\AttendanceTracker;
 use App\Models\ExcuseRequest;
 use App\Models\FollowupFlag;
+use App\Models\Enrollment;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\Rule;
 
 class ProgramHeadDashboardController extends Controller
 {
@@ -34,7 +36,9 @@ class ProgramHeadDashboardController extends Controller
 
         $data = [
             'program_name'     => $program->program_name,
-            'total_students'   => $program->users()->where('role', 'student')->count(),
+            'total_students' => Enrollment::whereHas('class', function ($q) use ($program) {
+                $q->where('program_id', $program->id);
+            })->distinct('student_id')->count('student_id'),
             'total_classes'    => $program->classes()->count(),
             'pending_requests' => ExcuseRequest::whereHas('enrollment.class', function ($q) use ($program) {
                 $q->where('program_id', $program->id);
@@ -57,7 +61,7 @@ class ProgramHeadDashboardController extends Controller
 
     /**
      * Students escalated to this Program Head via FollowupFlag (IR crossings).
-     * Supports ?status=pending|resolved filter; defaults to all.
+     * Supports ?status=open|resolved filter; defaults to all.
      */
     public function flaggedStudents(Request $request)
     {
@@ -69,6 +73,9 @@ class ProgramHeadDashboardController extends Controller
             ]);
 
         if ($request->filled('status')) {
+            $request->validate([
+                'status' => ['string', Rule::in(['open', 'resolved'])],
+            ]);
             $query->where('status', $request->query('status'));
         }
 
@@ -102,6 +109,9 @@ class ProgramHeadDashboardController extends Controller
         })->with(['enrollment.student', 'enrollment.class.instructor', 'reviewer', 'followupFlag']);
 
         if ($request->filled('status')) {
+            $request->validate([
+                'status' => ['string', Rule::in(['pending', 'approved', 'noted', 'invalid'])],
+            ]);
             $query->where('status', $request->query('status'));
         }
 

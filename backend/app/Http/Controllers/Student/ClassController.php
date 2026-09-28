@@ -24,7 +24,11 @@ class ClassController extends Controller
                 'enrollment_id' => $enrollment->id,
                 'class_id'      => $enrollment->class_id,
                 'subject_name'  => $enrollment->class->subject_name,
+                'section'       => $enrollment->class->section,
                 'schedule'      => $enrollment->class->schedule,
+                'semester'      => $enrollment->class->semester,
+                'school_year'   => $enrollment->class->school_year,
+                'year_level'    => $enrollment->year_level,
                 'instructor'    => $enrollment->class->instructor?->only(['id', 'name']),
                 'program'       => $enrollment->class->program?->program_name,
             ];

@@ -264,7 +264,7 @@ function FormNavigation({
   submit,
 }) {
   return (
-    <div className="mt-2 flex items-center justify-between border-t border-slate-200 pt-5">
+    <div className="mt-2 flex items-center justify-between pt-5">
       <Button
         type="button"
         variant="outline"

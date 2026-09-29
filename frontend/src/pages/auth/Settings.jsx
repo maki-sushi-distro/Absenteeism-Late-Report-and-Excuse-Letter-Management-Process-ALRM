@@ -23,6 +23,7 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { useAuth } from "@/context/AuthContext";
+import { getStoredProfileSetup } from "@/lib/profileSetup";
 import AdminPageLayout from "./admin/AdminPageLayout";
 import InstructorPageLayout from "./instructor/InstructorPageLayout";
 import StudentPageLayout from "./student/StudentPageLayout";
@@ -111,6 +112,24 @@ function programLabel(user) {
   );
 }
 
+function schoolStudentId(user) {
+  const storedSetup = getStoredProfileSetup(user);
+
+  return (
+    storedSetup?.student_number ||
+    storedSetup?.studentNumber ||
+    storedSetup?.student_id ||
+    user?.school_student_id ||
+    user?.student_number ||
+    user?.studentNumber ||
+    user?.school_id ||
+    user?.schoolId ||
+    user?.student_id_number ||
+    user?.studentIdNumber ||
+    ""
+  );
+}
+
 function userInitials(name) {
   const parts = String(name || "ALRM")
     .trim()
@@ -192,7 +211,7 @@ function ProfileCard({ user, config, role, onUnsupported }) {
   }
 
   if (normalizedRole === "student") {
-    fields.push({ label: "Student ID", value: user?.student_id || user?.id });
+    fields.push({ label: "Student ID", value: schoolStudentId(user) });
     fields.push({ label: "Program / Section", value: programLabel(user) });
     fields.push({ label: "Year Level", value: user?.year_level });
   }

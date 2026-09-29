@@ -77,6 +77,7 @@ function HttpErrorPage({ status = 404, description, onRetry }) {
   const destinationLabel = user ? "Go to dashboard" : "Go to sign in";
   const DestinationIcon = user ? LayoutDashboard : LogIn;
   const canRetry = status === 500 || status === 503;
+  const secondaryActionGoesBack = status === 401 || status === 403 || status === 404;
 
   function handlePrimaryAction() {
     if (canRetry) {
@@ -177,7 +178,7 @@ function HttpErrorPage({ status = 404, description, onRetry }) {
                 <PrimaryIcon className="size-4" />
                 {primaryLabel}
               </Button>
-              {status !== 401 && status !== 404 && (
+              {!secondaryActionGoesBack && (
                 <Button
                   type="button"
                   variant="outline"
@@ -189,7 +190,7 @@ function HttpErrorPage({ status = 404, description, onRetry }) {
                   {destinationLabel}
                 </Button>
               )}
-              {(status === 401 || status === 404) && (
+              {secondaryActionGoesBack && (
                 <Button
                   type="button"
                   variant="outline"

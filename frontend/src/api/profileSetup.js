@@ -47,36 +47,15 @@ function listFrom(body) {
 }
 
 export async function getProfileSetupPrograms() {
-  const endpoints = ["/api/programs", "/api/test/programs"];
-  let lastError = null;
+  const response = await apiFetch("/api/complete-profile/programs");
+  const body = await expectJson(response);
+  const programs = listFrom(body);
 
-  for (const endpoint of endpoints) {
-    const response = await apiFetch(endpoint);
-
-    if (response.ok) {
-      const programs = listFrom(await response.json());
-
-      if (programs.length === 0) {
-        throw new Error("The backend program list is empty.");
-      }
-
-      return programs;
-    }
-
-    try {
-      await expectJson(response);
-    } catch (error) {
-      lastError = error;
-    }
-
-    if (![404, 405].includes(response.status)) break;
+  if (programs.length === 0) {
+    throw new Error("The backend program list is empty.");
   }
 
-  throw new Error(
-    lastError?.status === 404
-      ? "The backend does not expose a program-list endpoint for profile setup."
-      : lastError?.message || "Unable to load programs from the backend.",
-  );
+  return programs;
 }
 
 export async function saveProfileSetup(payload) {

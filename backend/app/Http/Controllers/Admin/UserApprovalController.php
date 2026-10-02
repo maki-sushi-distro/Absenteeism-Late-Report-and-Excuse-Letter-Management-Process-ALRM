@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\TrustedDevice;
 use App\Models\User;
 use App\Services\AuditLoggerService;
 use Illuminate\Http\JsonResponse;
@@ -51,7 +52,7 @@ class UserApprovalController extends Controller
     {
         $request->validate([
             'role'   => ['sometimes', 'string', Rule::in(self::CREATABLE_ROLES)],
-            'status' => ['sometimes', 'string', Rule::in(['pending', 'approved', 'inactive'])],
+            'status' => ['sometimes', 'string', Rule::in(['pending', 'approved', 'deactivated', 'inactive'])],
         ]);
 
         $query = User::query()->whereNotNull('role');
@@ -61,7 +62,12 @@ class UserApprovalController extends Controller
         }
 
         if ($request->filled('status')) {
-            $query->where('status', $request->query('status'));
+            // legacy alias: 'inactive' -> 'deactivated'
+            $status = $request->query('status') === 'inactive'
+                ? 'deactivated'
+                : $request->query('status');
+
+            $query->where('status', $status);
         }
 
         $users = $query->withExists(['headedProgram as heads_program'])
@@ -109,7 +115,7 @@ class UserApprovalController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Email must be an institutional address (@'
-                    .$studentDomain.' or @'.$staffDomain.').',
+                    . $studentDomain . ' or @' . $staffDomain . ').',
                 'data'    => null,
             ], 422);
         }
@@ -133,7 +139,7 @@ class UserApprovalController extends Controller
             'password' => null,
         ]);
 
-        $this->auditLogger->log('pre_registered_user:'.$validated['role'], 'users', $user->id);
+        $this->auditLogger->log('pre_registered_user:' . $validated['role'], 'users', $user->id);
 
         return response()->json([
             'success' => true,
@@ -155,7 +161,7 @@ class UserApprovalController extends Controller
      */
     public function destroy(User $user): JsonResponse
     {
-        if (! in_array($user->status, ['pending', 'inactive'], true)) {
+        if (! in_array($user->status, ['pending', 'deactivated'], true)) {
             return response()->json([
                 'success' => false,
                 'message' => 'Only pending or deactivated accounts can be deleted. Deactivate this user first.',
@@ -213,8 +219,11 @@ class UserApprovalController extends Controller
     public function updateStatus(Request $request, User $user): JsonResponse
     {
         $validated = $request->validate([
-            'status' => ['required', 'string', Rule::in(['approved', 'inactive'])],
+            'status' => ['required', 'string', Rule::in(['approved', 'deactivated', 'inactive'])],
         ]);
+
+        // 'inactive' is a legacy alias; the DB enum only has 'deactivated'.
+        $newStatus = $validated['status'] === 'inactive' ? 'deactivated' : $validated['status'];
 
         if ($user->status === 'pending') {
             if (is_null($user->google_id)) {
@@ -225,10 +234,10 @@ class UserApprovalController extends Controller
                 ], 409);
             }
 
-            if ($validated['status'] !== 'approved') {
+            if ($newStatus !== 'approved') {
                 return response()->json([
                     'success' => false,
-                    'message' => "A self-registered account awaiting approval can only be approved through this endpoint. Delete it instead to reject the registration.",
+                    'message' => 'A self-registered account awaiting approval can only be approved through this endpoint. Delete it instead to reject the registration.',
                     'data'    => null,
                 ], 409);
             }
@@ -244,30 +253,35 @@ class UserApprovalController extends Controller
 
         $previousStatus = $user->status;
 
-        if ($previousStatus === $validated['status']) {
+        if ($previousStatus === $newStatus) {
             return response()->json([
                 'success' => false,
-                'message' => "User is already '{$validated['status']}'.",
+                'message' => "User is already '{$newStatus}'.",
                 'data'    => null,
             ], 409);
         }
 
-        $user->status = $validated['status'];
-        $user->deactivated_at = $validated['status'] === 'inactive' ? now() : null;
+        $user->status = $newStatus;
+        $user->deactivated_at = $newStatus === 'deactivated' ? now() : null;
         $user->save();
+
+        if ($newStatus === 'deactivated') {
+            $user->tokens()->delete();
+            TrustedDevice::where('user_id', $user->id)->delete();
+        }
 
         $this->auditLogger->log(
             $previousStatus === 'pending'
                 ? 'approved_self_registered_user'
-                : "status_changed:{$previousStatus}->{$validated['status']}",
+                : "status_changed:{$previousStatus}->{$newStatus}",
             'users',
             $user->id
         );
 
         $message = match (true) {
             $previousStatus === 'pending' => 'User approved.',
-            $validated['status'] === 'inactive' => 'User deactivated.',
-            default => 'User reactivated.',
+            $newStatus === 'deactivated'  => 'User deactivated.',
+            default                       => 'User reactivated.',
         };
 
         return response()->json([

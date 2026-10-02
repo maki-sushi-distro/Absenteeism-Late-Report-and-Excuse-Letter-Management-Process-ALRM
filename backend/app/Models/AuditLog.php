@@ -16,6 +16,7 @@ class AuditLog extends Model
 
     protected $keyType = 'string';
     public $incrementing = false;
+    protected $table = 'audit_log';
 
     // No created_at/updated_at — table only has 'timestamp'
     public $timestamps = false;

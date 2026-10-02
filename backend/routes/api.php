@@ -47,7 +47,7 @@ Route::prefix('auth')->group(function () {
         ->middleware('throttle:10,1');
 });
 
-Route::middleware(['auth:sanctum', 'inactive'])->group(function () {
+Route::middleware(['auth:sanctum', 'active', 'inactive'])->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/me', [AuthController::class, 'me']);
     Route::get('/complete-profile/programs', [ProfileController::class, 'programs']);

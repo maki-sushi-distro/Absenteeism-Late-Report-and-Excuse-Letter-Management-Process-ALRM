@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Database\Factories\UserFactory;
+use App\Enums\UserStatus;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -127,5 +128,15 @@ class User extends Authenticatable
     public function auditLogs(): HasMany
     {
         return $this->hasMany(AuditLog::class);
+    }
+
+    /**
+     * Allowlist check via UserStatus. NULL/unknown status fails closed.
+     * Intentionally no enum cast on `status`: RoleMiddleware compares
+     * $user->status !== 'approved' as a plain string.
+     */
+    public function canLogin(): bool
+    {
+        return UserStatus::allowsLogin($this->status);
     }
 }

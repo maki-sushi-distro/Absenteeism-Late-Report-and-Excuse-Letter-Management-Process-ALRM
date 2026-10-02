@@ -20,7 +20,7 @@ class AuthControllerOAuthTest extends TestCase
         parent::setUp();
 
         config(['app.frontend_url' => 'http://localhost:5173']);
-        config(['app.frontend_url_prod' => 'https://legit-frontend.vercel.app']);
+        config(['app.frontend_url_prod' => 'absenteeism-late-report-and-excuse.vercel.app']);
         config(['institution.student_domain' => 'student.edu.ph']);
         config(['institution.staff_domain' => 'staff.edu.ph']);
     }
@@ -55,7 +55,7 @@ class AuthControllerOAuthTest extends TestCase
     public function test_redirects_to_exact_signed_origin_when_state_is_valid_and_unexpired(): void
     {
         $validState = Crypt::encryptString(json_encode([
-            'origin' => 'https://legit-frontend.vercel.app',
+            'origin' => 'absenteeism-late-report-and-excuse.vercel.app',
             'nonce'  => Str::random(32),
             'exp'    => now()->addMinutes(10)->timestamp,
         ]));
@@ -69,13 +69,13 @@ class AuthControllerOAuthTest extends TestCase
 
         $response = $this->get('/api/auth/google/callback?state=' . urlencode($validState));
 
-        $response->assertRedirectContains('legit-frontend.vercel.app');
+        $response->assertRedirectContains('absenteeism-late-report-and-excuse.vercel.app');
     }
 
     public function test_rejects_an_expired_signed_state(): void
     {
         $expiredState = Crypt::encryptString(json_encode([
-            'origin' => 'https://legit-frontend.vercel.app',
+            'origin' => 'absenteeism-late-report-and-excuse.vercel.app',
             'nonce'  => Str::random(32),
             'exp'    => now()->subMinutes(5)->timestamp,
         ]));

@@ -44,6 +44,22 @@ class OtpController extends Controller
         $user->notify(new SendOtpCode($code));
     }
 
+    /**
+     * Deactivated/NULL/unknown status: wipe pending OTPs and refuse.
+     */
+    private function rejectInactive(User $user): JsonResponse
+    {
+        OtpCode::where('user_id', $user->id)
+            ->whereNull('verified_at')
+            ->delete();
+
+        return response()->json([
+            'success' => false,
+            'message' => 'Your account is not active. Please contact an administrator.',
+            'data'    => null,
+        ], 403);
+    }
+
     public function resend(Request $request): JsonResponse
     {
         $request->validate([
@@ -51,6 +67,10 @@ class OtpController extends Controller
         ]);
 
         $user = User::findOrFail($request->string('user_id'));
+
+        if (! $user->canLogin()) {
+            return $this->rejectInactive($user);
+        }
 
         $recent = OtpCode::where('user_id', $user->id)
             ->whereNull('verified_at')
@@ -105,7 +125,13 @@ class OtpController extends Controller
             'code'    => 'required|string',
         ]);
 
-        $otp = OtpCode::where('user_id', $request->string('user_id'))
+        $user = User::findOrFail($request->string('user_id'));
+
+        if (! $user->canLogin()) {
+            return $this->rejectInactive($user);
+        }
+
+        $otp = OtpCode::where('user_id', $user->id)
             ->whereNull('verified_at')
             ->latest()
             ->first();
@@ -146,7 +172,6 @@ class OtpController extends Controller
 
         $otp->update(['verified_at' => now()]);
 
-        $user = User::findOrFail($request->string('user_id'));
         $user->tokens()->delete();
         $token = $user->createToken('alrm-spa')->plainTextToken;
         $code = Str::random(40);

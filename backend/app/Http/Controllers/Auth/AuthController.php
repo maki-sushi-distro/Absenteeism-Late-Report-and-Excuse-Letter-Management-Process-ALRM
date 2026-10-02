@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use Laravel\Sanctum\PersonalAccessToken;
 use App\Http\Controllers\Auth\OtpController;
 use App\Support\TrustedDeviceManager;
 use App\Models\User;
@@ -134,7 +135,7 @@ class AuthController extends Controller
         $isFirstLogin = $isNewUser || is_null($user->google_id);
 
         // Block disabled/rejected accounts outright, even on first Google login.
-        if (! $isNewUser && $user->status === 'deactivated') {
+        if (! $isNewUser && ! $user->canLogin()) {
             return redirect()->away(
                 $frontendUrl . '/login?error=account_disabled'
             );
@@ -232,11 +233,18 @@ class AuthController extends Controller
             ], 401);
         }
 
-        return response()->json([
-            'success' => true,
-            'message' => 'OK',
-            'data'    => ['token' => $token],
-        ]);
+        $accessToken = PersonalAccessToken::findToken($token);
+        $user = $accessToken?->tokenable;
+
+        if (! $user || ! $user->canLogin()) {
+            $accessToken?->delete();
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Your account is not active. Please contact an administrator.',
+                'data'    => null,
+            ], 403);
+        }
     }
 
     public function logout(Request $request): JsonResponse

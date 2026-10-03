@@ -122,7 +122,15 @@ class AdminUserSeeder extends Seeder
             //     role: UserRole::ProgramHead,
             //     programIds: [],
             // ),
+
+            // new SeedUser(
+            //     name: 'Marwin Mandocdoc',
+            //     email: 'marwin.mandocdoc@student.laverdad.edu.ph',
+            //     role: UserRole::Instructor,
+            // ),
         ];
+
+
 
         $sheetUsers = $this->fetchInstructorsFromGoogleSheets();
 

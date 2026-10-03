@@ -6,12 +6,12 @@ use App\Enums\UserStatus;
 use App\Models\OtpCode;
 use App\Models\TrustedDevice;
 use App\Models\User;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
-use Laravel\Socialite\Facades\Socialite;
-use Laravel\Socialite\Two\User as SocialiteUser;
-use Mockery;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 class UserStatusAccessTest extends TestCase
@@ -25,12 +25,6 @@ class UserStatusAccessTest extends TestCase
         config(['app.frontend_url' => 'http://localhost:5173']);
         config(['institution.student_domain' => 'student.edu.ph']);
         config(['institution.staff_domain' => 'staff.edu.ph']);
-    }
-
-    protected function tearDown(): void
-    {
-        Mockery::close();
-        parent::tearDown();
     }
 
     private function makeUser(?string $status, string $role = 'student', array $extra = []): User
@@ -61,12 +55,18 @@ class UserStatusAccessTest extends TestCase
         $this->assertSame(0, $user->tokens()->count());
     }
 
-    public function test_null_status_user_with_valid_token_is_rejected(): void
+    public function test_database_rejects_null_status(): void
     {
-        $user  = $this->makeUser(null);
-        $token = $user->createToken('alrm-spa')->plainTextToken;
+        $this->expectException(QueryException::class);
 
-        $this->withToken($token)->getJson('/api/me')->assertForbidden();
+        DB::table('users')->insert([
+            'id'         => (string) Str::uuid(),
+            'name'       => 'Null Status',
+            'email'      => 'null.status@example.com',
+            'status'     => null,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
     }
 
     public function test_pending_user_can_still_reach_me(): void
@@ -77,24 +77,12 @@ class UserStatusAccessTest extends TestCase
         $this->withToken($token)->getJson('/api/me')->assertOk();
     }
 
-    public function test_callback_blocks_existing_user_with_null_status(): void
+    public function test_can_login_fails_closed_for_null_status_in_memory(): void
     {
-        $user = $this->makeUser(null, 'instructor', [
-            'email'     => 'nullstatus@staff.edu.ph',
-            'google_id' => null,
-        ]);
+        $user = new User();
+        $user->status = null;
 
-        $googleUser = Mockery::mock(SocialiteUser::class);
-        $googleUser->shouldReceive('getEmail')->andReturn('nullstatus@staff.edu.ph');
-        $googleUser->shouldReceive('getId')->andReturn('google-null');
-        $googleUser->shouldReceive('getName')->andReturn('Null Status');
-
-        Socialite::shouldReceive('driver->stateless->user')->andReturn($googleUser);
-
-        $this->get('/api/auth/google/callback')
-            ->assertRedirectContains('error=account_disabled');
-
-        $this->assertNull($user->refresh()->google_id);
+        $this->assertFalse($user->canLogin());
     }
 
     public function test_otp_verify_is_blocked_for_deactivated_user(): void

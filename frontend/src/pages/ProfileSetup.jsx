@@ -16,18 +16,28 @@ import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
 import { useAuth } from "@/context/AuthContext";
 import {
-  getProfileSetupRole,
-  getProfileSetupRoleOptions,
-  getStoredProfileSetup,
+  ASSOCIATE_YEAR_LEVELS,
+  YEAR_LEVELS,
+  clearLegacyProfileSetup,
   isProfileSetupComplete,
   splitVerifiedName,
-  storeProfileSetup,
 } from "@/lib/profileSetup";
 import { normalizeRole } from "@/lib/roles";
 import lvLogo from "@/assets/LV_Logo.png";
 
-const fullYearOptions = ["1st Year", "2nd Year", "3rd Year", "4th Year"];
-const associateYearOptions = ["1st Year", "2nd Year"];
+const ROLE_LABELS = {
+  student: "Student",
+  instructor: "Instructor",
+  program_head: "Program Head",
+  administrator: "Administrator",
+};
+
+// Backend field name -> form field name
+const FIELD_MAP = {
+  program_id: "programId",
+  school_student_id: "studentNumber",
+  year_level: "yearLevel",
+};
 
 function valueFrom(item, keys, fallback = "") {
   for (const key of keys) {
@@ -46,18 +56,9 @@ function programLabel(program) {
   return valueFrom(program, ["program_name", "programName", "name"], "Unnamed Program");
 }
 
-function normalizedProgramName(program) {
-  return programLabel(program).trim().toLowerCase();
-}
-
-function sortPrograms(programs) {
-  return [...programs].sort((first, second) =>
-    programLabel(first).localeCompare(programLabel(second)),
-  );
-}
-
 function isAssociateComputerTechnology(program) {
-  const label = normalizedProgramName(program);
+  if (!program) return false;
+  const label = programLabel(program).trim().toLowerCase();
 
   return (
     label === "associate in computer technology" ||
@@ -85,28 +86,32 @@ function FieldError({ message }) {
   return <p className="text-xs font-semibold text-red-600">{message}</p>;
 }
 
+const selectClass =
+  "h-10 w-full min-w-0 rounded-[5px] border border-slate-300 bg-white px-3 text-sm font-medium text-slate-900 shadow-none outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:bg-slate-100";
+
 function ProfileSetup() {
   const navigate = useNavigate();
   const { refreshUser, user } = useAuth();
-  const roleOptions = getProfileSetupRoleOptions(user?.email);
-  const isStudentRoleLocked =
-    roleOptions.length === 1 && roleOptions[0].value === "student";
-  const storedSetup = useMemo(() => getStoredProfileSetup(user), [user]);
+
+  // Ang role ay galing sa server at read-only. Hindi ito ipinapadala.
+  const serverRole = normalizeRole(user?.role);
+  const isStudent = serverRole === "student";
+  const roleLabel = ROLE_LABELS[user?.role] || user?.role || "";
+
   const parsedName = useMemo(() => splitVerifiedName(user?.name), [user?.name]);
   const [programs, setPrograms] = useState([]);
   const [programsLoading, setProgramsLoading] = useState(true);
   const [programsError, setProgramsError] = useState("");
   const [programsRequestKey, setProgramsRequestKey] = useState(0);
   const [submitting, setSubmitting] = useState(false);
-  const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const [form, setForm] = useState({
-    role: getProfileSetupRole(user?.email, user?.role, storedSetup?.role),
-    programId: user?.program_id || storedSetup?.program_id || "",
-    studentNumber: storedSetup?.student_number || user?.student_number || "",
-    yearLevel: user?.year_level || storedSetup?.year_level || "",
+    programId: user?.program_id || "",
+    studentNumber: user?.school_student_id || "",
+    yearLevel: user?.year_level || "",
   });
   const [errors, setErrors] = useState({});
+
   const selectedProgram = useMemo(
     () =>
       programs.find(
@@ -114,13 +119,14 @@ function ProfileSetup() {
       ),
     [form.programId, programs],
   );
-  const availableYearOptions = useMemo(
-    () =>
-      isAssociateComputerTechnology(selectedProgram)
-        ? associateYearOptions
-        : fullYearOptions,
-    [selectedProgram],
-  );
+  const availableYearOptions = isAssociateComputerTechnology(selectedProgram)
+    ? ASSOCIATE_YEAR_LEVELS
+    : YEAR_LEVELS;
+
+  // Isang beses: linisin ang lumang localStorage setup.
+  useEffect(() => {
+    clearLegacyProfileSetup();
+  }, []);
 
   useEffect(() => {
     if (user && isProfileSetupComplete(user)) {
@@ -137,12 +143,12 @@ function ProfileSetup() {
 
       try {
         const data = await getProfileSetupPrograms();
-        if (alive) setPrograms(sortPrograms(data));
+        if (alive) setPrograms(data);
       } catch (loadError) {
         if (alive) {
           setPrograms([]);
           setProgramsError(
-            loadError?.message || "Unable to load programs from the backend.",
+            loadError?.message || "Unable to load programs. Please try again.",
           );
         }
       } finally {
@@ -164,14 +170,14 @@ function ProfileSetup() {
       const nextProgram = programs.find(
         (program) => String(programId(program)) === String(value),
       );
-      const nextYearOptions = isAssociateComputerTechnology(nextProgram)
-        ? associateYearOptions
-        : fullYearOptions;
+      const nextOptions = isAssociateComputerTechnology(nextProgram)
+        ? ASSOCIATE_YEAR_LEVELS
+        : YEAR_LEVELS;
 
       return {
         ...current,
         programId: value,
-        yearLevel: nextYearOptions.includes(current.yearLevel)
+        yearLevel: nextOptions.some((year) => year.value === current.yearLevel)
           ? current.yearLevel
           : "",
       };
@@ -182,18 +188,13 @@ function ProfileSetup() {
 
   function validate() {
     const nextErrors = {};
-    const selectedRole = normalizeRole(form.role);
 
-    if (!roleOptions.some(({ value }) => value === form.role)) {
-      nextErrors.role = roleOptions.length
-        ? "Select a role available for your verified email."
-        : "A verified La Verdad student or staff email is required.";
-    }
+    if (!serverRole) nextErrors.role = "Your account has no role. Contact an administrator.";
     if (!form.programId) nextErrors.programId = "Select your program.";
-    if (selectedRole === "student" && !form.studentNumber.trim()) {
+    if (isStudent && !form.studentNumber.trim()) {
       nextErrors.studentNumber = "Enter your student ID.";
     }
-    if (selectedRole === "student" && !form.yearLevel) {
+    if (isStudent && !form.yearLevel) {
       nextErrors.yearLevel = "Select your year.";
     }
 
@@ -206,37 +207,34 @@ function ProfileSetup() {
 
     if (!validate()) return;
 
-    const payload = {
-      role: form.role,
-      program_id: form.programId,
-      student_id: form.studentNumber.trim(),
-      student_number: form.studentNumber.trim(),
-      year_level: form.yearLevel,
-    };
+    // Walang role, status, student_id, student_number. Ito lang ang tinatanggap ng backend.
+    const payload = { program_id: form.programId };
+    if (isStudent) {
+      payload.school_student_id = form.studentNumber.trim();
+      payload.year_level = form.yearLevel; // "1st" | "2nd" | "3rd" | "4th"
+    }
 
     setSubmitting(true);
-    setNotice("");
     setError("");
 
     try {
-      const result = await saveProfileSetup(payload);
-
-      storeProfileSetup(user, {
-        ...payload,
-        program_name: selectedProgram ? programLabel(selectedProgram) : "",
-      });
-
-      if (result.savedToBackend) {
-        await refreshUser();
-      } else {
-        setNotice(result.message);
-      }
-
+      await saveProfileSetup(payload);
+      await refreshUser(); // kunin ang bagong user mula sa server
       navigate("/dashboard", { replace: true });
     } catch (saveError) {
+      // 422: ilagay ang mensahe sa mismong field
+      if (saveError?.status === 422 && saveError.fieldErrors) {
+        const fieldErrors = {};
+        for (const [field, messages] of Object.entries(saveError.fieldErrors)) {
+          fieldErrors[FIELD_MAP[field] || "form"] = messages?.[0];
+        }
+        setErrors((current) => ({ ...current, ...fieldErrors }));
+      }
+
+      // 409 (kumpleto na), 422, network, atbp.: laging may nakikitang mensahe
       setError(
         saveError?.message ||
-          "Unable to save your profile setup. Please try again.",
+          "Unable to save your profile. Please try again.",
       );
     } finally {
       setSubmitting(false);
@@ -264,20 +262,10 @@ function ProfileSetup() {
         </CardHeader>
 
         <CardContent className="grid gap-5">
-          {notice && (
-            <Alert className="border-amber-200 bg-amber-50 text-amber-950">
-              <AlertCircle className="size-4" />
-              <AlertTitle>Frontend setup saved</AlertTitle>
-              <AlertDescription className="text-amber-900">
-                {notice}
-              </AlertDescription>
-            </Alert>
-          )}
-
           {error && (
             <Alert variant="destructive">
               <AlertCircle className="size-4" />
-              <AlertTitle>Profile setup failed</AlertTitle>
+              <AlertTitle>Profile not saved</AlertTitle>
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
@@ -308,47 +296,18 @@ function ProfileSetup() {
 
           <form className="grid gap-5" onSubmit={handleSubmit}>
             <div className="grid gap-4 md:grid-cols-2">
-              <div className="grid gap-2">
+              <div className="grid min-w-0 gap-2">
                 <Label htmlFor="setup-role">Role</Label>
-                {isStudentRoleLocked ? (
-                  <Input
-                    id="setup-role"
-                    readOnly
-                    value="Student"
-                    aria-describedby="setup-role-description"
-                    className="h-10 cursor-default rounded-[5px] border-slate-300 bg-slate-50 text-sm font-medium text-slate-700 shadow-none"
-                  />
-                ) : (
-                  <select
-                    id="setup-role"
-                    value={form.role}
-                    onChange={(event) => updateField("role", event.target.value)}
-                    disabled={!roleOptions.length || submitting}
-                    aria-invalid={Boolean(errors.role)}
-                    aria-describedby="setup-role-description"
-                    className="h-10 rounded-[5px] border border-slate-300 bg-white px-3 text-sm font-medium text-slate-900 shadow-none outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:bg-slate-100 aria-invalid:border-destructive"
-                  >
-                    <option value="">Select role</option>
-                    {roleOptions.map((role) => (
-                      <option key={role.value} value={role.value}>
-                        {role.label}
-                      </option>
-                    ))}
-                  </select>
-                )}
-                <div id="setup-role-description">
-                  <FieldError
-                    message={
-                      errors.role ||
-                      (!roleOptions.length
-                        ? "A verified La Verdad student or staff email is required."
-                        : "")
-                    }
-                  />
-                </div>
+                <Input
+                  id="setup-role"
+                  readOnly
+                  value={roleLabel}
+                  className="h-10 cursor-default rounded-[5px] border-slate-300 bg-slate-50 text-sm font-medium text-slate-700 shadow-none"
+                />
+                <FieldError message={errors.role} />
               </div>
 
-              <div className="grid gap-2">
+              <div className="grid min-w-0 gap-2">
                 <Label htmlFor="setup-program">Program</Label>
                 <select
                   id="setup-program"
@@ -356,8 +315,9 @@ function ProfileSetup() {
                   onChange={(event) =>
                     updateField("programId", event.target.value)
                   }
-                  disabled={programsLoading || Boolean(programsError)}
-                  className="h-10 rounded-[5px] border border-slate-300 bg-white px-3 text-sm font-medium text-slate-900 shadow-none outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:bg-slate-100"
+                  disabled={programsLoading || Boolean(programsError) || submitting}
+                  aria-invalid={Boolean(errors.programId)}
+                  className={selectClass}
                 >
                   <option value="">
                     {programsLoading
@@ -372,7 +332,7 @@ function ProfileSetup() {
                     </option>
                   ))}
                 </select>
-                {programsError && !errors.programId && (
+                {programsError && (
                   <div className="flex flex-wrap items-center gap-2 text-xs text-red-600">
                     <span>{programsError}</span>
                     <Button
@@ -392,51 +352,59 @@ function ProfileSetup() {
                 <FieldError message={errors.programId} />
               </div>
 
-              <div className="grid gap-2">
-                <Label htmlFor="setup-student-number">Student ID</Label>
-                <Input
-                  id="setup-student-number"
-                  value={form.studentNumber}
-                  onChange={(event) =>
-                    updateField("studentNumber", event.target.value)
-                  }
-                  placeholder="Enter your school student ID"
-                  className="h-10 rounded-[5px] border-slate-300 text-sm shadow-none"
-                />
-                <p className="text-xs text-slate-500">
-                  Required for student accounts.
-                </p>
-                <FieldError message={errors.studentNumber} />
-              </div>
+              {isStudent && (
+                <>
+                  <div className="grid min-w-0 gap-2">
+                    <Label htmlFor="setup-student-number">Student ID</Label>
+                    <Input
+                      id="setup-student-number"
+                      value={form.studentNumber}
+                      onChange={(event) =>
+                        updateField("studentNumber", event.target.value)
+                      }
+                      disabled={submitting}
+                      aria-invalid={Boolean(errors.studentNumber)}
+                      placeholder="Enter your school student ID"
+                      className="h-10 rounded-[5px] border-slate-300 text-sm shadow-none"
+                    />
+                    <p className="text-xs text-slate-500">
+                      Required for student accounts.
+                    </p>
+                    <FieldError message={errors.studentNumber} />
+                  </div>
 
-              <div className="grid gap-2">
-                <Label htmlFor="setup-year">Year</Label>
-                <select
-                  id="setup-year"
-                  value={form.yearLevel}
-                  onChange={(event) =>
-                    updateField("yearLevel", event.target.value)
-                  }
-                  className="h-10 rounded-[5px] border border-slate-300 bg-white px-3 text-sm font-medium text-slate-900 shadow-none outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-                >
-                  <option value="">Select year</option>
-                  {availableYearOptions.map((year) => (
-                    <option key={year} value={year}>
-                      {year}
-                    </option>
-                  ))}
-                </select>
-                <p className="text-xs text-slate-500">
-                  Required for student accounts.
-                </p>
-                <FieldError message={errors.yearLevel} />
-              </div>
+                  <div className="grid min-w-0 gap-2">
+                    <Label htmlFor="setup-year">Year</Label>
+                    <select
+                      id="setup-year"
+                      value={form.yearLevel}
+                      onChange={(event) =>
+                        updateField("yearLevel", event.target.value)
+                      }
+                      disabled={submitting}
+                      aria-invalid={Boolean(errors.yearLevel)}
+                      className={selectClass}
+                    >
+                      <option value="">Select year</option>
+                      {availableYearOptions.map((year) => (
+                        <option key={year.value} value={year.value}>
+                          {year.label}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-xs text-slate-500">
+                      Required for student accounts.
+                    </p>
+                    <FieldError message={errors.yearLevel} />
+                  </div>
+                </>
+              )}
             </div>
 
             <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
               <Button
                 type="submit"
-                disabled={submitting || !roleOptions.length}
+                disabled={submitting || programsLoading || Boolean(programsError)}
                 className="h-10 rounded-[5px] bg-[#0b4bd3] px-5 font-bold text-white hover:bg-[#083da9]"
               >
                 {submitting && <Spinner className="mr-2" />}

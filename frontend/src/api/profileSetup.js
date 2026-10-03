@@ -1,5 +1,9 @@
 import { apiFetch } from "./client.js";
 
+// Kumpirmado sa route:list: GET api/complete-profile/programs -> Auth\ProfileController@programs
+export const PROGRAMS_ENDPOINT = "/api/complete-profile/programs";
+export const COMPLETE_PROFILE_ENDPOINT = "/api/complete-profile";
+
 async function readJson(res) {
   try {
     return await res.json();
@@ -29,6 +33,7 @@ async function expectJson(res) {
     const error = new Error(message);
     error.status = res.status;
     error.body = body;
+    error.fieldErrors = body?.errors || null; // { field: ["msg"] } mula sa 422
     throw error;
   }
 
@@ -41,62 +46,34 @@ function listFrom(body) {
   if (Array.isArray(payload)) return payload;
   if (Array.isArray(payload?.data)) return payload.data;
   if (Array.isArray(payload?.programs)) return payload.programs;
-  if (Array.isArray(payload?.items)) return payload.items;
 
   return [];
 }
 
 export async function getProfileSetupPrograms() {
-  const endpoints = ["/api/programs", "/api/test/programs"];
-  let lastError = null;
+  // Walang fallback sa /api/test/programs: pekeng ID ang pinagmulan ng bug.
+  const body = await expectJson(await apiFetch(PROGRAMS_ENDPOINT));
+  const programs = listFrom(body);
 
-  for (const endpoint of endpoints) {
-    const response = await apiFetch(endpoint);
-
-    if (response.ok) {
-      const programs = listFrom(await response.json());
-
-      if (programs.length === 0) {
-        throw new Error("The backend program list is empty.");
-      }
-
-      return programs;
-    }
-
-    try {
-      await expectJson(response);
-    } catch (error) {
-      lastError = error;
-    }
-
-    if (![404, 405].includes(response.status)) break;
+  if (programs.length === 0) {
+    throw new Error("The program list is empty. Please contact an administrator.");
   }
 
-  throw new Error(
-    lastError?.status === 404
-      ? "The backend does not expose a program-list endpoint for profile setup."
-      : lastError?.message || "Unable to load programs from the backend.",
-  );
+  return programs;
 }
 
+/**
+ * POST /api/complete-profile
+ * Student:  { program_id, school_student_id, year_level }
+ * Staff:    { program_id }
+ * Hindi na nilulunok ang 404/405/409/422: lahat ay itinatapon bilang Error
+ * (may .status at .fieldErrors) para makita ng screen.
+ */
 export async function saveProfileSetup(payload) {
-  const res = await apiFetch("/api/me", {
-    method: "PATCH",
+  const res = await apiFetch(COMPLETE_PROFILE_ENDPOINT, {
+    method: "POST",
     body: JSON.stringify(payload),
   });
 
-  if ([404, 405].includes(res.status)) {
-    return {
-      savedToBackend: false,
-      message:
-        "The backend does not currently expose a self-profile update route.",
-    };
-  }
-
-  const body = await expectJson(res);
-
-  return {
-    savedToBackend: true,
-    body,
-  };
+  return expectJson(res);
 }

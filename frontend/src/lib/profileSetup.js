@@ -1,6 +1,15 @@
 import { normalizeRole } from "./roles.js";
 
-const PROFILE_SETUP_PREFIX = "alrm_profile_setup:";
+const LEGACY_PREFIX = "alrm_profile_setup:";
+
+export const YEAR_LEVELS = [
+  { value: "1st", label: "1st Year" },
+  { value: "2nd", label: "2nd Year" },
+  { value: "3rd", label: "3rd Year" },
+  { value: "4th", label: "4th Year" },
+];
+
+export const ASSOCIATE_YEAR_LEVELS = YEAR_LEVELS.slice(0, 2);
 
 export function getProfileSetupRoleOptions(email) {
   const domain = String(email || "")
@@ -22,64 +31,27 @@ export function getProfileSetupRoleOptions(email) {
   return [];
 }
 
-export function getProfileSetupRole(email, ...roles) {
-  const options = getProfileSetupRoleOptions(email);
-
-  if (options.length === 1) return options[0].value;
-
-  for (const role of roles) {
-    const option = options.find(
-      ({ value }) => normalizeRole(value) === normalizeRole(role),
-    );
-    if (option) return option.value;
-  }
-
-  return "";
-}
-
-function setupKey(user) {
-  return `${PROFILE_SETUP_PREFIX}${user?.id || user?.email || "unknown"}`;
-}
-
-function readLocalSetup(user) {
+/** Burahin ang lumang localStorage na pinagmulan ng maling "complete" state. */
+export function clearLegacyProfileSetup() {
   try {
-    const raw = localStorage.getItem(setupKey(user));
-    return raw ? JSON.parse(raw) : null;
+    Object.keys(localStorage)
+      .filter((key) => key.startsWith(LEGACY_PREFIX))
+      .forEach((key) => localStorage.removeItem(key));
   } catch {
-    return null;
+    // ignore (private mode, atbp.)
   }
-}
-
-function hasValue(value) {
-  return value !== undefined && value !== null && String(value).trim() !== "";
-}
-
-function studentNumberFrom(user, localSetup) {
-  return (
-    user?.student_number ||
-    user?.studentNumber ||
-    user?.school_id ||
-    user?.schoolId ||
-    user?.student_id_number ||
-    user?.studentIdNumber ||
-    localSetup?.student_number ||
-    localSetup?.studentNumber ||
-    ""
-  );
 }
 
 export function getStoredProfileSetup(user) {
-  return readLocalSetup(user);
-}
+  if (!user) return null;
 
-export function storeProfileSetup(user, setup) {
-  localStorage.setItem(
-    setupKey(user),
-    JSON.stringify({
-      ...setup,
-      completed_at: new Date().toISOString(),
-    }),
-  );
+  return {
+    role: user.role ?? "",
+    program_id: user.program_id ?? null,
+    program_name: user.program?.program_name ?? "",
+    student_number: user.school_student_id ?? "",
+    year_level: user.year_level ?? "",
+  };
 }
 
 export function splitVerifiedName(name = "") {
@@ -92,23 +64,35 @@ export function splitVerifiedName(name = "") {
   };
 }
 
+function hasValue(value) {
+  return value !== undefined && value !== null && String(value).trim() !== "";
+}
+
+/**
+ * Server data lang ang pinagbabatayan (galing sa /api/auth/me).
+ * Student:  program_id + year_level + school_student_id
+ * Staff:    may program_id O may laman ang `programs` (many-to-many)
+ */
 export function isProfileSetupComplete(user) {
   if (!user) return false;
 
-  const localSetup = readLocalSetup(user);
-  const role = normalizeRole(user.role || localSetup?.role);
-  const programId = user.program_id || user.programId || localSetup?.program_id;
-  const yearLevel = user.year_level || user.yearLevel || localSetup?.year_level;
-  const studentNumber = studentNumberFrom(user, localSetup);
-
+  const role = normalizeRole(user.role);
   if (!hasValue(role)) return false;
   if (role === "admin") return true;
-  if (role === "program" || role === "instructor") return hasValue(programId);
+
   if (role === "student") {
-    return hasValue(programId) && hasValue(yearLevel) && hasValue(studentNumber);
+    return (
+      hasValue(user.program_id) &&
+      hasValue(user.year_level) &&
+      hasValue(user.school_student_id)
+    );
   }
 
-  return false;
+  // instructor / program head
+  return (
+    hasValue(user.program_id) ||
+    (Array.isArray(user.programs) && user.programs.length > 0)
+  );
 }
 
 export function needsProfileSetup(user) {

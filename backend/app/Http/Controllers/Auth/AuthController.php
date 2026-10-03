@@ -146,7 +146,10 @@ class AuthController extends Controller
         if ($isNewUser) {
             $user->name = $googleUser->getName() ?: $user->name;
             $user->role = $isStudent ? 'student' : self::DEFAULT_STAFF_ROLE;
-            $user->status = 'pending';
+            // Student domain: a verified institutional Google account is enough,
+            // so a brand-new student is approved right away.
+            // Staff domain: stays pending until an administrator approves it.
+            $user->status = $isStudent ? 'approved' : 'pending';
             $user->password = null;
         } elseif ($isFirstLogin && $user->status === 'pending') {
             // Only auto-approve pre-registered accounts that were waiting
@@ -251,7 +254,7 @@ class AuthController extends Controller
             'message' => 'OK',
             'data'    => [
                 'token' => $token,
-                'user'  => $user,
+                'user'  => $user->load('program', 'programs'),
             ],
         ]);
     }
@@ -272,7 +275,7 @@ class AuthController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'OK',
-            'data'    => $request->user(),
+            'data'    => $request->user()->load('program', 'programs'),
         ]);
     }
 }

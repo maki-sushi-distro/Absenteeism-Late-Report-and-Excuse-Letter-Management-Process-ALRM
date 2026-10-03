@@ -21,7 +21,10 @@ use App\Http\Controllers\Auth\OtpController;
 
 
 Route::post('/internal/roster-sync', function (Request $request) {
-    if ($request->header('X-Sync-Secret') !== config('services.roster_sync.secret')) {
+    $expected = (string) config('services.roster_sync.secret');
+    $provided = (string) $request->header('X-Sync-Secret', '');
+
+    if ($expected === '' || ! hash_equals($expected, $provided)) {
         abort(403);
     }
 

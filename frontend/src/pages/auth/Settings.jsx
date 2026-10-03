@@ -103,14 +103,17 @@ function valueOrFallback(value, fallback = "Not available") {
   return String(value);
 }
 
-function programLabel(user, storedSetup) {
+function programLabel(user) {
+  const names = (user?.programs ?? [])
+    .map((program) => program.program_name)
+    .filter(Boolean);
+
   return (
-    storedSetup?.program_name ||
-    storedSetup?.programName ||
     user?.program?.program_name ||
     user?.headed_program?.program_name ||
+    (names.length ? names.join(", ") : null) ||
     user?.program_name ||
-    (user?.program_id ? `Program ID ${user.program_id}` : "Not assigned")
+    "Not assigned"
   );
 }
 
@@ -216,17 +219,14 @@ function ProfileCard({ user, config, role }) {
   }
 
   if (normalizedRole === "instructor") {
-    fields.push({ label: "Instructor ID", value: user?.employee_id || user?.id });
-    fields.push({ label: "Program", value: programLabel(user, storedSetup) });
+    fields.push({ label: "Instructor ID", value: user?.employee_id });
+    fields.push({ label: "Program", value: programLabel(user) });
   }
 
   if (normalizedRole === "student") {
-    fields.push({ label: "Student ID", value: schoolStudentId(user, storedSetup) });
-    fields.push({
-      label: "Program / Section",
-      value: programLabel(user, storedSetup),
-    });
-    fields.push({ label: "Year Level", value: yearLevel(user, storedSetup) });
+    fields.push({ label: "Student ID", value: user?.school_student_id });
+    fields.push({ label: "Program / Section", value: programLabel(user) });
+    fields.push({ label: "Year Level", value: user?.year_level });
   }
 
   return (

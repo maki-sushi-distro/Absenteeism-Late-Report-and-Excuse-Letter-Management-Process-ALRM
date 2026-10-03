@@ -32,11 +32,23 @@ class ProfileController extends Controller
      * required_if:role,student looked at the request input, which is
      * always empty because `role` is prohibited, so student fields were
      * never actually required.
+     *
+     * A student whose profile is already complete cannot re-submit it:
+     * enrollments hang off program/year_level, so changing them is an
+     * admin-side action, not a self-service one.
      */
     public function completeProfile(Request $request): JsonResponse
     {
         $user = $request->user();
         $isStudent = $user->role === 'student';
+
+        if ($isStudent && $user->program_id !== null && $user->school_student_id !== null) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Your profile is already complete. Please contact an administrator to change your program or year level.',
+                'data'    => null,
+            ], 409);
+        }
 
         $validated = $request->validate([
             'program_id'        => ['required', 'string', 'uuid', 'exists:programs,id'],
@@ -58,11 +70,13 @@ class ProfileController extends Controller
 
         if ($isStudent) {
             DB::transaction(function () use ($user, $validated) {
-                $user->update([
+                // forceFill so this keeps working after program_id is
+                // removed from User's #[Fillable] (mass-assignment fix).
+                $user->forceFill([
                     'program_id'        => $validated['program_id'],
                     'school_student_id' => $validated['school_student_id'],
                     'year_level'        => $validated['year_level'],
-                ]);
+                ])->save();
 
                 $this->autoEnrollStudent(
                     $user,

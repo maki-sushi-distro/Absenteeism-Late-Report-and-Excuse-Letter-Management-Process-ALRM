@@ -245,6 +245,15 @@ class AuthController extends Controller
                 'data'    => null,
             ], 403);
         }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'OK',
+            'data'    => [
+                'token' => $token,
+                'user'  => $user,
+            ],
+        ]);
     }
 
     public function logout(Request $request): JsonResponse

@@ -23,6 +23,7 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { useAuth } from "@/context/AuthContext";
+import { getStoredProfileSetup } from "@/lib/profileSetup";
 import AdminPageLayout from "./admin/AdminPageLayout";
 import InstructorPageLayout from "./instructor/InstructorPageLayout";
 import StudentPageLayout from "./student/StudentPageLayout";
@@ -102,12 +103,40 @@ function valueOrFallback(value, fallback = "Not available") {
   return String(value);
 }
 
-function programLabel(user) {
+function programLabel(user, storedSetup) {
   return (
+    storedSetup?.program_name ||
+    storedSetup?.programName ||
     user?.program?.program_name ||
     user?.headed_program?.program_name ||
     user?.program_name ||
     (user?.program_id ? `Program ID ${user.program_id}` : "Not assigned")
+  );
+}
+
+function schoolStudentId(user, storedSetup) {
+  return (
+    storedSetup?.student_number ||
+    storedSetup?.studentNumber ||
+    storedSetup?.student_id ||
+    user?.school_student_id ||
+    user?.student_number ||
+    user?.studentNumber ||
+    user?.school_id ||
+    user?.schoolId ||
+    user?.student_id_number ||
+    user?.studentIdNumber ||
+    ""
+  );
+}
+
+function yearLevel(user, storedSetup) {
+  return (
+    storedSetup?.year_level ||
+    storedSetup?.yearLevel ||
+    user?.year_level ||
+    user?.yearLevel ||
+    ""
   );
 }
 
@@ -173,28 +202,31 @@ function UnsupportedActionAlert({ notice }) {
   );
 }
 
-function ProfileCard({ user, config, role, onUnsupported }) {
+function ProfileCard({ user, config, role }) {
   const normalizedRole = normalizeRole(role);
+  const storedSetup = getStoredProfileSetup(user);
   const fields = [
     { label: "Name", value: user?.name },
     { label: "Email", value: user?.email },
     { label: "Role", value: formatRole(user?.role) },
-    { label: "Account Status", value: user?.status },
   ];
 
   if (normalizedRole === "program_head") {
-    fields.push({ label: "Program", value: programLabel(user) });
+    fields.push({ label: "Program", value: programLabel(user, storedSetup) });
   }
 
   if (normalizedRole === "instructor") {
     fields.push({ label: "Instructor ID", value: user?.employee_id || user?.id });
-    fields.push({ label: "Program", value: programLabel(user) });
+    fields.push({ label: "Program", value: programLabel(user, storedSetup) });
   }
 
   if (normalizedRole === "student") {
-    fields.push({ label: "Student ID", value: user?.student_id || user?.id });
-    fields.push({ label: "Program / Section", value: programLabel(user) });
-    fields.push({ label: "Year Level", value: user?.year_level });
+    fields.push({ label: "Student ID", value: schoolStudentId(user, storedSetup) });
+    fields.push({
+      label: "Program / Section",
+      value: programLabel(user, storedSetup),
+    });
+    fields.push({ label: "Year Level", value: yearLevel(user, storedSetup) });
   }
 
   return (
@@ -220,33 +252,6 @@ function ProfileCard({ user, config, role, onUnsupported }) {
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            className="h-9 rounded-[5px] border-slate-300 font-bold text-[#0b367f]"
-            onClick={() =>
-              onUnsupported(
-                "Profile editing unavailable",
-                "The backend currently exposes GET /api/me for reading the current user, but no profile update endpoint is registered."
-              )
-            }
-          >
-            Change Profile
-          </Button>
-          <Button
-            type="button"
-            className="h-9 rounded-[5px] bg-[#0b4bd3] font-bold text-white hover:bg-[#083da9]"
-            onClick={() =>
-              onUnsupported(
-                "Profile editing unavailable",
-                "No backend route is available for updating the current user's profile from Settings."
-              )
-            }
-          >
-            Edit Profile
-          </Button>
-        </div>
       </div>
 
       <Separator className="my-5" />
@@ -508,7 +513,6 @@ function Settings() {
             user={user}
             role={user?.role}
             config={config}
-            onUnsupported={showUnsupported}
           />
 
           {normalizedRole === "administrator" && <AdminPolicyCard />}

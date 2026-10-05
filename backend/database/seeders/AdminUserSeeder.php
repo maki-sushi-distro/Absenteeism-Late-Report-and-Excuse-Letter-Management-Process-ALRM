@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Database\Seeders;
 
 use App\Models\Program;
+use App\Models\TrustedDevice;
 use App\Models\User;
 use Google\Client as GoogleClient;
 use Google\Service\Sheets as GoogleSheets;
@@ -122,17 +123,23 @@ class AdminUserSeeder extends Seeder
             //     role: UserRole::ProgramHead,
             //     programIds: [],
             // ),
-
-            // new SeedUser(
-            //     name: 'Marwin Mandocdoc',
-            //     email: 'marwin.mandocdoc@student.laverdad.edu.ph',
-            //     role: UserRole::Instructor,
-            // ),
         ];
 
+        $sheet = $this->fetchInstructorsFromGoogleSheets();
+        $sheetUsers = $sheet['users'];
+        $failedTabs = $sheet['failedTabs'];
+        $sheetTrusted = $failedTabs === [] && $sheetUsers !== [];
 
+        if (! $sheetTrusted) {
+            $message = 'AdminUserSeeder: Google Sheet could not be fully read. '
+                . 'Seeding manual users only; no sheet user was created, updated or deactivated, '
+                . 'and no program head was changed.';
 
-        $sheetUsers = $this->fetchInstructorsFromGoogleSheets();
+            Log::error($message, ['failed_tabs' => $failedTabs, 'sheet_users_found' => count($sheetUsers)]);
+            $this->command?->error($message . ' Failed: ' . ($failedTabs === [] ? '(sheet returned no users)' : implode(', ', $failedTabs)));
+
+            $sheetUsers = [];
+        }
 
         $sheetEmails = array_map(fn(SeedUser $u) => $u->email, $sheetUsers);
 
@@ -164,7 +171,7 @@ class AdminUserSeeder extends Seeder
             );
         }
 
-        DB::transaction(function () use ($merged, $sheetEmails, $manualEmails) {
+        DB::transaction(function () use ($merged, $sheetEmails, $manualEmails, $sheetTrusted) {
             $created = [];
             $updated = [];
 
@@ -174,11 +181,16 @@ class AdminUserSeeder extends Seeder
                 $wasNew ? $created[] = $user->email : $updated[] = $user->email;
             }
 
-            $this->syncProgramHeads($merged); // NEW
+            $deactivated = [];
 
-            $deactivated = $this->deactivateMissingSheetUsers($sheetEmails, $manualEmails);
+            if ($sheetTrusted) {
+                $this->syncProgramHeads($merged);
+
+                $deactivated = $this->deactivateMissingSheetUsers($sheetEmails, $manualEmails);
+            }
 
             Log::info('AdminUserSeeder: run summary', [
+                'sheet_trusted' => $sheetTrusted,
                 'created' => $created,
                 'updated' => $updated,
                 'deactivated' => $deactivated,
@@ -220,16 +232,24 @@ class AdminUserSeeder extends Seeder
     }
 
     /**
-     * @return SeedUser[]
+     * @return array{users: SeedUser[], failedTabs: string[]}
      */
     private function fetchInstructorsFromGoogleSheets(): array
     {
-        $client = new GoogleClient();
-        $client->setApplicationName('AdminUserSeeder');
-        $client->setScopes([GoogleSheets::SPREADSHEETS_READONLY]);
-        $client->setAuthConfig($this->resolveCredentials());
+        $failedTabs = [];
 
-        $service = new GoogleSheets($client);
+        try {
+            $client = new GoogleClient();
+            $client->setApplicationName('AdminUserSeeder');
+            $client->setScopes([GoogleSheets::SPREADSHEETS_READONLY]);
+            $client->setAuthConfig($this->resolveCredentials());
+
+            $service = new GoogleSheets($client);
+        } catch (\Throwable $e) {
+            Log::error("AdminUserSeeder: could not set up the Google client: {$e->getMessage()}");
+
+            return ['users' => [], 'failedTabs' => ['(google client setup)']];
+        }
 
         /** @var array<string, array{name: string, role: UserRole, programIds: array<string>}> */
         $byEmail = [];
@@ -242,7 +262,6 @@ class AdminUserSeeder extends Seeder
             }
 
             try {
-                // Columns: A = role label, B = name, C = (blank), D = email.
                 $range = "'{$tabName}'!A2:C";
                 $response = $service->spreadsheets_values->get(self::SPREADSHEET_ID, $range);
 
@@ -256,7 +275,7 @@ class AdminUserSeeder extends Seeder
                     }
 
                     if (! $this->hasAllowedDomain($email)) {
-                        Log::warning("AdminUserSeeder: skipped '{$email}' (tab: {$tabName}) — not a recognized institutional domain.");
+                        Log::warning("AdminUserSeeder: skipped '{$email}' (tab: {$tabName}) — not a staff-domain address.");
 
                         continue;
                     }
@@ -273,8 +292,6 @@ class AdminUserSeeder extends Seeder
                         ];
                     }
 
-                    // Higher role wins across tabs too (e.g. Program Head
-                    // in one tab, plain Instructor in another).
                     if (self::ROLE_PRIORITY[$role->value] > self::ROLE_PRIORITY[$byEmail[$email]['role']->value]) {
                         $byEmail[$email]['role'] = $role;
                     }
@@ -284,11 +301,13 @@ class AdminUserSeeder extends Seeder
                     }
                 }
             } catch (\Throwable $e) {
+                $failedTabs[] = $tabName;
+
                 Log::warning("AdminUserSeeder: failed to fetch tab '{$tabName}': {$e->getMessage()}");
             }
         }
 
-        return array_map(
+        $users = array_map(
             fn(string $email, array $data) => new SeedUser(
                 name: $data['name'],
                 email: $email,
@@ -298,24 +317,22 @@ class AdminUserSeeder extends Seeder
             array_keys($byEmail),
             $byEmail,
         );
+
+        return ['users' => $users, 'failedTabs' => $failedTabs];
     }
 
     /**
-     * Same domain check AuthController uses at login — kept here too so
-     * a stray personal email in the sheet never even makes it into the
-     * `users` table, instead of relying only on the login gate to
-     * silently block it later.
+     * Sheet entries must be on the STAFF domain. A student-domain address
+     * in the sheet would otherwise be seeded as an instructor. Dev
+     * accounts on a student domain are handled separately through
+     * SEED_DEV_INSTRUCTOR_EMAILS and never go through this check.
      */
     private function hasAllowedDomain(string $email): bool
     {
         $domain = substr(strrchr($email, '@') ?: '', 1);
+        $staffDomain = strtolower((string) config('institution.staff_domain'));
 
-        $allowedDomains = array_filter([
-            config('institution.staff_domain'),
-            config('institution.student_domain'),
-        ]);
-
-        return in_array($domain, $allowedDomains, true);
+        return $staffDomain !== '' && $domain === $staffDomain;
     }
 
     private function saveUser(SeedUser $user): void
@@ -343,7 +360,6 @@ class AdminUserSeeder extends Seeder
 
     private function syncProgramHeads(array $merged): void
     {
-        // programId => userId, built fresh from the current run only.
         $headByProgram = [];
 
         foreach ($merged as $user) {
@@ -378,9 +394,18 @@ class AdminUserSeeder extends Seeder
     /**
      * Deactivates any existing sheet-managed user (instructor / program
      * head) whose email is no longer present in the sheet. Manual
-     * entries and any role outside SHEET_MANAGED_ROLES are never
-     * touched. Returns the list of emails that were deactivated, for
-     * logging.
+     * entries and any role outside SHEET_MANAGED_ROLES are never touched.
+     *
+     * Only STAFF-domain emails are considered, because the sheet can only
+     * ever contain staff-domain emails (see hasAllowedDomain()). A
+     * student-domain instructor (dev/test account) was never managed by
+     * the sheet, so it is never deactivated by it, with no config needed.
+     *
+     * Deactivated users also lose their API tokens and trusted devices, so
+     * an old token stops working immediately. Returns the list of emails
+     * that were deactivated, for logging.
+     *
+     * Only call this when the sheet was read completely (see run()).
      *
      * @param  string[]  $sheetEmails
      * @param  string[]  $manualEmails
@@ -388,8 +413,14 @@ class AdminUserSeeder extends Seeder
      */
     private function deactivateMissingSheetUsers(array $sheetEmails, array $manualEmails): array
     {
+        $staffDomain = strtolower((string) config('institution.staff_domain'));
+        if ($staffDomain === '') {
+            return [];
+        }
+
         $toDeactivate = User::query()
             ->whereIn('role', self::SHEET_MANAGED_ROLES)
+            ->where('email', 'like', '%@' . $staffDomain)
             ->whereNotIn('email', $sheetEmails)
             ->whereNotIn('email', $manualEmails)
             ->where('status', '!=', self::DEACTIVATED_STATUS)
@@ -400,6 +431,9 @@ class AdminUserSeeder extends Seeder
                 'status' => self::DEACTIVATED_STATUS,
                 'deactivated_at' => now(),
             ])->save();
+
+            $user->tokens()->delete();
+            TrustedDevice::where('user_id', $user->id)->delete();
         }
 
         return $toDeactivate->pluck('email')->all();

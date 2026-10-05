@@ -9,15 +9,11 @@ use App\Models\Program;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 
 class ProfileController extends Controller
 {
-    /**
-     * List of programs for the complete-profile dropdown.
-     * Shows program_name to the user; the id is what gets submitted.
-     *
-     * GET /api/complete-profile/programs
-     */
     public function programs(): JsonResponse
     {
         return response()->json([
@@ -30,36 +26,64 @@ class ProfileController extends Controller
     }
 
     /**
-     * Complete the authenticated user's profile after their first
-     * Google OAuth login. Required before dashboard access when the
-     * user's program/year_level (student) or program (instructor)
-     * is still unset.
-     *
      * POST /api/complete-profile
+     *
+     * Rules depend on the SERVER-side role ($user->role). The old
+     * required_if:role,student looked at the request input, which is
+     * always empty because `role` is prohibited, so student fields were
+     * never actually required.
+     *
+     * A student whose profile is already complete cannot re-submit it:
+     * enrollments hang off program/year_level, so changing them is an
+     * admin-side action, not a self-service one.
      */
     public function completeProfile(Request $request): JsonResponse
     {
         $user = $request->user();
+        $isStudent = $user->role === 'student';
+
+        if ($isStudent && $user->program_id !== null && $user->school_student_id !== null) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Your profile is already complete. Please contact an administrator to change your program or year level.',
+                'data'    => null,
+            ], 409);
+        }
 
         $validated = $request->validate([
             'program_id'        => ['required', 'string', 'uuid', 'exists:programs,id'],
-            'school_student_id' => ['required_if:role,student', 'nullable', 'string', 'max:50'],
-            'year_level'        => ['required_if:role,student', 'nullable', 'in:1st,2nd,3rd,4th'],
+            'school_student_id' => [
+                Rule::requiredIf($isStudent),
+                'nullable',
+                'string',
+                'max:50',
+                Rule::unique('users', 'school_student_id')->ignore($user->id),
+            ],
+            'year_level'        => [
+                Rule::requiredIf($isStudent),
+                'nullable',
+                Rule::in(['1st', '2nd', '3rd', '4th']),
+            ],
             'role'              => ['prohibited'],
+            'status'            => ['prohibited'],
         ]);
 
-        if ($user->role === 'student') {
-            $user->update([
-                'program_id'        => $validated['program_id'],
-                'school_student_id' => $validated['school_student_id'] ?? null,
-                'year_level'        => $validated['year_level'] ?? null,
-            ]);
+        if ($isStudent) {
+            DB::transaction(function () use ($user, $validated) {
+                // forceFill so this keeps working after program_id is
+                // removed from User's #[Fillable] (mass-assignment fix).
+                $user->forceFill([
+                    'program_id'        => $validated['program_id'],
+                    'school_student_id' => $validated['school_student_id'],
+                    'year_level'        => $validated['year_level'],
+                ])->save();
 
-            $this->autoEnrollStudent(
-                $user,
-                $validated['program_id'],
-                $validated['year_level'],
-            );
+                $this->autoEnrollStudent(
+                    $user,
+                    $validated['program_id'],
+                    $validated['year_level'],
+                );
+            });
         } else {
             // instructor / program_head / administrator — many-to-many
             $user->programs()->syncWithoutDetaching([$validated['program_id']]);
@@ -72,10 +96,6 @@ class ProfileController extends Controller
         ]);
     }
 
-    /**
-     * Auto-enroll a student to every class that matches their
-     * program + year_level for the current semester/school_year.
-     */
     protected function autoEnrollStudent(User $user, string $programId, string $yearLevel): void
     {
         $matchingClasses = ClassModel::query()

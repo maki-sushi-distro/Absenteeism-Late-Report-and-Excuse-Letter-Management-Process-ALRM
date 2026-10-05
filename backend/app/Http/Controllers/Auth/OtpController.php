@@ -44,6 +44,22 @@ class OtpController extends Controller
         $user->notify(new SendOtpCode($code));
     }
 
+    /**
+     * Deactivated/NULL/unknown status: wipe pending OTPs and refuse.
+     */
+    private function rejectInactive(User $user): JsonResponse
+    {
+        OtpCode::where('user_id', $user->id)
+            ->whereNull('verified_at')
+            ->delete();
+
+        return response()->json([
+            'success' => false,
+            'message' => 'Your account is not active. Please contact an administrator.',
+            'data'    => null,
+        ], 403);
+    }
+
     public function resend(Request $request): JsonResponse
     {
         $request->validate([
@@ -52,12 +68,25 @@ class OtpController extends Controller
 
         $user = User::findOrFail($request->string('user_id'));
 
+        if (! $user->canLogin()) {
+            return $this->rejectInactive($user);
+        }
+
         $recent = OtpCode::where('user_id', $user->id)
             ->whereNull('verified_at')
             ->latest()
             ->first();
 
         if ($recent) {
+            // Locked out: don't send another email, don't hand out new guesses.
+            if ($recent->expires_at->isFuture() && $recent->attempts >= 5) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Too many attempts. Please log in again.',
+                    'data'    => null,
+                ], 429);
+            }
+
             $secondsSinceLastSend = $recent->created_at->diffInSeconds(now());
 
             if ($secondsSinceLastSend < 30) {
@@ -71,6 +100,12 @@ class OtpController extends Controller
             }
         }
 
+        // Carry over failed attempts of a still-valid code so resend can't
+        // be used to get a fresh 5 guesses.
+        $carriedAttempts = ($recent && $recent->expires_at->isFuture())
+            ? (int) $recent->attempts
+            : 0;
+
         // Invalidate old codes and force-send a new one.
         OtpCode::where('user_id', $user->id)
             ->whereNull('verified_at')
@@ -78,11 +113,13 @@ class OtpController extends Controller
 
         $code = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
 
-        OtpCode::create([
+        $otp = new OtpCode();
+        $otp->forceFill([
             'user_id'    => $user->id,
             'code'       => $code,
+            'attempts'   => $carriedAttempts,
             'expires_at' => now()->addMinutes(5),
-        ]);
+        ])->save();
 
         $user->notify(new SendOtpCode($code));
 
@@ -105,7 +142,13 @@ class OtpController extends Controller
             'code'    => 'required|string',
         ]);
 
-        $otp = OtpCode::where('user_id', $request->string('user_id'))
+        $user = User::findOrFail($request->string('user_id'));
+
+        if (! $user->canLogin()) {
+            return $this->rejectInactive($user);
+        }
+
+        $otp = OtpCode::where('user_id', $user->id)
             ->whereNull('verified_at')
             ->latest()
             ->first();
@@ -134,7 +177,7 @@ class OtpController extends Controller
             ], 429);
         }
 
-        if ($otp->code !== $request->string('code')->toString()) {
+        if (! hash_equals((string) $otp->code, $request->string('code')->toString())) {
             $otp->increment('attempts');
 
             return response()->json([
@@ -146,7 +189,6 @@ class OtpController extends Controller
 
         $otp->update(['verified_at' => now()]);
 
-        $user = User::findOrFail($request->string('user_id'));
         $user->tokens()->delete();
         $token = $user->createToken('alrm-spa')->plainTextToken;
         $code = Str::random(40);

@@ -21,7 +21,10 @@ use App\Http\Controllers\Auth\OtpController;
 
 
 Route::post('/internal/roster-sync', function (Request $request) {
-    if ($request->header('X-Sync-Secret') !== config('services.roster_sync.secret')) {
+    $expected = (string) config('services.roster_sync.secret');
+    $provided = (string) $request->header('X-Sync-Secret', '');
+
+    if ($expected === '' || ! hash_equals($expected, $provided)) {
         abort(403);
     }
 
@@ -47,7 +50,7 @@ Route::prefix('auth')->group(function () {
         ->middleware('throttle:10,1');
 });
 
-Route::middleware(['auth:sanctum', 'inactive'])->group(function () {
+Route::middleware(['auth:sanctum', 'active', 'inactive'])->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/me', [AuthController::class, 'me']);
     Route::get('/complete-profile/programs', [ProfileController::class, 'programs']);

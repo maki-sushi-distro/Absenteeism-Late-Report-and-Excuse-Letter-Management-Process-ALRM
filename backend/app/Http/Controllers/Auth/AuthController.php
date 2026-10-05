@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use Laravel\Sanctum\PersonalAccessToken;
 use App\Http\Controllers\Auth\OtpController;
 use App\Support\TrustedDeviceManager;
 use App\Models\User;
@@ -10,28 +11,55 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use Illuminate\Contracts\Encryption\DecryptException;
 use Laravel\Socialite\Facades\Socialite;
-use Laravel\Socialite\Two\InvalidStateException;
 
 class AuthController extends Controller
 {
-    /**
-     * Default role for a brand-new staff-domain account, only when
-     * nobody pre-registered them (UserApprovalController::store()).
-     */
     private const DEFAULT_STAFF_ROLE = 'instructor';
 
     /**
+     * Allowed frontend origins (exact scheme+host match, not prefix match).
+     */
+    private function allowedOrigins(): array
+    {
+        return array_filter([
+            rtrim((string) config('app.frontend_url', 'http://localhost:5173'), '/'),
+            rtrim((string) config('app.frontend_url_prod'), '/'),
+        ]);
+    }
+
+    /**
+     * Exact-match origin check (scheme + host + port), not str_starts_with.
+     */
+    private function resolveOrigin(?string $origin): ?string
+    {
+        if (! $origin) {
+            return null;
+        }
+
+        $parsed = parse_url($origin);
+        if (! $parsed || empty($parsed['host'])) {
+            return null;
+        }
+
+        $normalized = ($parsed['scheme'] ?? 'https') . '://' . $parsed['host']
+            . (isset($parsed['port']) ? ':' . $parsed['port'] : '');
+
+        foreach ($this->allowedOrigins() as $allowed) {
+            if (rtrim($allowed, '/') === $normalized) {
+                return $normalized;
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Step 1 — Send the user's browser to Google's consent screen.
-     *
-     * Accepts an `origin` query param (the frontend's own
-     * window.location.origin) so we know where to send the user back
-     * to in callback() — this lets both localhost and the deployed
-     * Vercel frontend use the same backend without hardcoding one URL.
-     * The chosen origin is base64-encoded and passed through Google's
-     * `state` param, which Google returns to us untouched.
      *
      * GET /api/auth/google/redirect
      */
@@ -40,56 +68,46 @@ class AuthController extends Controller
         $origin = $request->query('origin')
             ?? $request->headers->get('referer');
 
-        $allowedOrigins = array_filter([
-            rtrim((string) env('FRONTEND_URL', 'http://localhost:5173'), '/'),
-            rtrim((string) env('FRONTEND_URL_PROD'), '/'),
-        ]);
+        $frontendUrl = $this->resolveOrigin($origin)
+            ?? ($this->allowedOrigins()[0] ?? null);
 
-        $frontendUrl = collect($allowedOrigins)
-            ->first(fn($url) => $origin && str_starts_with($origin, $url));
+        if (! $frontendUrl) {
+            abort(500, 'No valid frontend URL configured.');
+        }
 
-        $frontendUrl ??= end($allowedOrigins) ?: reset($allowedOrigins);
+        // Signed + timestamped payload — tampering or replay beyond TTL fails to decrypt/expire.
+        $state = Crypt::encryptString(json_encode([
+            'origin' => $frontendUrl,
+            'nonce'  => Str::random(32),
+            'exp'    => now()->addMinutes(10)->timestamp,
+        ]));
 
         return Socialite::driver('google')
             ->stateless()
-            ->with(['state' => base64_encode($frontendUrl)])
+            ->with(['state' => $state])
             ->redirect();
     }
 
     /**
-     * Step 2 — Google redirects here with an auth code. We exchange it
-     * for the profile, validate the domain, find-or-create the local
-     * user, issue a Sanctum token, then redirect back to the SPA with
-     * ?token=... (can't return JSON — this is a browser redirect).
-     *
-     * The `state` param carries the frontend origin we encoded in
-     * redirect(), so we always bounce the user back to whichever
-     * frontend (localhost or Vercel) they started from.
-     *
-     * New users land as status='pending' (self-registration + approval
-     * requirement) — a token is still issued so the frontend can call
-     * GET /api/me and show "awaiting approval". RoleMiddleware is what
-     * actually blocks pending users from role-gated routes.
+     * Step 2 — Google redirects here with an auth code.
      *
      * GET /api/auth/google/callback
      */
     public function callback(): RedirectResponse
     {
-        Log::debug('Raw code received', [
-            'code' => request()->query('code'),
-            'length' => strlen((string) request()->query('code')),
-        ]);
+        $defaultFrontend = $this->allowedOrigins()[0] ?? null;
 
-        $state = request()->query('state');
-        $frontendUrl = $state
-            ? rtrim((string) base64_decode($state), '/')
-            : rtrim((string) env('FRONTEND_URL_PROD', env('FRONTEND_URL')), '/');
+        $frontendUrl = $this->decodeState(request()->query('state')) ?? $defaultFrontend;
+
+        if (! $frontendUrl) {
+            abort(500, 'No valid frontend URL configured.');
+        }
 
         try {
             $googleUser = Socialite::driver('google')
                 ->stateless()
                 ->user();
-        } catch (InvalidStateException | \Throwable $e) {
+        } catch (\Throwable $e) {
             Log::warning('Google OAuth callback failed', ['error' => $e->getMessage()]);
 
             return redirect()->away(
@@ -100,8 +118,8 @@ class AuthController extends Controller
         $email = strtolower((string) $googleUser->getEmail());
         $domain = substr(strrchr($email, '@') ?: '', 1);
 
-        $studentDomain = config('institution.student_domain');
-        $staffDomain = config('institution.staff_domain');
+        $studentDomain = strtolower((string) config('institution.student_domain'));
+        $staffDomain = strtolower((string) config('institution.staff_domain'));
 
         if (! in_array($domain, [$studentDomain, $staffDomain], true)) {
             return redirect()->away(
@@ -116,14 +134,26 @@ class AuthController extends Controller
         $isNewUser = ! $user->exists;
         $isFirstLogin = $isNewUser || is_null($user->google_id);
 
+        // Block disabled/rejected accounts outright, even on first Google login.
+        if (! $isNewUser && ! $user->canLogin()) {
+            return redirect()->away(
+                $frontendUrl . '/login?error=account_disabled'
+            );
+        }
+
         $user->google_id = $googleUser->getId();
 
         if ($isNewUser) {
             $user->name = $googleUser->getName() ?: $user->name;
             $user->role = $isStudent ? 'student' : self::DEFAULT_STAFF_ROLE;
-            $user->status = 'pending';
+            // Student domain: a verified institutional Google account is enough,
+            // so a brand-new student is approved right away.
+            // Staff domain: stays pending until an administrator approves it.
+            $user->status = $isStudent ? 'approved' : 'pending';
             $user->password = null;
-        } elseif ($isFirstLogin) {
+        } elseif ($isFirstLogin && $user->status === 'pending') {
+            // Only auto-approve pre-registered accounts that were waiting
+            // specifically for their first Google login, not any arbitrary status.
             $user->name = $googleUser->getName() ?: $user->name;
             $user->status = 'approved';
             $user->password = null;
@@ -148,9 +178,45 @@ class AuthController extends Controller
     }
 
     /**
-     * Step 3 — SPA exchanges the one-time code for the real Sanctum
-     * token. Single-use, expires in 60s, so a token never sits exposed
-     * in the URL/history.
+     * Decrypt + validate the signed state. Returns null on any failure
+     * (tampered, expired, or origin no longer in allowlist) so callers
+     * fall back to the default frontend instead of trusting attacker input.
+     */
+    private function decodeState(?string $state): ?string
+    {
+        if (! $state) {
+            return null;
+        }
+
+        try {
+            $payload = json_decode(Crypt::decryptString($state), true);
+        } catch (DecryptException) {
+            Log::warning('OAuth state failed decryption — possible tampering.');
+            return null;
+        }
+
+        if (! is_array($payload) || empty($payload['origin']) || empty($payload['exp'])) {
+            return null;
+        }
+
+        if (now()->timestamp > $payload['exp']) {
+            Log::warning('OAuth state expired.');
+            return null;
+        }
+
+        // Re-validate against the CURRENT allowlist — config may have changed
+        // since redirect(), and this guarantees we never trust a raw value.
+        foreach ($this->allowedOrigins() as $allowed) {
+            if (rtrim($allowed, '/') === rtrim($payload['origin'], '/')) {
+                return rtrim($payload['origin'], '/');
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Step 3 — SPA exchanges the one-time code for the real Sanctum token.
      *
      * POST /api/auth/exchange
      */
@@ -170,18 +236,29 @@ class AuthController extends Controller
             ], 401);
         }
 
+        $accessToken = PersonalAccessToken::findToken($token);
+        $user = $accessToken?->tokenable;
+
+        if (! $user || ! $user->canLogin()) {
+            $accessToken?->delete();
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Your account is not active. Please contact an administrator.',
+                'data'    => null,
+            ], 403);
+        }
+
         return response()->json([
             'success' => true,
             'message' => 'OK',
-            'data'    => ['token' => $token],
+            'data'    => [
+                'token' => $token,
+                'user'  => $user->load('program', 'programs'),
+            ],
         ]);
     }
 
-    /**
-     * Revoke the token used to authenticate the current request.
-     *
-     * POST /api/logout
-     */
     public function logout(Request $request): JsonResponse
     {
         $request->user()->currentAccessToken()->delete();
@@ -193,18 +270,12 @@ class AuthController extends Controller
         ]);
     }
 
-    /**
-     * Authenticated user's profile. Frontend checks `status` here —
-     * 'pending' means show "awaiting approval" instead of the dashboard.
-     *
-     * GET /api/me
-     */
     public function me(Request $request): JsonResponse
     {
         return response()->json([
             'success' => true,
             'message' => 'OK',
-            'data'    => $request->user(),
+            'data'    => $request->user()->load('program', 'programs'),
         ]);
     }
 }

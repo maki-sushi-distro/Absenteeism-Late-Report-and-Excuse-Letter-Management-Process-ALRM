@@ -17,6 +17,7 @@ class InstructorRequestController extends Controller
     public function __construct(
         protected AuditLoggerService $auditLogger,
     ) {}
+
     /**
      * List requests for classes taught by the authenticated instructor.
      */
@@ -72,11 +73,27 @@ class InstructorRequestController extends Controller
             $this->applyToTracker($request);
         }
 
+        // Notification for the student (includes request date + instructor name)
+        $request->loadMissing('enrollment.class.instructor');
+
+        $instructorName = $request->enrollment->class->instructor?->name ?? 'your instructor';
+        $typeLabel      = $request->type === 'late' ? 'late' : 'absence';
+
+        $dateLabel = $request->start_date_of_absence
+            ? ' for ' . \Illuminate\Support\Carbon::parse($request->start_date_of_absence)->format('M j')
+            : '';
+
+        $statusLabel = match ($validated['status']) {
+            'approved' => 'approved',
+            'noted'    => 'noted',
+            'invalid'  => 'marked invalid',
+        };
+
         UserNotification::create([
             'user_id'    => $request->enrollment->student_id,
             'request_id' => $request->id,
             'type'       => 'request_decision',
-            'message'    => "Your {$request->type} request has been {$validated['status']}.",
+            'message'    => "Your {$typeLabel} request{$dateLabel} was {$statusLabel} by {$instructorName}.",
             'channel'    => 'in_app',
             'date_sent'  => now(),
             'is_read'    => false,
@@ -98,7 +115,6 @@ class InstructorRequestController extends Controller
      */
     private function applyToTracker(ExcuseRequest $request): void
     {
-        
         [$tracker, $previousStatus] = DB::transaction(function () use ($request) {
             $tracker = AttendanceTracker::where('enrollment_id', $request->enrollment_id)
                 ->lockForUpdate()
@@ -153,7 +169,7 @@ class InstructorRequestController extends Controller
         if ($tracker->status === 'IR') {
             FollowupFlag::create([
                 'request_id'   => $request->id,
-                'flagged_date'   => now(),
+                'flagged_date' => now(),
                 'escalated_to' => $programHead?->id,
                 'status'       => 'open',
             ]);

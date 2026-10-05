@@ -7,6 +7,7 @@ use App\Http\Resources\StudentDashboardResource;
 use App\Models\AttendanceTracker;
 use App\Models\ExcuseRequest;
 use App\Models\UserNotification;
+use App\Services\AcademicPeriod;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -28,11 +29,11 @@ class StudentDashboardController extends Controller
         $student = $request->user();
 
         $trackers = AttendanceTracker::query()
-            ->whereHas('enrollment', fn ($q) => $q->where('student_id', $student->id))
+            ->whereHas('enrollment', fn($q) => $q->where('student_id', $student->id))
             ->get(['total_lates', 'total_absences', 'converted_absences', 'status']);
 
-        $ownRequests = fn () => ExcuseRequest::query()
-            ->whereHas('enrollment', fn ($q) => $q->where('student_id', $student->id));
+        $ownRequests = fn() => ExcuseRequest::query()
+            ->whereHas('enrollment', fn($q) => $q->where('student_id', $student->id));
 
         $pendingRequests = $ownRequests()->where('status', 'pending')->count();
 
@@ -54,7 +55,11 @@ class StudentDashboardController extends Controller
             'success' => true,
             'message' => null,
             'data'    => new StudentDashboardResource([
-                'total_classes'        => $student->enrollments()->count(),
+                'total_classes' => $student->enrollments()
+                    ->whereHas('class', fn($q) => $q
+                        ->where('semester', AcademicPeriod::semester())
+                        ->where('school_year', AcademicPeriod::schoolYear()))
+                    ->count(),
                 'unexcused_absences'   => (int) $trackers->sum('total_absences'),
                 'excused_absences'     => $excusedAbsences,
                 'lates_recorded'       => (int) $trackers->sum('total_lates'),

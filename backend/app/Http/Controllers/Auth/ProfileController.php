@@ -7,6 +7,7 @@ use App\Models\ClassModel;
 use App\Models\Enrollment;
 use App\Models\Program;
 use App\Models\User;
+use App\Services\AcademicPeriod;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -101,8 +102,8 @@ class ProfileController extends Controller
         $matchingClasses = ClassModel::query()
             ->where('program_id', $programId)
             ->where('year_level', $yearLevel)
-            ->where('semester', config('academic.current_semester'))
-            ->where('school_year', config('academic.current_school_year'))
+            ->where('semester', AcademicPeriod::semester())
+            ->where('school_year', AcademicPeriod::schoolYear())
             ->get();
 
         foreach ($matchingClasses as $class) {

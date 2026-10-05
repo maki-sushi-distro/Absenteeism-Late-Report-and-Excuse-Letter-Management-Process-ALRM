@@ -6,9 +6,11 @@ use Illuminate\Support\Facades\Artisan;
 use App\Http\Controllers\Auth\ProfileController;
 use App\Http\Controllers\ProgramHead\FollowupFlagController;
 use App\Http\Controllers\Auth\AuthController;
+use App\Http\Controllers\NotificationController;                          
 use App\Http\Controllers\Student\ClassController;
 use App\Http\Controllers\Student\RequestController;
 use App\Http\Controllers\Student\AttendanceController;
+use App\Http\Controllers\Student\StudentDashboardController;              
 use App\Http\Controllers\Instructor\InstructorRequestController;
 use App\Http\Controllers\Instructor\InstructorDashboardController;
 use App\Http\Controllers\ProgramHead\ProgramHeadDashboardController;
@@ -34,9 +36,10 @@ Route::post('/internal/roster-sync', function (Request $request) {
 
     return response()->json(['success' => true, 'message' => 'Sync started']);
 })->middleware('throttle:10,1');
+
 /*
 |--------------------------------------------------------------------------
-| Auth Routes (Google OAuth/SSO — README §9/§10, no email/password reg)
+| Auth Routes (Google OAuth/SSO no email/password reg)
 |--------------------------------------------------------------------------
 */
 
@@ -55,14 +58,32 @@ Route::middleware(['auth:sanctum', 'active', 'inactive'])->group(function () {
     Route::get('/me', [AuthController::class, 'me']);
     Route::get('/complete-profile/programs', [ProfileController::class, 'programs']);
     Route::post('/complete-profile', [ProfileController::class, 'completeProfile']);
+
+    /*
+    |----------------------------------------------------------------
+    | Notifications (lahat ng roles)
+    |----------------------------------------------------------------
+    */
+    Route::get('/notifications', [NotificationController::class, 'index']);
+    Route::get('/notifications/unread-count', [NotificationController::class, 'unreadCount']);
+    Route::patch('/notifications/read-all', [NotificationController::class, 'markAllAsRead']);   // dapat nasa unahan
+    Route::patch('/notifications/{notification}/read', [NotificationController::class, 'markAsRead']);
+
+    /*
+    |----------------------------------------------------------------
+    | Student Routes
+    |----------------------------------------------------------------
+    */
     Route::middleware('role:student')->group(function () {
+        Route::get('/dashboard', [StudentDashboardController::class, 'index']);   // idinagdag
+
         Route::get('/classes', [ClassController::class, 'index']);
 
         Route::post('/requests', [RequestController::class, 'store']);
         Route::get('/requests', [RequestController::class, 'index']);
         Route::get('/requests/{request}', [RequestController::class, 'show']);
-        Route::patch('/requests/{request}', [RequestController::class, 'update']);   
-        Route::delete('/requests/{request}', [RequestController::class, 'destroy']); 
+        Route::patch('/requests/{request}', [RequestController::class, 'update']);
+        Route::delete('/requests/{request}', [RequestController::class, 'destroy']);
 
         Route::get('/attendance/summary', [AttendanceController::class, 'summary']);
     });

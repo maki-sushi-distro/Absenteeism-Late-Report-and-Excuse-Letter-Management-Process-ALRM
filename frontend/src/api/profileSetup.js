@@ -56,7 +56,9 @@ export async function getProfileSetupPrograms() {
   const programs = listFrom(body);
 
   if (programs.length === 0) {
-    throw new Error("The program list is empty. Please contact an administrator.");
+    throw new Error(
+      "The program list is empty. Please contact an administrator.",
+    );
   }
 
   return programs;

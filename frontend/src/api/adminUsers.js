@@ -1,4 +1,4 @@
-import { apiFetch } from "./client";
+import { apiFetch } from "./client.js";
 
 async function readJson(res) {
   try {
@@ -56,10 +56,6 @@ export function createInstructor(form) {
     name: form.fullName.trim(),
     email: form.email.trim().toLowerCase(),
     role: "instructor",
-    program_id: Number(form.programId),
-    status: form.status === "active" ? "approved" : "pending",
-    employee_id: form.employeeId.trim(),
-    subject_handled: form.subjectHandled.trim(),
   });
 }
 
@@ -68,9 +64,5 @@ export function createStudent(form) {
     name: form.fullName.trim(),
     email: form.email.trim().toLowerCase(),
     role: "student",
-    program_id: Number(form.programId),
-    status: form.status === "active" ? "approved" : "pending",
-    student_id: form.studentId.trim(),
-    year_level: form.yearLevel.trim(),
   });
 }

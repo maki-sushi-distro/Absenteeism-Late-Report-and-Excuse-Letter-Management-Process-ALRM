@@ -41,7 +41,9 @@ const statusOptions = [
 
 function valueFrom(item, keys, fallback = "") {
   for (const key of keys) {
-    const value = key.split(".").reduce((current, part) => current?.[part], item);
+    const value = key
+      .split(".")
+      .reduce((current, part) => current?.[part], item);
     if (value !== undefined && value !== null && value !== "") return value;
   }
 
@@ -62,10 +64,15 @@ function formatDate(value) {
 }
 
 function displayId(student) {
-  return valueFrom(
-    student,
-    ["school_student_id", "student_id", "studentId", "display_id", "displayId", "profile.student_id", "id"],
-  );
+  return valueFrom(student, [
+    "school_student_id",
+    "student_id",
+    "studentId",
+    "display_id",
+    "displayId",
+    "profile.student_id",
+    "id",
+  ]);
 }
 
 function programName(student) {
@@ -101,17 +108,31 @@ function yearLevel(student) {
 }
 
 function studentName(student) {
-  return valueFrom(student, ["name", "full_name", "fullName", "user.name"], "Unnamed Student");
+  return valueFrom(
+    student,
+    ["name", "full_name", "fullName", "user.name"],
+    "Unnamed Student",
+  );
 }
 
 function studentEmail(student) {
-  return valueFrom(student, ["email", "user.email", "profile.email"], "Not recorded");
+  return valueFrom(
+    student,
+    ["email", "user.email", "profile.email"],
+    "Not recorded",
+  );
 }
 
 function studentContact(student) {
   return valueFrom(
     student,
-    ["contact_number", "contactNumber", "phone", "mobile_number", "profile.contact_number"],
+    [
+      "contact_number",
+      "contactNumber",
+      "phone",
+      "mobile_number",
+      "profile.contact_number",
+    ],
     "Not recorded",
   );
 }
@@ -151,17 +172,28 @@ function studentRequests(student) {
 function attendanceSummary(student) {
   const directAttendance = valueFrom(
     student,
-    ["attendance", "attendance_tracker", "attendanceTracker", "absence_summary"],
+    [
+      "attendance",
+      "attendance_tracker",
+      "attendanceTracker",
+      "absence_summary",
+    ],
     null,
   );
 
   if (directAttendance) return directAttendance;
 
   const enrollment = listFrom(student?.enrollments).find(
-    (item) => item?.attendance_tracker || item?.attendanceTracker || item?.attendance,
+    (item) =>
+      item?.attendance_tracker || item?.attendanceTracker || item?.attendance,
   );
 
-  return enrollment?.attendance_tracker || enrollment?.attendanceTracker || enrollment?.attendance || null;
+  return (
+    enrollment?.attendance_tracker ||
+    enrollment?.attendanceTracker ||
+    enrollment?.attendance ||
+    null
+  );
 }
 
 function requestClass(request) {
@@ -219,7 +251,13 @@ function requestReason(request) {
 function requestStatus(request) {
   return valueFrom(
     request,
-    ["status", "approval_status", "approvalStatus", "request_status", "requestStatus"],
+    [
+      "status",
+      "approval_status",
+      "approvalStatus",
+      "request_status",
+      "requestStatus",
+    ],
     "",
   );
 }
@@ -290,7 +328,9 @@ function StudentIdentityCard({ student }) {
 }
 
 function AbsenceCountCard({ attendance }) {
-  const threshold = Number(attendance?.threshold || attendance?.absence_threshold || 6);
+  const threshold = Number(
+    attendance?.threshold || attendance?.absence_threshold || 6,
+  );
   const count = Number(
     attendance?.converted_absences ??
       attendance?.convertedAbsences ??
@@ -300,7 +340,8 @@ function AbsenceCountCard({ attendance }) {
       attendance?.totalAbsences ??
       0,
   );
-  const percent = threshold > 0 ? Math.min(100, Math.round((count / threshold) * 100)) : 0;
+  const percent =
+    threshold > 0 ? Math.min(100, Math.round((count / threshold) * 100)) : 0;
 
   return (
     <div className="rounded-[5px] border border-slate-300 bg-slate-50 px-4 py-4">
@@ -455,7 +496,9 @@ function StudentProfile() {
       } catch (loadError) {
         if (alive) {
           setStudent(null);
-          setError(loadError?.message || "Unable to load this student profile.");
+          setError(
+            loadError?.message || "Unable to load this student profile.",
+          );
         }
       } finally {
         if (alive) setLoading(false);

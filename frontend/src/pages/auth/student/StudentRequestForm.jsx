@@ -572,18 +572,19 @@ function StudentRequestForm() {
     setError("");
 
     try {
-      const matchedClass =
-        form.requestType === "absence"
-          ? findClassByText(classes, form.classText)
-          : null;
+      const matchedClass = isAbsence
+        ? findClassByText(classes, form.classText)
+        : classes.find(
+            (item) => String(item?.class_id) === String(form.classId),
+          );
 
       await createStudentRequest({
-        class_id:
-          form.requestType === "absence" ? matchedClass?.class_id : form.classId,
+        class_id: matchedClass?.class_id || form.classId,
         type: form.requestType,
-        start_date_of_absence: isAbsence
-          ? form.startDateOfAbsence
-          : form.dateSubmitted,
+        subjects_missed:
+          matchedClass?.subject_name || form.classText.trim(),
+        minutes_late: isAbsence ? null : Number(form.minutesLate),
+        start_date_of_absence: isAbsence ? form.startDateOfAbsence : null,
         end_date_of_absence: isAbsence ? form.endDateOfAbsence : null,
         reason,
         evidence_file_url: form.evidenceFile?.name || null,

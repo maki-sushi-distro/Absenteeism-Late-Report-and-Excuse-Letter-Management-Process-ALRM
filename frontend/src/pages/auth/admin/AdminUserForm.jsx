@@ -110,11 +110,17 @@ function AdminUserForm({
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState("");
   const [submitError, setSubmitError] = useState("");
+  const needsPrograms = fields.some((field) => field.type === "program");
 
   useEffect(() => {
     let alive = true;
 
     async function loadPrograms() {
+      if (!needsPrograms) {
+        setLoadingPrograms(false);
+        return;
+      }
+
       setLoadingPrograms(true);
       setProgramError("");
 
@@ -137,7 +143,7 @@ function AdminUserForm({
     return () => {
       alive = false;
     };
-  }, []);
+  }, [needsPrograms]);
 
   const programOptions = useMemo(
     () =>
@@ -169,8 +175,11 @@ function AdminUserForm({
     setSubmitting(true);
 
     try {
-      await createUser(values);
-      setSuccess(`${title} saved successfully.`);
+      const result = await createUser(values);
+      setSuccess(
+        result?.message ||
+          `${title} pre-registered. The account will be completed at first sign-in.`,
+      );
       setValues(initialValues);
       setErrors({});
     } catch (error) {

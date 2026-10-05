@@ -43,7 +43,13 @@ function valueFrom(item, keys, fallback = "") {
 function studentDisplayId(student) {
   return valueFrom(
     student,
-    ["student_id", "studentId", "display_id", "displayId", "id"],
+    [
+      "school_student_id",
+      "student_id",
+      "studentId",
+      "display_id",
+      "displayId",
+    ],
     "Unassigned",
   );
 }
@@ -330,7 +336,7 @@ function Students() {
             <AlertDescription>
               {error}
               {error.includes("404") &&
-                " Confirm that GET /api/admin/students is available on the backend."}
+                " Confirm that GET /api/admin/users?role=student is available on the backend."}
             </AlertDescription>
           </Alert>
         )}

@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
+    "test:api": "node --test tests/api-contracts.test.js",
     "test:session": "node --test tests/session.test.js",
     "preview": "vite preview"
   },

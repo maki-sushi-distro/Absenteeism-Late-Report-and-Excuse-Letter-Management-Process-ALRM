@@ -1,13 +1,9 @@
 import { createStudent } from "@/api/adminUsers";
-import { AdminUserForm, emailPattern, IdCard, Mail, User } from "./AdminUserForm";
+import { AdminUserForm, emailPattern, Mail, User } from "./AdminUserForm";
 
 const initialValues = {
   fullName: "",
   email: "",
-  studentId: "",
-  programId: "",
-  yearLevel: "",
-  status: "active",
 };
 
 const fields = [
@@ -24,31 +20,6 @@ const fields = [
     type: "email",
     icon: Mail,
   },
-  {
-    name: "studentId",
-    label: "Student ID",
-    placeholder: "Enter student ID",
-    icon: IdCard,
-  },
-  {
-    name: "programId",
-    label: "Program",
-    type: "program",
-  },
-  {
-    name: "yearLevel",
-    label: "Year Level",
-    placeholder: "Enter year level",
-  },
-  {
-    name: "status",
-    label: "Account Status",
-    type: "select",
-    options: [
-      { label: "Active", value: "active" },
-      { label: "Inactive", value: "inactive" },
-    ],
-  },
 ];
 
 function validate(values) {
@@ -60,11 +31,6 @@ function validate(values) {
   } else if (!emailPattern.test(values.email.trim())) {
     errors.email = "Enter a valid email address.";
   }
-  if (!values.studentId.trim()) errors.studentId = "Student ID is required.";
-  if (!values.programId) errors.programId = "Program is required.";
-  if (!values.yearLevel.trim()) errors.yearLevel = "Year level is required.";
-  if (!values.status) errors.status = "Account status is required.";
-
   return errors;
 }
 
@@ -72,7 +38,7 @@ function AddStudent() {
   return (
     <AdminUserForm
       title="Add Student"
-      subtitle="Create a new student account"
+      subtitle="Pre-register a student for Google sign-in"
       sectionTitle="Student Information"
       submitLabel="Add Student"
       cancelPath="/students"

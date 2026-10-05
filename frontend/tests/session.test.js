@@ -6,7 +6,7 @@ import { getPostLoginPath, rememberAuthenticatedPage } from '../src/api/authSecu
 
 const user = {
   id: 'student-one', role: 'student', program_id: 1,
-  student_number: '2026-1001', year_level: '1st Year',
+  school_student_id: '2026-1001', year_level: '1st Year',
 };
 
 beforeEach(() => {
@@ -62,6 +62,20 @@ test('network failures and malformed responses do not erase the token', async ()
   assert.equal(getToken(), 'valid-session');
   fetch.mock.mockImplementation(async () => Response.json({ data: null }));
   await assert.rejects(getSessionUser(getToken()));
+  assert.equal(getToken(), 'valid-session');
+});
+
+test('a transient network failure is retried before session restoration fails', async () => {
+  setToken('valid-session');
+  let attempts = 0;
+  const fetch = mock.method(globalThis, 'fetch', async () => {
+    attempts += 1;
+    if (attempts === 1) throw new TypeError('cold start connection reset');
+    return Response.json({ data: user });
+  });
+
+  assert.deepEqual(await getSessionUser(getToken()), user);
+  assert.equal(fetch.mock.callCount(), 2);
   assert.equal(getToken(), 'valid-session');
 });
 

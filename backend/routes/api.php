@@ -47,6 +47,8 @@ Route::prefix('auth')->group(function () {
     Route::get('/google/redirect', [AuthController::class, 'redirect']);
     Route::get('/google/callback', [AuthController::class, 'callback']);
     Route::post('/exchange', [AuthController::class, 'exchange']);
+    Route::post('/otp/check-trusted', [AuthController::class, 'checkTrusted'])
+        ->middleware('throttle:10,1');
     Route::post('/otp/verify', [OtpController::class, 'verify'])
         ->middleware('throttle:10,1');
     Route::post('/otp/resend', [OtpController::class, 'resend'])

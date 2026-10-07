@@ -45,6 +45,32 @@ class OtpController extends Controller
     }
 
     /**
+     * Tama ba ang "pending" token para sa user_id na ito?
+     * Ang token ay ibinibigay ng Google callback (AuthController::callback)
+     * at nakatago sa cache nang 10 minuto.
+     */
+    private function pendingMatches(Request $request): bool
+    {
+        $pending = (string) $request->input('pending');
+
+        if ($pending === '') {
+            return false;
+        }
+
+        return (string) Cache::get("auth_pending:{$pending}")
+            === (string) $request->input('user_id');
+    }
+
+    private function expiredSession(): JsonResponse
+    {
+        return response()->json([
+            'success' => false,
+            'message' => 'Your login session expired. Please sign in again.',
+            'data'    => null,
+        ], 410);
+    }
+
+    /**
      * Deactivated/NULL/unknown status: wipe pending OTPs and refuse.
      */
     private function rejectInactive(User $user): JsonResponse
@@ -60,11 +86,19 @@ class OtpController extends Controller
         ], 403);
     }
 
+    /**
+     * POST /api/auth/otp/resend
+     */
     public function resend(Request $request): JsonResponse
     {
         $request->validate([
             'user_id' => 'required|string|exists:users,id',
+            'pending' => 'required|string',
         ]);
+
+        if (! $this->pendingMatches($request)) {
+            return $this->expiredSession();
+        }
 
         $user = User::findOrFail($request->string('user_id'));
 
@@ -140,7 +174,12 @@ class OtpController extends Controller
         $request->validate([
             'user_id' => 'required|string|exists:users,id',
             'code'    => 'required|string',
+            'pending' => 'required|string',
         ]);
+
+        if (! $this->pendingMatches($request)) {
+            return $this->expiredSession();
+        }
 
         $user = User::findOrFail($request->string('user_id'));
 
@@ -188,6 +227,10 @@ class OtpController extends Controller
         }
 
         $otp->update(['verified_at' => now()]);
+
+        // Isang beses lang magagamit ang pending token.
+        Cache::forget("auth_pending:{$request->input('pending')}");
+        Cache::forget("auth_pending_sent:{$request->input('pending')}");
 
         $user->tokens()->delete();
         $token = $user->createToken('alrm-spa')->plainTextToken;

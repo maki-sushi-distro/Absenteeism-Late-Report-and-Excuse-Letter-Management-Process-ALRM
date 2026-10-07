@@ -85,9 +85,9 @@ class TrustedDeviceManager
             minutes: self::LIFETIME_DAYS * 24 * 60,
             path: '/',
             domain: null,
-            secure: $isProduction,                  // true sa production (HTTPS), false sa local (HTTP)
-            httpOnly: true,                           // JS can't read it — mitigates XSS token theft
-            sameSite: $isProduction ? 'none' : 'lax',  // 'lax' okay habang same-domain localhost testing
+            secure: $isProduction,   // true sa production (HTTPS), false sa local (HTTP)
+            httpOnly: true,          // JS can't read it, mitigates XSS token theft
+            sameSite: 'lax',         // first-party na via Vercel proxy
         );
     }
 }

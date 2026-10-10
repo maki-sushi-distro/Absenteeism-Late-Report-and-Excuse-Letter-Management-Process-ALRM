@@ -3,9 +3,18 @@ import { API_URL } from "./client";
 const PENDING_TOKEN_KEY = "pending_otp_token";
 const PENDING_EMAIL_KEY = "pending_otp_email";
 const PENDING_USER_ID_KEY = "pending_otp_user_id";
+const PENDING_LOGIN_KEY = "pending_otp_login";
 const EXCHANGE_ENDPOINT = "/api/auth/exchange";
 const RESEND_ENDPOINT = "/api/auth/otp/resend";
 const VERIFY_ENDPOINT = "/api/auth/otp/verify";
+const CHECK_TRUSTED_ENDPOINT = "/api/auth/otp/check-trusted";
+
+// Mga status na ibinabalik ng Render/Vercel habang gumigising ang backend.
+const RETRYABLE_STATUSES = [502, 503, 504];
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 async function readJson(res) {
   try {
@@ -78,10 +87,24 @@ export function getPendingOtpUserId() {
   return sessionStorage.getItem(PENDING_USER_ID_KEY);
 }
 
+// Ang "pending" token mula sa Google callback (patunay na dumaan sa Google).
+export function setPendingLogin(pending) {
+  if (pending) {
+    sessionStorage.setItem(PENDING_LOGIN_KEY, pending);
+  } else {
+    sessionStorage.removeItem(PENDING_LOGIN_KEY);
+  }
+}
+
+export function getPendingLogin() {
+  return sessionStorage.getItem(PENDING_LOGIN_KEY);
+}
+
 export function clearPendingOtp() {
   setPendingOtpToken(null);
   setPendingOtpEmail(null);
   setPendingOtpUserId(null);
+  setPendingLogin(null);
 }
 
 export function setPendingOtpSession({ token, email, userId }) {
@@ -138,7 +161,41 @@ export async function exchangeOtpCode(exchangeCode) {
   return expectJson(res);
 }
 
-export async function sendOtp({ token, userId, email }) {
+export async function checkTrustedDevice(
+  { pending },
+  { retries = 6, delayMs = 5000 } = {},
+) {
+  let lastError;
+
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const res = await fetch(`${API_URL}${CHECK_TRUSTED_ENDPOINT}`, {
+        method: "POST",
+        credentials: "include",
+        headers: otpHeaders(),
+        body: JSON.stringify({ pending }),
+      });
+
+      if (RETRYABLE_STATUSES.includes(res.status) && attempt < retries) {
+        await sleep(delayMs);
+        continue;
+      }
+
+      return await expectJson(res);
+    } catch (err) {
+      lastError = err;
+
+      const retryable = !err.status || RETRYABLE_STATUSES.includes(err.status);
+
+      if (!retryable || attempt >= retries) throw err;
+      await sleep(delayMs);
+    }
+  }
+
+  throw lastError;
+}
+
+export async function sendOtp({ token, userId, email, pending }) {
   const res = await fetch(`${API_URL}${RESEND_ENDPOINT}`, {
     method: "POST",
     credentials: "include",
@@ -147,13 +204,14 @@ export async function sendOtp({ token, userId, email }) {
       token,
       user_id: userId,
       email,
+      pending,
     }),
   });
 
   return expectJson(res);
 }
 
-export async function verifyOtp({ token, userId, email, code }) {
+export async function verifyOtp({ token, userId, email, code, pending }) {
   const res = await fetch(`${API_URL}${VERIFY_ENDPOINT}`, {
     method: "POST",
     credentials: "include",
@@ -162,6 +220,7 @@ export async function verifyOtp({ token, userId, email, code }) {
       token,
       user_id: userId,
       email,
+      pending,
       otp: code,
       code,
       otp_code: code,

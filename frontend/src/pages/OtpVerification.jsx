@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { AlertCircle, CheckCircle2, KeyRound, Mail } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -19,15 +19,18 @@ import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
 import { useAuth } from "@/context/AuthContext";
 import {
+  checkTrustedDevice,
   clearPendingOtp,
   exchangeOtpCode,
   getExchangeCodeFromResponse,
   getOtpTokenFromResponse,
   getOtpWaitSeconds,
+  getPendingLogin,
   getPendingOtpEmail,
   getPendingOtpToken,
   getPendingOtpUserId,
   sendOtp,
+  setPendingLogin,
   setPendingOtpSession,
   verifyOtp,
 } from "@/api/otp";
@@ -61,6 +64,27 @@ function OtpVerificationForm() {
   const [sending, setSending] = useState(false);
   const [verifying, setVerifying] = useState(false);
   const [resendSeconds, setResendSeconds] = useState(0);
+
+  // "pending" token mula sa Google callback. Sine-save sa sessionStorage
+  // para hindi mawala kapag nag-refresh o nagbago ang URL.
+  const pendingLogin = useMemo(() => {
+    const fromUrl = searchParams.get("pending");
+
+    if (fromUrl) {
+      setPendingLogin(fromUrl);
+      return fromUrl;
+    }
+
+    return getPendingLogin();
+  }, [searchParams]);
+
+  const exchangeFromUrl = searchParams.get("exchange_code");
+  const alreadyChecked = searchParams.get("checked") === "1";
+  const needsTrustedCheck =
+    Boolean(exchangeFromUrl) || (Boolean(pendingLogin) && !alreadyChecked);
+
+  const [checking, setChecking] = useState(needsTrustedCheck);
+  const checkedRef = useRef(false);
 
   const pendingSession = useMemo(() => {
     const urlToken =
@@ -127,6 +151,42 @@ function OtpVerificationForm() {
   }
 
   useEffect(() => {
+    if (!needsTrustedCheck || checkedRef.current) return;
+    checkedRef.current = true;
+
+    (async () => {
+      try {
+        let exchangeCode = exchangeFromUrl;
+
+        if (!exchangeCode) {
+          const res = await checkTrustedDevice({ pending: pendingLogin });
+
+          if (res?.data?.trusted) {
+            exchangeCode = res?.data?.exchange_code;
+          }
+        }
+
+        if (exchangeCode) {
+          const exchangeRes = await exchangeOtpCode(exchangeCode);
+          const token = getOtpTokenFromResponse(exchangeRes);
+
+          if (token) {
+            const verifiedUser = await loginWithToken(token);
+            clearPendingOtp();
+            navigate(getPostLoginPath(verifiedUser), { replace: true });
+            return;
+          }
+        }
+      } catch (checkError) {
+        setError(checkError?.message || "Unable to verify this device.");
+      }
+
+      setChecking(false); // hindi trusted: ipakita ang OTP form
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [needsTrustedCheck]);
+
+  useEffect(() => {
     if (!hasPendingOtp) return;
 
     const savedReadyAt = Number(sessionStorage.getItem(resendStorageKey));
@@ -175,6 +235,7 @@ function OtpVerificationForm() {
         token: pendingToken,
         userId: pendingUserId,
         email: pendingEmail,
+        pending: pendingLogin,
       });
       startResendCountdown(
         getOtpWaitSeconds(response, initialResendWaitSeconds),
@@ -219,6 +280,7 @@ function OtpVerificationForm() {
         userId: pendingUserId,
         email: pendingEmail,
         code,
+        pending: pendingLogin,
       });
       let verifiedToken = getOtpTokenFromResponse(response);
 
@@ -253,8 +315,29 @@ function OtpVerificationForm() {
   }
 
   async function handleBackToLogin() {
+    clearPendingOtp();
     await logout();
     window.location.href = googleLoginUrl({ prompt: "select_account" });
+  }
+
+  if (checking) {
+    return (
+      <main className="grid min-h-screen place-items-center bg-slate-50 px-5 text-slate-950">
+        <div className="grid justify-items-center gap-4 text-center">
+          <img
+            src={lvLogo}
+            alt="La Verdad Christian College logo"
+            className="size-20 object-contain"
+          />
+          <p
+            role="status"
+            className="flex items-center gap-2 text-sm text-slate-600"
+          >
+            <Spinner /> Signing you in...
+          </p>
+        </div>
+      </main>
+    );
   }
 
   if (!hasPendingOtp) {

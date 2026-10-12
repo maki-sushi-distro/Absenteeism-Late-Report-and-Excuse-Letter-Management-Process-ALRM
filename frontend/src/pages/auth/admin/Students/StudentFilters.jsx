@@ -7,7 +7,7 @@ const yearOptions = ["1st", "2nd", "3rd", "4th"];
 function SelectFilter({ label, value, onChange, children }) {
   return <div className="relative">
     <select value={value} onChange={onChange} aria-label={label}
-      className="h-10 w-full min-w-0 appearance-none rounded-[5px] border border-[#9aa9cf] bg-white px-4 pr-10 text-sm font-medium text-slate-900 outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 sm:min-w-[204px]">
+      className="h-10 w-full min-w-0 appearance-none rounded-[5px] border border-[#9aa9cf] bg-white px-4 pr-10 text-sm font-medium text-slate-900 outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50">
       {children}
     </select>
     <ChevronDown className="pointer-events-none absolute right-4 top-1/2 size-4 -translate-y-1/2 text-slate-900" />
@@ -15,7 +15,7 @@ function SelectFilter({ label, value, onChange, children }) {
 }
 
 function StudentFilters({ filters, loadingPrograms, onChange, programs }) {
-  return <div className="grid gap-2 sm:grid-cols-[minmax(220px,236px)_minmax(180px,204px)_minmax(160px,204px)]">
+  return <div className="grid min-w-0 gap-2 sm:grid-cols-2 xl:grid-cols-[minmax(0,236px)_minmax(0,204px)_minmax(0,204px)]">
     <div className="relative">
       <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-500" />
       <Input value={filters.search} onChange={(event) => onChange("search", event.target.value)}

@@ -23,8 +23,8 @@ function DecisionPanel({ request, onClose, onSaved }) {
     }
   }
 
-  return <div className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
-    <div role="dialog" aria-modal="true" aria-labelledby="decision-title" className="w-full max-w-lg border border-slate-200 bg-white p-6 text-slate-950 shadow-xl dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
+  return <div className="fixed inset-0 z-50 grid overflow-y-auto bg-black/50 p-4" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+    <div role="dialog" aria-modal="true" aria-labelledby="decision-title" className="my-auto w-full max-w-lg justify-self-center overflow-y-auto border border-slate-200 bg-white p-4 text-slate-950 shadow-xl max-h-[calc(100dvh-2rem)] dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 sm:p-6">
       <h2 id="decision-title" className="text-lg font-bold">Review request</h2>
       <p className="mt-2 text-sm">{request.enrollment?.student?.name || "Student"} · {request.enrollment?.class?.subject_name || "Class"}</p>
       <p className="mt-3 text-sm text-slate-600 dark:text-slate-300">{request.reason}</p>

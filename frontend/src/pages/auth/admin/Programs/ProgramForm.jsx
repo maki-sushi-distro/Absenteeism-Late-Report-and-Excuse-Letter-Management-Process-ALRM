@@ -24,10 +24,10 @@ function ProgramForm({ heads, selected, onCancel, onSaved }) {
     }
   }
 
-  return <form onSubmit={submit} className="grid max-w-xl gap-4 border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
+  return <form onSubmit={submit} className="grid w-full min-w-0 max-w-xl gap-4 border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
     <h2 className="text-lg font-bold">{selected ? "Edit program" : "Add program"}</h2>
-    <label className="grid gap-2 text-sm font-semibold">Program name<input required maxLength={255} value={name} onChange={(event) => setName(event.target.value)} className="h-10 border border-slate-300 bg-white px-3 dark:border-slate-700 dark:bg-slate-950" /></label>
-    <label className="grid gap-2 text-sm font-semibold">Program head<select value={headId} onChange={(event) => setHeadId(event.target.value)} className="h-10 border border-slate-300 bg-white px-3 dark:border-slate-700 dark:bg-slate-950"><option value="">Unassigned</option>{heads.map((head) => <option key={head.id} value={head.id}>{head.name}</option>)}</select></label>
+    <label className="grid min-w-0 gap-2 text-sm font-semibold">Program name<input required maxLength={255} value={name} onChange={(event) => setName(event.target.value)} className="h-10 w-full min-w-0 border border-slate-300 bg-white px-3 dark:border-slate-700 dark:bg-slate-950" /></label>
+    <label className="grid min-w-0 gap-2 text-sm font-semibold">Program head<select value={headId} onChange={(event) => setHeadId(event.target.value)} className="h-10 w-full min-w-0 border border-slate-300 bg-white px-3 dark:border-slate-700 dark:bg-slate-950"><option value="">Unassigned</option>{heads.map((head) => <option key={head.id} value={head.id}>{head.name}</option>)}</select></label>
     {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
     <div className="flex justify-end gap-2"><Button type="button" variant="outline" onClick={onCancel}>Cancel</Button><Button type="submit" disabled={saving} className="bg-[#203b82] text-white hover:bg-[#172e68]">{saving ? "Saving..." : "Save program"}</Button></div>
   </form>;

@@ -8,9 +8,9 @@ const heights = {
 
 function DashboardPageLayout({ children, name, role, variant = "standard" }) {
   const height = heights[variant];
-  return <SidebarInset className="alrm-dashboard-scope min-h-screen bg-white text-slate-950 transition-colors dark:bg-slate-950 dark:text-slate-100">
+  return <SidebarInset className="alrm-dashboard-scope min-h-screen min-w-0 bg-white text-slate-950 transition-colors dark:bg-slate-950 dark:text-slate-100">
       <DashboardHeader height={height.header} name={name} role={role} />
-      <main className={`${height.content} w-full bg-white px-5 py-7 transition-colors dark:bg-slate-950 sm:px-8 lg:px-10`}>
+      <main className={`${height.content} min-w-0 w-full bg-white px-5 py-7 transition-colors dark:bg-slate-950 sm:px-8 lg:px-10`}>
         {children}
       </main>
     </SidebarInset>;

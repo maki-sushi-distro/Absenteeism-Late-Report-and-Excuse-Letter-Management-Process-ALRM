@@ -7,7 +7,7 @@ function SettingsCard({ icon: Icon, title, description, children }) {
         <div className="flex size-10 shrink-0 items-center justify-center rounded-[6px] bg-[#203b82]/10 text-[#203b82]">
           <Icon className="size-5" strokeWidth={2.1} />
         </div>
-        <div>
+        <div className="min-w-0">
           <CardTitle className="text-base font-black text-slate-950">{title}</CardTitle>
           <CardDescription className="mt-1 text-sm text-slate-600">{description}</CardDescription>
         </div>

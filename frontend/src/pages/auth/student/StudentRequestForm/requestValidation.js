@@ -37,3 +37,11 @@ export function validateRequestStep(form, currentStep, classes, classesError) {
   if (currentStep === 6 && !form.declaration) errors.declaration = "Confirm the declaration before submitting.";
   return errors;
 }
+
+export function firstInvalidRequestStep(form, classes, classesError) {
+  for (let step = 0; step <= 6; step += 1) {
+    const errors = validateRequestStep(form, step, classes, classesError);
+    if (Object.keys(errors).length > 0) return { step, errors };
+  }
+  return null;
+}

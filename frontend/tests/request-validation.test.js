@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { initialForm } from "../src/pages/auth/student/StudentRequestForm/requestConfig.js";
-import { validateRequestStep } from "../src/pages/auth/student/StudentRequestForm/requestValidation.js";
+import { firstInvalidRequestStep, validateRequestStep } from "../src/pages/auth/student/StudentRequestForm/requestValidation.js";
 
 const enrolledClass = { class_id: "class-one", subject_name: "Information Management" };
 
@@ -37,4 +37,15 @@ test("declaration is required at final review", () => {
   assert.equal(validateRequestStep(initialForm, 6, [], "").declaration,
     "Confirm the declaration before submitting.");
   assert.deepEqual(validateRequestStep({ ...initialForm, declaration: true }, 6, [], ""), {});
+});
+
+test("final submission accepts a filled guardian name and returns to missing details", () => {
+  const form = { ...initialForm, requestType: "late", consent: "agree",
+    studentName: "Alex Student", program: "BS in Information Systems", level: "1st year",
+    guardianName: "Alex Parent", contactNumber: "09123456789", dateSubmitted: "2026-10-13",
+    minutesLate: "15", classId: "class-one", reason: "Traffic", declaration: true };
+  assert.equal(firstInvalidRequestStep(form, [enrolledClass], ""), null);
+  assert.deepEqual(firstInvalidRequestStep({ ...form, guardianName: "" }, [enrolledClass], ""), {
+    step: 3, errors: { guardianName: "Enter a valid parent or guardian's name." },
+  });
 });

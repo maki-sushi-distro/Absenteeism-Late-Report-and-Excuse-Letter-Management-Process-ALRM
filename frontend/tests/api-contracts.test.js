@@ -65,6 +65,8 @@ test("student requests post all fields required by the backend", async () => {
     minutes_late: 15,
     start_date_of_absence: null,
     end_date_of_absence: null,
+    guardian_name: "Alex Parent",
+    contact_number: "09123456789",
     reason: "Transport delay",
     evidence_file_url: null,
     evidence_type: null,

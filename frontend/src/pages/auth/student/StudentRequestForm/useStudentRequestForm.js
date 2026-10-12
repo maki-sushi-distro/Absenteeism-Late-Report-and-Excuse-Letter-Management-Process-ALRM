@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { createStudentRequest, getStudentClasses } from "@/api/studentRequests";
 import { getStoredProfileSetup } from "@/lib/profileSetup";
-import { findClassByText, initialForm, today, yearOptionsForProgram } from "./requestConfig";
-import { validateRequestStep } from "./requestValidation";
+import { initialForm, today, yearOptionsForProgram } from "./requestConfig";
+import { buildStudentRequestPayload } from "./requestPayload";
+import { firstInvalidRequestStep, validateRequestStep } from "./requestValidation";
 
 export function useStudentRequestForm(user) {
   const storedProfile = useMemo(() => getStoredProfileSetup(user), [user]);
@@ -87,28 +88,17 @@ export function useStudentRequestForm(user) {
 
   async function handleSubmit(event) {
     event.preventDefault();
-    if (!validateStep(6)) return;
-    const isAbsence = form.requestType === "absence";
-    const reason = isAbsence ? [
-      `Reason(s) of absence: ${form.absenceReasons.join(", ")}`,
-      `Supporting document(s): ${form.proofTypes.join(", ") || "None selected"}`,
-      `Parent/Guardian: ${form.guardianName.trim()}`,
-      `Contact: ${form.contactNumber.trim()}`,
-    ].join("\n") : [
-      `Late by ${form.minutesLate.trim()} minute(s).`, `Reason: ${form.reason.trim()}`,
-      `Parent/Guardian: ${form.guardianName.trim()}`, `Contact: ${form.contactNumber.trim()}`,
-    ].join("\n");
+    const invalid = firstInvalidRequestStep(form, classes, classesError);
+    if (invalid) {
+      setStep(invalid.step);
+      setFieldErrors(invalid.errors);
+      return;
+    }
+    setFieldErrors({});
     setSubmitting(true);
     setError("");
     try {
-      const matchedClass = isAbsence ? findClassByText(classes, form.classText) :
-        classes.find((item) => String(item?.class_id) === String(form.classId));
-      await createStudentRequest({ class_id: matchedClass?.class_id || form.classId,
-        type: form.requestType, subjects_missed: matchedClass?.subject_name || form.classText.trim(),
-        minutes_late: isAbsence ? null : Number(form.minutesLate),
-        start_date_of_absence: isAbsence ? form.startDateOfAbsence : null,
-        end_date_of_absence: isAbsence ? form.endDateOfAbsence : null,
-        reason, evidence_file_url: null, evidence_type: null });
+      await createStudentRequest(buildStudentRequestPayload(form, classes));
       setSubmitted(true);
     } catch (submitError) {
       setError(submitError?.message || "Unable to submit your request.");

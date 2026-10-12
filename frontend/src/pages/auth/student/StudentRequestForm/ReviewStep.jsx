@@ -9,7 +9,7 @@ function ReviewStep({ wizard }) {
       <AlertDescription>{wizard.error}</AlertDescription>
     </Alert>}
     <SectionBox invalid={Boolean(wizard.fieldErrors.declaration)} title="Student Declaration">
-      <p className="rounded-[10px] border border-slate-200 bg-white p-4 text-sm font-semibold leading-relaxed text-slate-700">
+      <p className="rounded-[10px] border border-slate-200 bg-white p-4 text-sm font-semibold leading-relaxed text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
         I hereby certify that the information provided above is true and correct. I understand that submission of this form does not automatically excuse my{" "}
         {wizard.form.requestType === "absence" ? "absence" : "tardiness"} and remains subject to verification and approval by the appropriate authority.
       </p>

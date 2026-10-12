@@ -15,7 +15,7 @@ function AttachmentStep({ wizard }) {
     </SectionBox>}
     <SectionBox title={wizard.form.requestType === "late" ? "Explanation" : undefined}>
       <FieldLabel>Please attach any applicable supporting document(s):</FieldLabel>
-      <div className="flex min-h-[88px] flex-col items-center justify-center gap-2 rounded-[10px] border-[1.5px] border-dashed border-slate-200 bg-[#FBFBFD] px-4 py-6 text-center text-sm text-slate-500">
+      <div className="flex min-h-[88px] flex-col items-center justify-center gap-2 rounded-[10px] border-[1.5px] border-dashed border-slate-200 bg-[#FBFBFD] px-4 py-6 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
         <span className="inline-flex items-center gap-2 font-bold text-slate-500"><Upload className="size-4" />File attachments unavailable</span>
         <span>The backend does not currently provide a file upload endpoint.</span>
       </div>

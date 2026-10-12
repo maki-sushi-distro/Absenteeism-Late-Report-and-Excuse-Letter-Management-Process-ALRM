@@ -15,7 +15,7 @@ function StudentProfile() {
   return <AdminPageLayout>
     <div className="mx-auto grid w-full max-w-[1040px] gap-6">
       <Button type="button" variant="ghost" onClick={() => navigate("/students")}
-        className="h-auto w-fit rounded-[5px] px-0 py-0 text-sm font-black text-[#203b82] hover:bg-transparent hover:text-[#14285f]">
+        className="h-auto w-fit rounded-[5px] px-0 py-0 text-sm font-black text-[#203b82] hover:bg-transparent hover:text-[#14285f] dark:text-blue-200 dark:hover:text-blue-100">
         <ArrowLeft className="size-4" />Back to Students
       </Button>
       <h1 className="text-2xl font-black tracking-normal text-slate-950">Student Profile</h1>

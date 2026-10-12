@@ -47,7 +47,7 @@ export function findClassByText(classes, text) {
 
 export function controlClass(hasError, className = "") {
   return [className,
-    "border-[1.5px] bg-[#FBFBFD] transition-colors focus-visible:border-[#101C4A] focus-visible:ring-[#101C4A]/15",
-    hasError ? "border-red-500 ring-2 ring-red-100 focus-visible:border-red-500 focus-visible:ring-red-100" : "border-slate-200",
+    "border-[1.5px] bg-[#FBFBFD] text-slate-900 transition-colors focus-visible:border-[#101C4A] focus-visible:ring-[#101C4A]/15 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-400 dark:focus-visible:border-blue-400 dark:focus-visible:ring-blue-400/20",
+    hasError ? "border-red-500 ring-2 ring-red-100 focus-visible:border-red-500 focus-visible:ring-red-100 dark:border-red-400 dark:ring-red-950 dark:focus-visible:border-red-400 dark:focus-visible:ring-red-950" : "border-slate-200 dark:border-slate-700",
   ].filter(Boolean).join(" ");
 }

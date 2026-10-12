@@ -8,7 +8,7 @@ function ActiveFilters({ filters, programName, onClear }) {
     {programName && <span>Program: {programName}</span>}
     {filters.yearLevel && <span>Year: {filters.yearLevel}</span>}
     <Button type="button" variant="ghost" onClick={onClear}
-      className="h-auto rounded-[5px] px-2 py-0 text-xs font-black text-[#203b82]">Clear filters</Button>
+      className="h-auto rounded-[5px] px-2 py-0 text-xs font-black text-[#203b82] dark:text-blue-200">Clear filters</Button>
   </div>;
 }
 

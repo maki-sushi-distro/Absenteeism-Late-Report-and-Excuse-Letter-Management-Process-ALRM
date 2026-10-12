@@ -8,11 +8,11 @@ function StudentIdentityCard({ student }) {
       <UserCircle className="size-14" strokeWidth={1.45} />
     </AvatarFallback></Avatar>
     <div className="min-w-0">
-      <h2 className="break-words text-xl font-black text-[#203b82]">{studentName(student)}</h2>
-      <p className="mt-1 text-xs font-bold text-[#203b82]">Program: {programName(student)}</p>
-      <p className="mt-1 break-all text-xs font-bold text-[#203b82]">Student ID: {displayId(student)}</p>
-      <p className="mt-1 break-all text-xs font-bold text-[#203b82]">Email: {studentEmail(student)}</p>
-      <p className="mt-1 break-words text-xs font-bold text-[#203b82]">Contact: {studentContact(student)}</p>
+      <h2 className="break-words text-xl font-black text-[#203b82] dark:text-blue-200">{studentName(student)}</h2>
+      <p className="mt-1 text-xs font-bold text-[#203b82] dark:text-blue-200">Program: {programName(student)}</p>
+      <p className="mt-1 break-all text-xs font-bold text-[#203b82] dark:text-blue-200">Student ID: {displayId(student)}</p>
+      <p className="mt-1 break-all text-xs font-bold text-[#203b82] dark:text-blue-200">Email: {studentEmail(student)}</p>
+      <p className="mt-1 break-words text-xs font-bold text-[#203b82] dark:text-blue-200">Contact: {studentContact(student)}</p>
     </div>
   </div>;
 }

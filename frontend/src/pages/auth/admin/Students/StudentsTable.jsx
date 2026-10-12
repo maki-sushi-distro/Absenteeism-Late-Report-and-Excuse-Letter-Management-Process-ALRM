@@ -22,7 +22,7 @@ function StudentsTable({ loading, onOpenStudent, programs, students }) {
 
   return <div className="overflow-x-auto"><Table className="min-w-[720px]">
     <TableHeader><TableRow className="border-[#b9c2dd] hover:bg-transparent">
-      {headers.map((header) => <TableHead key={header.label} className={`${header.width} px-0 py-3 text-sm font-black text-[#203b82]`}>{header.label}</TableHead>)}
+      {headers.map((header) => <TableHead key={header.label} className={`${header.width} px-0 py-3 text-sm font-black text-[#203b82] dark:text-blue-200`}>{header.label}</TableHead>)}
     </TableRow></TableHeader>
     <TableBody>{students.map((student, index) => <StudentRow key={studentRecordId(student) || index}
       student={student} index={index} programs={programs} onOpenStudent={onOpenStudent} />)}</TableBody>

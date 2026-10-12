@@ -13,7 +13,7 @@ function AbsenceCountCard({ attendance }) {
 
   return <div className="rounded-[5px] border border-slate-300 bg-slate-50 px-4 py-4">
     <p className="text-xs font-medium text-slate-950">Absence Count</p>
-    <p className="mt-3 text-2xl font-black text-[#14285f]">{count}/{threshold}</p>
+    <p className="mt-3 text-2xl font-black text-[#14285f] dark:text-blue-200">{count}/{threshold}</p>
     <div className="mt-3 grid grid-cols-[1fr_auto] items-center gap-3">
       <Progress value={percent} className="[&_[data-slot=progress-indicator]]:bg-[#203b82] [&_[data-slot=progress-track]]:h-2 [&_[data-slot=progress-track]]:rounded-none [&_[data-slot=progress-track]]:bg-slate-300" />
       <span className="text-sm font-medium text-slate-950">{percent}%</span>

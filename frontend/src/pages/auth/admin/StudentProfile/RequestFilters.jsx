@@ -13,10 +13,10 @@ function RequestFilters({ search, status, onSearchChange, onStatusChange }) {
     </div>
     <div className="relative w-full sm:w-[126px]">
       <select value={status} onChange={(event) => onStatusChange(event.target.value)} aria-label="Filter request status"
-        className="h-9 w-full appearance-none rounded-[5px] border border-[#9aa9cf] bg-white px-3 pr-9 text-sm font-medium text-[#203b82] outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50">
+        className="h-9 w-full appearance-none rounded-[5px] border border-[#9aa9cf] bg-white px-3 pr-9 text-sm font-medium text-[#203b82] outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
         {statusOptions.map((option) => <option key={option} value={option}>{option === "all" ? "All Status" : option[0].toUpperCase() + option.slice(1)}</option>)}
       </select>
-      <ChevronDown className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-[#203b82]" />
+      <ChevronDown className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-[#203b82] dark:text-blue-200" />
     </div>
   </div>;
 }

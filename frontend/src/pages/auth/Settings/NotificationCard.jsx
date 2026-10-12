@@ -21,7 +21,7 @@ function NotificationCard({ config, onUnsupported }) {
           <Switch checked={false} disabled aria-label={channel.label} /></div>
       </div>)}
     </div>
-    <Button type="button" variant="outline" className="mt-4 h-9 rounded-[5px] border-slate-300 font-bold text-[#0b367f]"
+    <Button type="button" variant="outline" className="mt-4 h-9 rounded-[5px] border-slate-300 font-bold text-[#0b367f] dark:border-slate-700 dark:bg-slate-800 dark:text-blue-200 dark:hover:bg-slate-700"
       onClick={() => onUnsupported("Notification preferences unavailable",
         "The backend has notification records, but no preference endpoint is registered for reading or saving per-user notification channels.")}>
       Manage Notifications

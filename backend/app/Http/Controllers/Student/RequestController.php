@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Enrollment;
 use App\Models\ExcuseRequest;
 use Illuminate\Http\Request as HttpRequest;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 
 class RequestController extends Controller
@@ -27,7 +28,7 @@ class RequestController extends Controller
      *    ng sariling drafts
      * 6. Route additions sa api.php (student group)
      */
-    
+
     /**
      * Store a new excuse/late request.
      * Enrollment is resolved from the authenticated student + class_id —
@@ -45,6 +46,8 @@ class RequestController extends Controller
             'reason'            => ['required', 'string'],
             'evidence_file_url' => ['nullable', 'string'],
             'evidence_type'     => ['nullable', 'string'],
+            'guardian_name'  => ['required', 'string', 'min:2', 'max:60', 'regex:/^[^\d]*$/'],
+            'contact_number' => ['required', 'regex:/^(09\d{9}|\+639\d{9})$/'],
         ]);
 
         $enrollment = Enrollment::where('student_id', Auth::id())
@@ -59,19 +62,29 @@ class RequestController extends Controller
             ], 403);
         }
 
-        $excuseRequest = ExcuseRequest::create([
-            'enrollment_id'         => $enrollment->id,
-            'type'                  => $validated['type'],
-            'subjects_missed'       => $validated['subjects_missed'],
-            'minutes_late'          => $validated['minutes_late'] ?? null,
-            'start_date_of_absence' => $validated['start_date_of_absence'] ?? null,
-            'end_date_of_absence'   => $validated['end_date_of_absence'] ?? null,
-            'reason'                => $validated['reason'],
-            'evidence_file_url'     => $validated['evidence_file_url'] ?? null,
-            'evidence_type'         => $validated['evidence_type'] ?? null,
-            'status'                => 'pending',
-            'date_submitted'        => now(),
-        ]);
+        $excuseRequest = DB::transaction(function () use ($httpRequest, $validated, $enrollment) {
+            $excuseRequest = ExcuseRequest::create([
+                'enrollment_id'         => $enrollment->id,
+                'type'                  => $validated['type'],
+                'subjects_missed'       => $validated['subjects_missed'],
+                'minutes_late'          => $validated['minutes_late'] ?? null,
+                'start_date_of_absence' => $validated['start_date_of_absence'] ?? null,
+                'end_date_of_absence'   => $validated['end_date_of_absence'] ?? null,
+                'reason'                => $validated['reason'],
+                'evidence_file_url'     => $validated['evidence_file_url'] ?? null,
+                'evidence_type'         => $validated['evidence_type'] ?? null,
+                'status'                => 'pending',
+                'date_submitted'        => now(),
+            ]);
+
+            // Para auto-filled na sa susunod na request
+            $httpRequest->user()->update([
+                'guardian_name'  => $validated['guardian_name'],
+                'contact_number' => $validated['contact_number'],
+            ]);
+
+            return $excuseRequest;
+        });
 
         return response()->json([
             'success' => true,
@@ -128,14 +141,17 @@ class RequestController extends Controller
 
 
         $validated = $httpRequest->validate([
-            'type'                  => ['required', 'in:absence,late'],
-            'subjects_missed'       => ['required', 'string'],
-            'minutes_late'          => ['required_if:type,late', 'nullable', 'integer', 'min:1'],
+            'class_id'        => ['required', 'string', 'uuid', 'exists:classes,id'],
+            'type'            => ['required', 'in:absence,late'],
+            'subjects_missed' => ['required', 'string', 'max:255'],
+            'minutes_late'          => ['required_if:type,late', 'nullable', 'integer', 'min:1', 'max:999'],
             'start_date_of_absence' => ['required_if:type,absence', 'nullable', 'date'],
             'end_date_of_absence'   => ['nullable', 'date', 'after_or_equal:start_date_of_absence'],
-            'reason'                => ['required', 'string', 'max:500'],
-            'evidence_file_url'     => ['nullable', 'string'],
-            'evidence_type'         => ['nullable', 'string'],
+            'reason'            => ['required', 'string', 'max:600'],
+            'evidence_file_url' => ['nullable', 'string', 'max:255'],
+            'evidence_type'     => ['nullable', 'string', 'max:100'],
+            'guardian_name'  => ['required', 'string', 'min:2', 'max:60', 'regex:/^[^\d]*$/'],
+            'contact_number' => ['required', 'regex:/^(09\d{9}|\+639\d{9})$/'],
         ]);
 
         $request->update($validated);

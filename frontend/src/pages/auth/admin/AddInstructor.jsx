@@ -1,5 +1,5 @@
 import { createInstructor } from "@/api/adminUsers";
-import { AdminUserForm, emailPattern, Mail, User } from "./AdminUserForm";
+import { AdminUserForm, emailPattern, Mail, User } from "./AdminUserForm/index.js";
 
 const initialValues = {
   fullName: "",

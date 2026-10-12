@@ -5,6 +5,7 @@ RUN apt-get update && apt-get install -y \
     git \
     curl \
     libpng-dev \
+    libjpeg62-turbo-dev \
     libonig-dev \
     libxml2-dev \
     libzip-dev \
@@ -12,13 +13,17 @@ RUN apt-get update && apt-get install -y \
     unzip \
     && rm -rf /var/lib/apt/lists/*
 
-# Install PHP extensions needed by Laravel + MySQL/TiDB
-RUN docker-php-ext-install pdo pdo_mysql mbstring exif pcntl bcmath gd zip
+# Install PHP extensions with GD JPEG support
+RUN docker-php-ext-configure gd --with-jpeg \
+    && docker-php-ext-install pdo pdo_mysql mbstring exif pcntl bcmath gd zip
 
-# Enable Apache mod_rewrite (needed for Laravel's pretty URLs)
+# Verify JPEG and PNG support after installation
+RUN php -r 'if (!gd_info()["JPEG Support"] || !gd_info()["PNG Support"]) { fwrite(STDERR, "GD JPEG/PNG support is required.\n"); exit(1); }'
+
+# Enable Apache mod_rewrite
 RUN a2enmod rewrite
 
-# Point Apache's document root to Laravel's public/ folder
+# Point Apache's document root to Laravel's public folder
 ENV APACHE_DOCUMENT_ROOT=/var/www/html/public
 RUN sed -ri -e 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/sites-available/*.conf
 RUN sed -ri -e 's!/var/www/!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/apache2.conf /etc/apache2/conf-available/*.conf
@@ -28,17 +33,17 @@ COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
 WORKDIR /var/www/html
 
-# Copy composer files first (better layer caching)
+# Copy Composer files first for dependency caching
 COPY composer.json composer.lock ./
 RUN composer install --no-dev --no-scripts --no-autoloader --optimize-autoloader
 
-# Copy the rest of the application code
+# Copy application files
 COPY . .
 
-# Finish composer setup now that all files are present
+# Generate the optimized autoloader
 RUN composer dump-autoload --optimize
 
-# Laravel needs these folders to be writable
+# Set Laravel directory permissions
 RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache \
     && chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
 

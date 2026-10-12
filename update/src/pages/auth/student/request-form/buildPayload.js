@@ -1,0 +1,69 @@
+function buildReason(form, isAbsence) {
+  if (isAbsence) {
+    return form.absenceReasons.join(", ");
+  }
+
+  return form.reason.trim();
+}
+
+export function buildRequestPayload(form, classes, evidence = null) {
+  const isAbsence = form.requestType === "absence";
+
+  const matchedClass = classes.find(
+    (item) => String(item?.class_id) === String(form.classId),
+  );
+
+  return {
+    class_id: matchedClass?.class_id || form.classId,
+    type: form.requestType,
+    subjects_missed: matchedClass?.subject_name || "",
+    minutes_late: isAbsence ? null : Number(form.minutesLate),
+    start_date_of_absence: isAbsence ? form.startDateOfAbsence : null,
+    end_date_of_absence: isAbsence ? form.endDateOfAbsence : null,
+    reason: buildReason(form, isAbsence),
+    proof_types: isAbsence ? [...(form.proof_types || [])] : [],
+    evidence_file_url: evidence?.path || null,
+    evidence_type: evidence?.type || null,
+    guardian_name: form.guardianName.trim(),
+    contact_number: form.contactNumber.trim(),
+  };
+}
+
+export function proofTypeError(errors = {}) {
+  return [...new Set(Object.entries(errors || {})
+    .filter(([key]) => key === "proof_types" || key.startsWith("proof_types."))
+    .flatMap(([, messages]) => Array.isArray(messages) ? messages : [messages])
+    .filter(Boolean))].join(" ");
+}
+
+export function requestReason(record) {
+  const reason = String(record.reason || "").trim();
+  const prefix = record.type === "absence" ? "Reason(s) of absence: " : "Reason: ";
+  const legacy = reason.split(/\r?\n/).find((line) => line.startsWith(prefix));
+  return legacy ? legacy.slice(prefix.length).trim() : reason;
+}
+
+export function buildRequestEditForm(record) {
+  return {
+    type: record.type,
+    subjects_missed: record.subjects_missed || record.enrollment?.class?.subject_name || "",
+    reason: requestReason(record),
+    minutes_late: String(record.minutes_late ?? ""),
+    start_date_of_absence: record.start_date_of_absence?.slice(0, 10) || "",
+    end_date_of_absence: record.end_date_of_absence?.slice(0, 10) || "",
+    proof_types: Array.isArray(record.proof_types) ? [...record.proof_types] : [],
+  };
+}
+
+export function buildRequestUpdatePayload(form) {
+  const isAbsence = form.type === "absence";
+  return {
+    type: form.type,
+    subjects_missed: form.subjects_missed,
+    reason: form.reason.trim(),
+    minutes_late: isAbsence ? null : Number(form.minutes_late),
+    start_date_of_absence: isAbsence ? form.start_date_of_absence : null,
+    end_date_of_absence: isAbsence ? form.end_date_of_absence || null : null,
+    proof_types: isAbsence ? [...(form.proof_types || [])] : [],
+  };
+}

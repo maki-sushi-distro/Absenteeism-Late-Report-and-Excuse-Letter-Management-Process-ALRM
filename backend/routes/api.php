@@ -6,11 +6,12 @@ use Illuminate\Support\Facades\Artisan;
 use App\Http\Controllers\Auth\ProfileController;
 use App\Http\Controllers\ProgramHead\FollowupFlagController;
 use App\Http\Controllers\Auth\AuthController;
-use App\Http\Controllers\NotificationController;                          
+use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\Student\ClassController;
 use App\Http\Controllers\Student\RequestController;
+use App\Http\Controllers\Student\EvidenceController;   
 use App\Http\Controllers\Student\AttendanceController;
-use App\Http\Controllers\Student\StudentDashboardController;              
+use App\Http\Controllers\Student\StudentDashboardController;
 use App\Http\Controllers\Instructor\InstructorRequestController;
 use App\Http\Controllers\Instructor\InstructorDashboardController;
 use App\Http\Controllers\ProgramHead\ProgramHeadDashboardController;
@@ -20,22 +21,6 @@ use App\Http\Controllers\Admin\ProgramController;
 use App\Http\Controllers\Admin\ClassManagementController;
 use App\Http\Controllers\Admin\ReportController;
 use App\Http\Controllers\Auth\OtpController;
-
-
-Route::post('/internal/roster-sync', function (Request $request) {
-    $expected = (string) config('services.roster_sync.secret');
-    $provided = (string) $request->header('X-Sync-Secret', '');
-
-    if ($expected === '' || ! hash_equals($expected, $provided)) {
-        abort(403);
-    }
-
-    dispatch(function () {
-        Artisan::call('roster:sync');
-    })->afterResponse();
-
-    return response()->json(['success' => true, 'message' => 'Sync started']);
-})->middleware('throttle:10,1');
 
 /*
 |--------------------------------------------------------------------------
@@ -73,13 +58,24 @@ Route::middleware(['auth:sanctum', 'active', 'inactive'])->group(function () {
 
     /*
     |----------------------------------------------------------------
+    | Request attachment (lahat ng roles; ang ExcuseRequestPolicy
+    | ang nagpapasya kung sino ang pwedeng tumingin)
+    |----------------------------------------------------------------
+    */
+    Route::get('/requests/{request}/evidence', [RequestController::class, 'evidence']);   
+
+    /*
+    |----------------------------------------------------------------
     | Student Routes
     |----------------------------------------------------------------
     */
     Route::middleware('role:student')->group(function () {
-        Route::get('/dashboard', [StudentDashboardController::class, 'index']);   // idinagdag
+        Route::get('/dashboard', [StudentDashboardController::class, 'index']);  
 
         Route::get('/classes', [ClassController::class, 'index']);
+
+        Route::post('/requests/evidence', [EvidenceController::class, 'store'])   
+            ->middleware('throttle:20,1');
 
         Route::post('/requests', [RequestController::class, 'store']);
         Route::get('/requests', [RequestController::class, 'index']);

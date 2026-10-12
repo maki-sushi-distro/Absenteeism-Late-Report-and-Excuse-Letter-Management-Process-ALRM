@@ -5,9 +5,12 @@ namespace App\Http\Controllers\Student;
 use App\Http\Controllers\Controller;
 use App\Models\Enrollment;
 use App\Models\ExcuseRequest;
+use App\Models\RequestAttachment;                  
 use Illuminate\Http\Request as HttpRequest;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;                 
+use Illuminate\Validation\Rule;                    
+use Illuminate\Validation\ValidationException;     
 
 class RequestController extends Controller
 {
@@ -39,13 +42,19 @@ class RequestController extends Controller
         $validated = $httpRequest->validate([
             'class_id'        => ['required', 'string', 'uuid', 'exists:classes,id'],
             'type'            => ['required', 'in:absence,late'],
-            'subjects_missed' => ['required', 'string'],
-            'minutes_late'          => ['required_if:type,late', 'nullable', 'integer', 'min:1'],
+            'subjects_missed' => ['required', 'string', 'max:255'],
+            'minutes_late'          => ['required_if:type,late', 'nullable', 'integer', 'min:1', 'max:999'],
             'start_date_of_absence' => ['required_if:type,absence', 'nullable', 'date'],
             'end_date_of_absence'   => ['nullable', 'date', 'after_or_equal:start_date_of_absence'],
-            'reason'            => ['required', 'string'],
-            'evidence_file_url' => ['nullable', 'string'],
-            'evidence_type'     => ['nullable', 'string'],
+            'reason'            => ['required', 'string', 'max:600'],
+            'evidence_file_url' => [
+                'nullable',
+                'uuid',
+                Rule::exists('request_attachments', 'id')
+                    ->where('user_id', $httpRequest->user()->id)
+                    ->whereNull('excuse_request_id'),
+            ],
+            'evidence_type'     => ['nullable', 'string', 'max:100'],
             'guardian_name'  => ['required', 'string', 'min:2', 'max:60', 'regex:/^[^\d]*$/'],
             'contact_number' => ['required', 'regex:/^(09\d{9}|\+639\d{9})$/'],
         ]);
@@ -77,7 +86,19 @@ class RequestController extends Controller
                 'date_submitted'        => now(),
             ]);
 
-            // Para auto-filled na sa susunod na request
+            if (! empty($validated['evidence_file_url'])) {
+                $linked = RequestAttachment::where('id', $validated['evidence_file_url'])
+                    ->where('user_id', $httpRequest->user()->id)
+                    ->whereNull('excuse_request_id')
+                    ->update(['excuse_request_id' => $excuseRequest->id]);
+
+                if ($linked === 0) {
+                    throw ValidationException::withMessages([
+                        'evidence_file_url' => 'The attachment is no longer available. Please upload it again.',
+                    ]);
+                }
+            }
+
             $httpRequest->user()->update([
                 'guardian_name'  => $validated['guardian_name'],
                 'contact_number' => $validated['contact_number'],
@@ -141,17 +162,14 @@ class RequestController extends Controller
 
 
         $validated = $httpRequest->validate([
-            'class_id'        => ['required', 'string', 'uuid', 'exists:classes,id'],
-            'type'            => ['required', 'in:absence,late'],
-            'subjects_missed' => ['required', 'string', 'max:255'],
-            'minutes_late'          => ['required_if:type,late', 'nullable', 'integer', 'min:1', 'max:999'],
+            'type'                  => ['required', 'in:absence,late'],
+            'subjects_missed'       => ['required', 'string'],
+            'minutes_late'          => ['required_if:type,late', 'nullable', 'integer', 'min:1'],
             'start_date_of_absence' => ['required_if:type,absence', 'nullable', 'date'],
             'end_date_of_absence'   => ['nullable', 'date', 'after_or_equal:start_date_of_absence'],
-            'reason'            => ['required', 'string', 'max:600'],
-            'evidence_file_url' => ['nullable', 'string', 'max:255'],
-            'evidence_type'     => ['nullable', 'string', 'max:100'],
-            'guardian_name'  => ['required', 'string', 'min:2', 'max:60', 'regex:/^[^\d]*$/'],
-            'contact_number' => ['required', 'regex:/^(09\d{9}|\+639\d{9})$/'],
+            'reason'                => ['required', 'string', 'max:500'],
+            'evidence_file_url'     => ['nullable', 'string'],
+            'evidence_type'         => ['nullable', 'string'],
         ]);
 
         $request->update($validated);
@@ -182,6 +200,36 @@ class RequestController extends Controller
             'success' => true,
             'message' => 'Request cancelled.',
             'data'    => $request->fresh(),
+        ]);
+    }
+
+    /**
+     * NEW: I-stream ang attachment ng request. Ang ExcuseRequestPolicy
+     * ang nagpapasya kung sino ang pwedeng tumingin.
+     */
+    public function evidence(ExcuseRequest $request)
+    {
+        $this->authorize('view', $request);
+
+        $attachment = RequestAttachment::where('excuse_request_id', $request->id)->first();
+
+        if (! $attachment) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No attachment available for this request.',
+                'data'    => null,
+            ], 404);
+        }
+
+        $extension = $attachment->mime_type === 'application/pdf'
+            ? 'pdf'
+            : ($attachment->mime_type === 'image/png' ? 'png' : 'jpg');
+
+        return response($attachment->data, 200, [
+            'Content-Type'           => $attachment->mime_type,
+            'Content-Disposition'    => 'inline; filename="attachment.' . $extension . '"',
+            'X-Content-Type-Options' => 'nosniff',
+            'Cache-Control'          => 'private, no-store',
         ]);
     }
 }

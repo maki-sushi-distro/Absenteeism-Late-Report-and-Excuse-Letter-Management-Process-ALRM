@@ -1,85 +1,42 @@
-import { CalendarDays, ClipboardList, FileText, Settings } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
-import { useAuth } from "@/context/AuthContext";
+import { BookOpen, CalendarDays, ClipboardList, FileText } from "lucide-react";
+import { Link } from "react-router-dom";
+import { getStudentAttendance, getStudentRequestHistory } from "@/api/dashboardData";
+import MetricCard from "@/components/dashboard/MetricCard";
+import PageHeading from "@/components/dashboard/PageHeading";
+import { ResourceState } from "@/components/dashboard/ResourceState";
+import { useApiResource } from "@/hooks/useApiResource";
 import StudentPageLayout from "./StudentPageLayout";
 
-const dashboardCards = [
-  {
-    label: "My Records",
-    value: "0",
-    note: "Attendance entries available for review",
-    icon: ClipboardList,
-  },
-  {
-    label: "Pending Requests",
-    value: "0",
-    note: "Excuse or late requests awaiting review",
-    icon: FileText,
-  },
-  {
-    label: "This Week",
-    value: "0",
-    note: "Recorded absence or late items",
-    icon: CalendarDays,
-  },
-  {
-    label: "Settings",
-    value: "Ready",
-    note: "Manage account preferences",
-    icon: Settings,
-  },
-];
+function loadOverview() {
+  return Promise.all([getStudentAttendance(), getStudentRequestHistory()]).then(([attendance, requests]) => ({ attendance, requests }));
+}
 
 function StudentDashboard() {
-  const { user } = useAuth();
-
-  return (
-    <StudentPageLayout>
-      <div className="grid gap-6">
-        <section>
-          <p className="mb-4 inline-flex bg-slate-50 px-1 text-sm font-black uppercase text-[#0b367f] dark:bg-slate-900 dark:text-blue-300">
-            Dashboard
-          </p>
-          <h1 className="text-2xl font-black tracking-normal text-slate-950 dark:text-slate-50">
-            Welcome back, {user?.name || "Student"}!
-          </h1>
-          <p className="mt-1 text-lg font-medium text-slate-900 dark:text-slate-300">
-            Here's your student overview
-          </p>
+  const resource = useApiResource(loadOverview);
+  const attendance = resource.data?.attendance || [];
+  const requests = resource.data?.requests || [];
+  const pending = requests.filter((request) => request.status === "pending").length;
+  const absences = attendance.reduce((sum, item) => sum + Number(item.tracker?.total_absences || 0), 0);
+  return <StudentPageLayout>
+    <PageHeading title="Dashboard" description="Your attendance and request overview" action={<Link to="/student/request" className="rounded-[5px] bg-[#203b82] px-4 py-2 text-sm font-semibold text-white hover:bg-[#172e68]">New request</Link>} />
+    <ResourceState {...resource} onRetry={resource.reload}>
+      <>
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <MetricCard label="Classes" value={attendance.length} icon={BookOpen} />
+          <MetricCard label="Requests" value={requests.length} icon={FileText} />
+          <MetricCard label="Pending" value={pending} icon={CalendarDays} />
+          <MetricCard label="Recorded absences" value={absences} icon={ClipboardList} />
+        </div>
+        <section className="mt-8">
+          <div className="mb-3 flex items-center justify-between"><h2 className="text-lg font-bold">Recent requests</h2><Link to="/student/records" className="text-sm font-semibold text-blue-700 hover:underline dark:text-blue-300">View records</Link></div>
+          <div className="border border-slate-200 dark:border-slate-800">
+            {requests.slice(0, 5).map((request) => <div key={request.id} className="flex justify-between gap-4 border-b border-slate-200 px-4 py-3 text-sm last:border-b-0 dark:border-slate-800"><span>{request.enrollment?.class?.subject_name || request.subjects_missed || "Request"}</span><span className="capitalize">{request.status}</span></div>)}
+            {!requests.length && <p className="px-4 py-8 text-center text-sm text-slate-500">No requests submitted yet.</p>}
+          </div>
         </section>
-
-        <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          {dashboardCards.map((card) => {
-            const Icon = card.icon;
-
-            return (
-              <Card
-                key={card.label}
-                className="rounded-[5px] border border-slate-300 bg-slate-50 py-0 shadow-none ring-0 dark:border-slate-800 dark:bg-slate-900"
-              >
-                <CardContent className="p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-xs font-black uppercase text-slate-800 dark:text-slate-300">
-                        {card.label}
-                      </p>
-                      <p className="mt-3 text-3xl font-black leading-none text-slate-950 dark:text-slate-50">
-                        {card.value}
-                      </p>
-                      <p className="mt-1 text-xs font-medium text-slate-700 dark:text-slate-400">
-                        {card.note}
-                      </p>
-                    </div>
-                    <Icon className="size-5 text-[#203b82] dark:text-blue-300" />
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </section>
-      </div>
-    </StudentPageLayout>
-  );
+      </>
+    </ResourceState>
+  </StudentPageLayout>;
 }
 
 export default StudentDashboard;

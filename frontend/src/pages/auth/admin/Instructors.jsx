@@ -1,58 +1,26 @@
-import { useNavigate } from "react-router-dom";
-import { Plus, Users } from "lucide-react";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Link } from "react-router-dom";
+import { getAdminUsers } from "@/api/dashboardData";
+import DataTable from "@/components/dashboard/DataTable";
+import PageHeading from "@/components/dashboard/PageHeading";
+import { ResourceState } from "@/components/dashboard/ResourceState";
+import StatusBadge from "@/components/dashboard/StatusBadge";
+import { useApiResource } from "@/hooks/useApiResource";
 import AdminPageLayout from "./AdminPageLayout";
 
+function loadInstructors() { return getAdminUsers("instructor"); }
+
+const columns = [
+  { key: "name", label: "Name" },
+  { key: "email", label: "LV Email" },
+  { key: "status", label: "Status", render: (row) => <StatusBadge value={row.status} /> },
+];
+
 function Instructors() {
-  const navigate = useNavigate();
-
-  return (
-    <AdminPageLayout>
-      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-black tracking-normal text-slate-950">
-            Instructors
-          </h1>
-          <p className="mt-1 text-sm font-medium text-slate-600">
-            Manage instructor accounts and assignments
-          </p>
-        </div>
-        <Button
-          type="button"
-          onClick={() => navigate("/instructors/add")}
-          className="h-9 rounded-[5px] bg-[#0b4bd3] px-4 font-bold text-white hover:bg-[#083da9]"
-        >
-          <Plus className="size-4" />
-          Add Instructor
-        </Button>
-      </div>
-
-      <Card className="max-w-[960px] rounded-[5px] border border-slate-300 py-0 shadow-none ring-0">
-        <CardContent className="grid gap-4 px-5 py-7 sm:px-8">
-          <Users className="size-10 text-[#203b82]" />
-          <div>
-            <h2 className="text-lg font-bold text-slate-950">
-              Instructor directory
-            </h2>
-            <p className="mt-1 max-w-2xl text-sm text-slate-600">
-              Use the add button to create an instructor account. The current
-              backend exposes pending-user approval and program endpoints, but
-              not a complete instructor listing endpoint yet.
-            </p>
-          </div>
-          <Alert>
-            <AlertTitle>Backend endpoint needed for full listing</AlertTitle>
-            <AlertDescription>
-              Expected future endpoint: GET /api/admin/users?role=instructor or
-              equivalent.
-            </AlertDescription>
-          </Alert>
-        </CardContent>
-      </Card>
-    </AdminPageLayout>
-  );
+  const resource = useApiResource(loadInstructors);
+  return <AdminPageLayout>
+    <PageHeading title="Instructors" description="Instructor directory" action={<Link to="/instructors/add" className="rounded-[5px] bg-[#203b82] px-4 py-2 text-sm font-semibold text-white hover:bg-[#172e68]">Add instructor</Link>} />
+    <ResourceState {...resource} onRetry={resource.reload}><DataTable columns={columns} rows={resource.data || []} empty="No instructors found." /></ResourceState>
+  </AdminPageLayout>;
 }
 
 export default Instructors;

@@ -1,4 +1,5 @@
 import { apiFetch } from "./client.js";
+import { getAdminPrograms } from "./adminUsers.js";
 
 async function readJson(res) {
   try {
@@ -111,7 +112,7 @@ export async function getAdminStudents(filters = {}) {
 }
 
 export async function getAdminStudent(studentId) {
-  const students = await getAdminStudents();
+  const [students, programs] = await Promise.all([getAdminStudents(), getAdminPrograms()]);
   const student = students.find(
     (item) => String(item?.id ?? item?.user_id) === String(studentId),
   );
@@ -122,5 +123,8 @@ export async function getAdminStudent(studentId) {
     throw error;
   }
 
-  return student;
+  return {
+    ...student,
+    program: programs.find((program) => String(program.id) === String(student.program_id)) || null,
+  };
 }

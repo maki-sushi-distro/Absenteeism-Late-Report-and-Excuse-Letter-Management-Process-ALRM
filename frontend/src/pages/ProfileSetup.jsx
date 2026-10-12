@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
 import { useAuth } from "@/context/AuthContext";
+import { usePreviewRole } from "@/hooks/usePreviewRole";
 import {
   ASSOCIATE_YEAR_LEVELS,
   YEAR_LEVELS,
@@ -23,6 +24,10 @@ import {
   splitVerifiedName,
 } from "@/lib/profileSetup";
 import { normalizeRole } from "@/lib/roles";
+import {
+  PREVIEW_ROLE_OPTIONS,
+  previewRoleLabel,
+} from "@/lib/previewRole";
 import lvLogo from "@/assets/LV_Logo.png";
 
 const ROLE_LABELS = {
@@ -92,6 +97,7 @@ const selectClass =
 function ProfileSetup() {
   const navigate = useNavigate();
   const { refreshUser, user } = useAuth();
+  const { activeRole, canPreviewRoles, setActiveRole } = usePreviewRole(user);
 
   // Ang role ay galing sa server at read-only. Hindi ito ipinapadala.
   const serverRole = normalizeRole(user?.role);
@@ -297,13 +303,37 @@ function ProfileSetup() {
           <form className="grid gap-5" onSubmit={handleSubmit}>
             <div className="grid gap-4 md:grid-cols-2">
               <div className="grid min-w-0 gap-2">
-                <Label htmlFor="setup-role">Role</Label>
-                <Input
-                  id="setup-role"
-                  readOnly
-                  value={roleLabel}
-                  className="h-10 cursor-default rounded-[5px] border-slate-300 bg-slate-50 text-sm font-medium text-slate-700 shadow-none"
-                />
+                <Label htmlFor="setup-role">
+                  {canPreviewRoles ? "Dashboard Role (Testing)" : "Role"}
+                </Label>
+                {canPreviewRoles ? (
+                  <select
+                    id="setup-role"
+                    value={activeRole}
+                    onChange={(event) => setActiveRole(event.target.value)}
+                    disabled={submitting}
+                    className={selectClass}
+                  >
+                    {PREVIEW_ROLE_OPTIONS.map((role) => (
+                      <option key={role.value} value={role.value}>
+                        {role.label}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <Input
+                    id="setup-role"
+                    readOnly
+                    value={roleLabel}
+                    className="h-10 cursor-default rounded-[5px] border-slate-300 bg-slate-50 text-sm font-medium text-slate-700 shadow-none"
+                  />
+                )}
+                {canPreviewRoles && (
+                  <p className="text-xs text-amber-700">
+                    Viewing as {previewRoleLabel(activeRole)} changes frontend
+                    navigation only. Your backend account remains Student.
+                  </p>
+                )}
                 <FieldError message={errors.role} />
               </div>
 

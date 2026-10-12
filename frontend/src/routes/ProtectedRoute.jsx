@@ -7,6 +7,7 @@ import { useAuth } from '../context/AuthContext';
 import { getPendingOtpToken, getPendingOtpUserId } from '../api/otp';
 import { needsProfileSetup } from '../lib/profileSetup';
 import { roleMatches } from '../lib/roles';
+import { usePreviewRole } from '../hooks/usePreviewRole';
 import HttpErrorPage from '../pages/HttpErrorPage';
 
 function AuthenticatedPage({ user, children }) {
@@ -26,6 +27,7 @@ export function ProtectedRoute({
   const location = useLocation();
   const pendingOtpToken = getPendingOtpToken();
   const pendingOtpUserId = getPendingOtpUserId();
+  const { activeRole } = usePreviewRole(user);
 
   if (!user && (loading || sessionError)) return <SessionStatus />;
 
@@ -37,7 +39,7 @@ export function ProtectedRoute({
   if (!allowedIncompleteProfile && needsProfileSetup(user)) {
     return <Navigate to="/complete-profile" replace />;
   }
-  if (allowedRoles?.length && !roleMatches(user.role, allowedRoles)) {
+  if (allowedRoles?.length && !roleMatches(activeRole, allowedRoles)) {
     return <HttpErrorPage status={403} />;
   }
 

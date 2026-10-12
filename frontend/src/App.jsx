@@ -10,11 +10,18 @@ import ProfileSetup from "./pages/ProfileSetup";
 import AddInstructor from "./pages/auth/admin/AddInstructor";
 import AddStudent from "./pages/auth/admin/AddStudent";
 import Instructors from "./pages/auth/admin/Instructors";
+import UserManagement from "./pages/auth/admin/UserManagement";
+import Programs from "./pages/auth/admin/Programs";
+import Classes from "./pages/auth/admin/Classes";
+import Reports from "./pages/auth/admin/Reports";
 import StudentProfile from "./pages/auth/admin/StudentProfile";
 import Students from "./pages/auth/admin/Students";
 import Settings from "./pages/auth/Settings";
-import InstructorPlaceholderPage from "./pages/auth/instructor/InstructorPlaceholderPage";
-import StudentPlaceholderPage from "./pages/auth/student/StudentPlaceholderPage";
+import InstructorClassRecords from "./pages/auth/instructor/InstructorClassRecords";
+import InstructorRequests from "./pages/auth/instructor/InstructorRequests";
+import ProgramHeadRequests from "./pages/auth/programHead/ProgramHeadRequests";
+import FlaggedStudents from "./pages/auth/programHead/FlaggedStudents";
+import StudentRecords from "./pages/auth/student/StudentRecords";
 import StudentRequestForm from "./pages/auth/student/StudentRequestForm";
 import AppErrorBoundary from "./components/AppErrorBoundary";
 import HttpErrorPage from "./pages/HttpErrorPage";
@@ -63,6 +70,12 @@ function App() {
               </ProtectedRoute>
             }
           />
+          <Route path="/user-management" element={<ProtectedRoute allowedRoles={["admin"]}><UserManagement /></ProtectedRoute>} />
+          <Route path="/programs" element={<ProtectedRoute allowedRoles={["admin"]}><Programs /></ProtectedRoute>} />
+          <Route path="/classes" element={<ProtectedRoute allowedRoles={["admin"]}><Classes /></ProtectedRoute>} />
+          <Route path="/reports" element={<ProtectedRoute allowedRoles={["admin"]}><Reports /></ProtectedRoute>} />
+          <Route path="/program-head/requests" element={<ProtectedRoute allowedRoles={["program"]}><ProgramHeadRequests /></ProtectedRoute>} />
+          <Route path="/program-head/flagged" element={<ProtectedRoute allowedRoles={["program"]}><FlaggedStudents /></ProtectedRoute>} />
           <Route
             path="/instructors/add"
             element={
@@ -99,10 +112,7 @@ function App() {
             path="/instructor/class-records"
             element={
               <ProtectedRoute allowedRoles={["instructor"]}>
-                <InstructorPlaceholderPage
-                  title="Class Records"
-                  description="Review attendance records for your assigned classes."
-                />
+                <InstructorClassRecords />
               </ProtectedRoute>
             }
           />
@@ -110,10 +120,7 @@ function App() {
             path="/instructor/class-requests"
             element={
               <ProtectedRoute allowedRoles={["instructor"]}>
-                <InstructorPlaceholderPage
-                  title="Class Requests"
-                  description="Review student absence and late requests."
-                />
+                <InstructorRequests />
               </ProtectedRoute>
             }
           />
@@ -121,10 +128,7 @@ function App() {
             path="/student/records"
             element={
               <ProtectedRoute allowedRoles={["student"]}>
-                <StudentPlaceholderPage
-                  title="My Records"
-                  description="Review your attendance and late records."
-                />
+                <StudentRecords />
               </ProtectedRoute>
             }
           />

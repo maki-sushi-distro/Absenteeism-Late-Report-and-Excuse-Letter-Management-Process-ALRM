@@ -55,6 +55,8 @@ class RequestController extends Controller
                     ->whereNull('excuse_request_id'),
             ],
             'evidence_type'     => ['nullable', 'string', 'max:100'],
+            'proof_types'       => ['nullable', 'array', 'list', 'max:6'],
+            'proof_types.*'     => ['required', 'string', 'distinct', Rule::in(ExcuseRequest::PROOF_TYPES)],
             'guardian_name'  => ['required', 'string', 'min:2', 'max:60', 'regex:/^[^\d]*$/'],
             'contact_number' => ['required', 'regex:/^(09\d{9}|\+639\d{9})$/'],
         ]);
@@ -82,6 +84,7 @@ class RequestController extends Controller
                 'reason'                => $validated['reason'],
                 'evidence_file_url'     => $validated['evidence_file_url'] ?? null,
                 'evidence_type'         => $validated['evidence_type'] ?? null,
+                'proof_types'           => $validated['proof_types'] ?? null,
                 'status'                => 'pending',
                 'date_submitted'        => now(),
             ]);
@@ -170,6 +173,8 @@ class RequestController extends Controller
             'reason'                => ['required', 'string', 'max:500'],
             'evidence_file_url'     => ['nullable', 'string'],
             'evidence_type'         => ['nullable', 'string'],
+            'proof_types'           => ['nullable', 'array', 'list', 'max:6'],
+            'proof_types.*'         => ['required', 'string', 'distinct', Rule::in(ExcuseRequest::PROOF_TYPES)],
         ]);
 
         $request->update($validated);

@@ -17,7 +17,7 @@ class RunAttendanceAutomation extends Command
 
     public function handle(): int
     {
-        $lock = Cache::lock('alrm:process-automation', 300); 
+        $lock = Cache::lock('alrm:process-automation', 300);
 
         if (! $lock->get()) {
             $this->warn('alrm:process-automation is already running — skipping this invocation.');
@@ -108,10 +108,15 @@ class RunAttendanceAutomation extends Command
             ->get();
 
         foreach ($warningTrackers as $tracker) {
+            $class   = $tracker->enrollment?->class;
+            $subject = $class?->subject_name ?? 'a subject';
+            $used    = $class ? $tracker->unitsUsed() : 0;
+            $limit   = $class ? $tracker->allowedUnits() : 0;
+
             $sent = $this->notifyThreshold(
                 $tracker,
                 'attendance_warning',
-                "Student has reached {$tracker->converted_absences} converted absence(s) — Warning threshold."
+                "Student is near the absence limit in {$subject} ({$used} of {$limit} units)."
             );
 
             if ($sent) {
@@ -126,10 +131,15 @@ class RunAttendanceAutomation extends Command
             ->get();
 
         foreach ($irTrackers as $tracker) {
+            $class   = $tracker->enrollment?->class;
+            $subject = $class?->subject_name ?? 'a subject';
+            $used    = $class ? $tracker->unitsUsed() : 0;
+            $limit   = $class ? $tracker->allowedUnits() : 0;
+
             $sent = $this->notifyThreshold(
                 $tracker,
                 'attendance_ir',
-                "Student has reached {$tracker->converted_absences} converted absence(s) — Incident Report (IR) threshold."
+                "Student exceeded the allowable absences in {$subject} ({$used} of {$limit} units) — Incident Report (IR) threshold."
             );
 
             if ($sent) {

@@ -14,14 +14,6 @@ use Illuminate\Http\Request;
 class StudentDashboardController extends Controller
 {
     /**
-     * Converted absences at which a student reaches IR.
-     * Mirrors AttendanceTracker::recompute() (warning at 2, IR at 3).
-     */
-    private const IR_LIMIT = 3;
-
-    /**
-     * Student dashboard snapshot (matches the Figma home screen).
-     *
      * GET /api/dashboard
      */
     public function index(Request $request): JsonResponse
@@ -30,7 +22,8 @@ class StudentDashboardController extends Controller
 
         $trackers = AttendanceTracker::query()
             ->whereHas('enrollment', fn($q) => $q->where('student_id', $student->id))
-            ->get(['total_lates', 'total_absences', 'converted_absences', 'status']);
+            ->with('enrollment.class')
+            ->get();
 
         $ownRequests = fn() => ExcuseRequest::query()
             ->whereHas('enrollment', fn($q) => $q->where('student_id', $student->id));
@@ -47,6 +40,9 @@ class StudentDashboardController extends Controller
             $trackers->contains('status', 'warning') => 'warning',
             default                                  => 'safe',
         };
+
+        // Subject na pinakamalapit sa limit
+        $closest = $trackers->sortByDesc(fn($t) => $t->usageRatio())->first();
 
         $notifications = UserNotification::query()
             ->where('user_id', $student->id);
@@ -65,8 +61,8 @@ class StudentDashboardController extends Controller
                 'lates_recorded'       => (int) $trackers->sum('total_lates'),
                 'pending_requests'     => $pendingRequests,
                 'threshold'            => [
-                    'used'   => (int) $trackers->max('converted_absences'),
-                    'limit'  => self::IR_LIMIT,
+                    'used'   => $closest?->unitsUsed() ?? 0,
+                    'limit'  => $closest?->allowedUnits() ?? 0,
                     'status' => $thresholdStatus,
                 ],
                 'unread_notifications' => (clone $notifications)->where('is_read', false)->count(),

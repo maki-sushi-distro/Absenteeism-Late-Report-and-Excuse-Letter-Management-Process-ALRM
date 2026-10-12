@@ -27,56 +27,63 @@ class AttendanceTracker extends Model
 
     protected $table = 'attendance_tracker';
 
-
-    /*
-    |--------------------------------------------------------------------------
-    | Casts
-    |--------------------------------------------------------------------------
-    */
-
     protected function casts(): array
     {
         return [
-            'total_lates'          => 'integer',
-            'total_absences'       => 'integer',
-            'converted_absences'   => 'integer',
-            'warning_notified_at'  => 'datetime',
-            'ir_notified_at'       => 'datetime',
+            'total_lates'         => 'integer',
+            'total_absences'      => 'integer',
+            'converted_absences'  => 'integer',
+            'warning_notified_at' => 'datetime',
+            'ir_notified_at'      => 'datetime',
         ];
     }
-
-    /*
-    |--------------------------------------------------------------------------
-    | Relationships
-    |--------------------------------------------------------------------------
-    */
 
     public function enrollment(): BelongsTo
     {
         return $this->belongsTo(Enrollment::class);
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Business Logic
-    |--------------------------------------------------------------------------
-    */
+    /** Units (hours) na nagamit na, batay sa converted absences. */
+    public function unitsUsed(): float
+    {
+        return round(
+            $this->converted_absences * $this->enrollment->class->unitsPerMeeting(),
+            2
+        );
+    }
+
+    /** Allowable absence units ng class (20% ng total hours). */
+    public function allowedUnits(): float
+    {
+        return $this->enrollment->class->allowedAbsenceUnits();
+    }
+
+    /** Ginagamit para hanapin ang subject na pinakamalapit sa limit. */
+    public function usageRatio(): float
+    {
+        $allowed = $this->allowedUnits();
+
+        return $allowed > 0 ? $this->unitsUsed() / $allowed : 0;
+    }
 
     /**
-     * Recompute converted_absences and update status.
-     * Call this every time total_lates or total_absences changes.
-     *
-     * Policy: 3 lates = 1 absence
-     * Triggers: 2 converted absences = warning, 3 = IR
+     * Policy: 3 lates = 1 absence.
+     * IR      → lumampas na sa 20% allowable units.
+     * warning → isa pang absence ay lalampas na sa limit.
+     * Tawagin tuwing nagbabago ang total_lates o total_absences.
      */
     public function recompute(): void
     {
         $this->converted_absences = $this->total_absences + (int) floor($this->total_lates / 3);
 
+        $perMeeting = $this->enrollment->class->unitsPerMeeting();
+        $used       = $this->unitsUsed();
+        $allowed    = $this->allowedUnits();
+
         $this->status = match (true) {
-            $this->converted_absences >= 3 => 'IR',
-            $this->converted_absences >= 2 => 'warning',
-            default                         => 'safe',
+            $used > $allowed               => 'IR',
+            $used + $perMeeting > $allowed => 'warning',
+            default                        => 'safe',
         };
 
         $this->save();

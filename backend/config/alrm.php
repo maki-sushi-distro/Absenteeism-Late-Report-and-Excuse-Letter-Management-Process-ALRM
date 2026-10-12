@@ -19,5 +19,7 @@ return [
     */
 
     'followup_response_window_hours' => (int) env('FOLLOWUP_RESPONSE_WINDOW_HOURS', 48),
+    'semester_weeks'     => 16,
+    'absence_limit_rate' => 0.20,
 
 ];

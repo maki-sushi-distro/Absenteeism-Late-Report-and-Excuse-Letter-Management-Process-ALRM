@@ -54,4 +54,21 @@ class ClassModel extends Model
     {
         return $this->hasMany(Enrollment::class, 'class_id');
     }
+
+    /** Units (hours) ng 1 absence = oras ng isang meeting. */
+    public function unitsPerMeeting(): float
+    {
+        return $this->weekly_hours / max(1, $this->meetings_per_week);
+    }
+
+    /** 20% ng total hours: 3 hrs → 9.6, 5 hrs → 16 */
+    public function allowedAbsenceUnits(): float
+    {
+        return round(
+            $this->weekly_hours
+                * config('alrm.semester_weeks')
+                * config('alrm.absence_limit_rate'),
+            2
+        );
+    }
 }

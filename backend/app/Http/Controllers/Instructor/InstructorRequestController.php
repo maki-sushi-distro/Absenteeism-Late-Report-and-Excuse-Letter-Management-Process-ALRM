@@ -122,11 +122,11 @@ class InstructorRequestController extends Controller
 
             if (! $tracker) {
                 $tracker = AttendanceTracker::create([
-                    'enrollment_id'       => $request->enrollment_id,
-                    'total_lates'         => 0,
-                    'total_absences'      => 0,
-                    'converted_absences'  => 0,
-                    'status'              => 'safe',
+                    'enrollment_id'      => $request->enrollment_id,
+                    'total_lates'        => 0,
+                    'total_absences'     => 0,
+                    'converted_absences' => 0,
+                    'status'             => 'safe',
                 ]);
                 $tracker = AttendanceTracker::where('enrollment_id', $request->enrollment_id)
                     ->lockForUpdate()
@@ -148,7 +148,7 @@ class InstructorRequestController extends Controller
         });
 
         if ($tracker->status === $previousStatus) {
-            return; // no new threshold crossed
+            return; // walang bagong threshold na naabot
         }
 
         $student     = $request->enrollment->student;
@@ -157,12 +157,16 @@ class InstructorRequestController extends Controller
 
         $recipients = array_filter([$instructor, $programHead]);
 
+        $subject = $request->enrollment->class->subject_name;
+        $used    = $tracker->unitsUsed();
+        $limit   = $tracker->allowedUnits();
+
         if ($tracker->status === 'warning') {
             $this->notifyAll(
                 $recipients,
                 $request,
                 'threshold_warning',
-                "{$student->name} has reached 2 converted absences (warning)."
+                "{$student->name} is near the absence limit in {$subject} ({$used} of {$limit} units). One more absence will trigger an IR."
             );
         }
 
@@ -178,7 +182,7 @@ class InstructorRequestController extends Controller
                 $recipients,
                 $request,
                 'ir_escalation',
-                "{$student->name} has reached IR status (3 converted absences) and needs follow-up."
+                "{$student->name} exceeded the allowable absences in {$subject} ({$used} of {$limit} units) and needs follow-up."
             );
         }
     }

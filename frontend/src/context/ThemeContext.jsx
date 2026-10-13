@@ -41,6 +41,8 @@ export function ThemeProvider({ children }) {
   );
 }
 
+// Keep the provider hook colocated with its context for existing consumers.
+// eslint-disable-next-line react-refresh/only-export-components
 export function useTheme() {
   const context = useContext(ThemeContext);
 

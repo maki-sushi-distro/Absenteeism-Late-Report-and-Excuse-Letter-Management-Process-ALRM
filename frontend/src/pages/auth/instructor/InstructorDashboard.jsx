@@ -1,35 +1,91 @@
-import { AlertTriangle, BookOpen, FileText, UsersRound } from "lucide-react";
-import { Link } from "react-router-dom";
-import { getInstructorDashboard } from "@/api/dashboardData";
-import MetricCard from "@/components/dashboard/MetricCard";
-import PageHeading from "@/components/dashboard/PageHeading";
-import { ResourceState } from "@/components/dashboard/ResourceState";
-import { useApiResource } from "@/hooks/useApiResource";
-import InstructorPageLayout from "./InstructorPageLayout";
+import { useEffect, useState } from "react";
+import { decideRequest, getInstructorDashboard, getInstructorRequests } from "@/api/instructor";
+import { EmptyState } from "@/components/common/EmptyState";
+import { ErrorState } from "@/components/common/ErrorState";
+import { StatusBadge } from "@/components/common/StatusBadge";
+import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 
-function InstructorDashboard() {
-  const resource = useApiResource(getInstructorDashboard);
-  const data = resource.data;
-  return <InstructorPageLayout>
-    <PageHeading title="Dashboard" description="Your classes and student requests" />
-    <ResourceState {...resource} onRetry={resource.reload}>
-      {data && <>
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <MetricCard label="Classes" value={data.total_classes} icon={BookOpen} />
-          <MetricCard label="Students" value={data.total_students} icon={UsersRound} />
-          <MetricCard label="Pending requests" value={data.pending_requests?.length ?? 0} icon={FileText} />
-          <MetricCard label="Flagged students" value={data.flagged_students?.length ?? 0} icon={AlertTriangle} />
-        </div>
-        <section className="mt-8">
-          <div className="mb-3 flex items-center justify-between"><h2 className="text-lg font-bold">Requests awaiting review</h2><Link to="/instructor/class-requests" className="text-sm font-semibold text-blue-700 hover:underline dark:text-blue-300">View all</Link></div>
-          <div className="border border-slate-200 dark:border-slate-800">
-            {(data.pending_requests || []).slice(0, 5).map((request) => <div key={request.id} className="flex justify-between gap-4 border-b border-slate-200 px-4 py-3 text-sm last:border-b-0 dark:border-slate-800"><span>{request.enrollment?.student?.name || "Student"} · {request.enrollment?.class?.subject_name || "Class"}</span><span className="capitalize text-slate-500">{request.type}</span></div>)}
-            {!data.pending_requests?.length && <p className="px-4 py-8 text-center text-sm text-slate-500">No requests are awaiting review.</p>}
+export function InstructorDashboard({ view = "dashboard" }) {
+  const [dashboard, setDashboard] = useState(null);
+  const [requests, setRequests] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [workingId, setWorkingId] = useState(null);
+  const [error, setError] = useState("");
+
+  async function loadData() {
+    setLoading(true);
+    setError("");
+    try {
+      const [dashboardData, requestData] = await Promise.all([getInstructorDashboard(), getInstructorRequests()]);
+      setDashboard(dashboardData);
+      setRequests(requestData || []);
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    const timer = window.setTimeout(loadData, 0);
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  async function handleDecision(requestId, status) {
+    setWorkingId(requestId);
+    setError("");
+    try {
+      await decideRequest(requestId, status);
+      await loadData();
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setWorkingId(null);
+    }
+  }
+
+  if (loading) return <div className="flex min-h-80 items-center justify-center gap-3 text-sm text-slate-600"><Spinner />Loading instructor dashboard</div>;
+
+  const showMetrics = view === "dashboard";
+  const showRequests = view === "dashboard" || view === "requests";
+
+  return (
+    <div className="space-y-6">
+      {error ? <ErrorState message={error} /> : null}
+      {showMetrics ? <section className="grid gap-4 md:grid-cols-3">
+        <article className="rounded-lg border border-slate-200 bg-white p-5"><p className="text-sm text-slate-500">Classes</p><p className="mt-2 text-3xl font-bold">{dashboard?.total_classes || 0}</p></article>
+        <article className="rounded-lg border border-slate-200 bg-white p-5"><p className="text-sm text-slate-500">Students</p><p className="mt-2 text-3xl font-bold">{dashboard?.total_students || 0}</p></article>
+        <article className="rounded-lg border border-slate-200 bg-white p-5"><p className="text-sm text-slate-500">Pending requests</p><p className="mt-2 text-3xl font-bold">{dashboard?.pending_requests?.length || 0}</p></article>
+      </section> : null}
+      {showRequests ? <section>
+        <h2 className="mb-3 text-lg font-semibold">Requests for review</h2>
+        {requests.length === 0 ? <EmptyState title="No class requests" /> : (
+          <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+            <table className="w-full min-w-[760px] text-left text-sm">
+              <tbody className="divide-y divide-slate-100">
+                {requests.map((request) => (
+                  <tr key={request.id}>
+                    <td className="px-4 py-3 font-medium">{request.enrollment?.student?.name || "Student"}</td>
+                    <td className="px-4 py-3">{request.enrollment?.class?.subject_name || "Class"}</td>
+                    <td className="px-4 py-3 capitalize">{request.type}</td>
+                    <td className="px-4 py-3"><StatusBadge value={request.status} /></td>
+                    <td className="px-4 py-3">
+                      {request.status === "pending" ? (
+                        <div className="flex flex-wrap gap-2">
+                          {["approved", "noted", "invalid"].map((status) => (
+                            <Button key={status} size="sm" variant={status === "invalid" ? "destructive" : "outline"} disabled={workingId === request.id} onClick={() => handleDecision(request.id, status)}>{status}</Button>
+                          ))}
+                        </div>
+                      ) : "Recorded"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-        </section>
-      </>}
-    </ResourceState>
-  </InstructorPageLayout>;
+        )}
+      </section> : null}
+    </div>
+  );
 }
-
-export default InstructorDashboard;

@@ -40,8 +40,10 @@ export function AuthProvider({ children }) {
     return () => { requestVersion.current += 1; };
   }, [loadUser, token]);
 
-  async function refreshUser() {
-    setSession((current) => ({ ...current, loading: true, error: '' }));
+  async function refreshUser({ silent = false } = {}) {
+    if (!silent) {
+      setSession((current) => ({ ...current, loading: true, error: '' }));
+    }
     return loadUser(getToken());
   }
 
@@ -82,6 +84,8 @@ export function AuthProvider({ children }) {
   );
 }
 
+// Keep the provider hook colocated with its context for existing consumers.
+// eslint-disable-next-line react-refresh/only-export-components
 export function useAuth() {
   const ctx = useContext(AuthContext);
   if (!ctx) throw new Error('useAuth must be used within AuthProvider');

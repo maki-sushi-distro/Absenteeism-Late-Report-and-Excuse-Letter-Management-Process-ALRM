@@ -94,7 +94,7 @@ function Login() {
 
         <Card className="w-full max-w-[500px] border-0 bg-transparent py-0 shadow-none ring-0">
           <CardHeader className="items-center gap-2 px-0 text-center">
-            <CardTitle className="text-3xl font-black tracking-normal text-slate-800 sm:text-[48px]">
+            <CardTitle className="text-[48px] font-black tracking-normal text-slate-800">
               Welcome Back!
             </CardTitle>
             <CardDescription className="text-[18px] text-slate-600">

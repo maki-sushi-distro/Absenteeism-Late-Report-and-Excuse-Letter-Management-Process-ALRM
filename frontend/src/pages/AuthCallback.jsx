@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import { getPostLoginPath } from '../api/authSecurity';
-import { exchangeOtpCode, getOtpTokenFromResponse } from '../api/otp';
-import { useAuth } from '../context/AuthContext';
+import { useEffect, useRef, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { getPostLoginPath } from "../api/authSecurity";
+import { exchangeOtpCode, getOtpTokenFromResponse } from "../api/otp";
+import { useAuth } from "../context/AuthContext";
 
 export function AuthCallback() {
   const [searchParams] = useSearchParams();
@@ -17,26 +17,21 @@ export function AuthCallback() {
 
     async function completeLogin() {
       try {
-        if (searchParams.get('error')) {
-          throw new Error('Login failed. Please use your official LV email account.');
+        if (searchParams.get("error")) {
+          throw new Error("Login failed. Please use your official LV email account.");
         }
 
-        let token =
-          searchParams.get('token') ||
-          searchParams.get('otp_token') ||
-          searchParams.get('verification_token');
-
+        let token = searchParams.get("token") || searchParams.get("otp_token") || searchParams.get("verification_token");
         if (!token) {
-          const code = searchParams.get('code');
-          if (!code) throw new Error('Missing login token.');
+          const code = searchParams.get("code");
+          if (!code) throw new Error("Missing login token.");
           token = getOtpTokenFromResponse(await exchangeOtpCode(code));
         }
 
-        // The backend issues the session token after OTP; /api/me validates it.
         const user = await loginWithToken(token);
         navigate(getPostLoginPath(user), { replace: true });
       } catch (loginError) {
-        setError(loginError.message || 'Login failed. Please try again.');
+        setError(loginError.message || "Login failed. Please try again.");
       }
     }
 
@@ -49,9 +44,7 @@ export function AuthCallback() {
       <div className="grid min-h-screen place-items-center bg-background px-6 text-center text-foreground">
         <div className="grid gap-4">
           <p role="alert">{error}</p>
-          <a className="font-semibold text-primary" href="/login">
-            Back to login
-          </a>
+          <a className="font-semibold text-primary" href="/login">Back to login</a>
         </div>
       </div>
     );

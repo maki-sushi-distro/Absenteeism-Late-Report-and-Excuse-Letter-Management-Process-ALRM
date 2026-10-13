@@ -29,6 +29,7 @@ async function expectJson(res) {
     const error = new Error(message);
     error.status = res.status;
     error.body = body;
+    error.validationErrors = body?.errors || {};
     throw error;
   }
 
@@ -60,4 +61,69 @@ export async function createStudentRequest(payload) {
   });
 
   return expectJson(res);
+}
+
+export async function getStudentRequest(requestId, options = {}) {
+  const res = await apiFetch(`/api/requests/${encodeURIComponent(requestId)}`, options);
+  const body = await expectJson(res);
+  return body?.data ?? body;
+}
+
+export async function updateStudentRequest(requestId, payload) {
+  const res = await apiFetch(`/api/requests/${encodeURIComponent(requestId)}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+  const body = await expectJson(res);
+  return body?.data ?? body;
+}
+
+// NEW: i-upload ang attachment. Ibinabalik ang { path (attachment ID), name, type }
+export async function uploadEvidence(file) {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const res = await apiFetch("/api/requests/evidence", {
+    method: "POST",
+    body: formData,
+  });
+  const body = await expectJson(res);
+
+  return body?.data;
+}
+
+// NEW: buksan ang attachment ng isang request (para sa instructor/program head/admin page).
+// Kailangan ng Authorization header, kaya hindi pwede ang plain link.
+export async function openEvidence(requestId) {
+  const popup = window.open("", "_blank"); // buksan agad para hindi ma-block ng browser
+  if (popup) popup.opener = null;
+
+  try {
+    const res = await apiFetch(`/api/requests/${requestId}/evidence`);
+    if (!res.ok) throw new Error("No attachment available.");
+
+    const file = await res.blob();
+    if (!["application/pdf", "image/jpeg", "image/png"].includes(file.type)) {
+      throw new Error("Unsupported attachment type.");
+    }
+    const url = URL.createObjectURL(file);
+    // Blob navigation does not carry the response's Content-Disposition header.
+    try {
+      if (file.type === "application/pdf") {
+        popup?.close();
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = "attachment.pdf";
+        link.click();
+      } else {
+        if (!popup || popup.closed) throw new Error("Allow popups to view this image.");
+        popup.location.href = url;
+      }
+    } finally {
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    }
+  } catch (error) {
+    popup?.close();
+    throw error;
+  }
 }

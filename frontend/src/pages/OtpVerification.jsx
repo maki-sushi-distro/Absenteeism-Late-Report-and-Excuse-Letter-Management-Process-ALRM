@@ -192,6 +192,8 @@ function OtpVerificationForm() {
     const savedReadyAt = Number(sessionStorage.getItem(resendStorageKey));
 
     if (Number.isFinite(savedReadyAt) && savedReadyAt > Date.now()) {
+      // Restore the countdown saved before this page was mounted.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setResendSeconds(Math.ceil((savedReadyAt - Date.now()) / 1000));
       return;
     }
@@ -386,7 +388,7 @@ function OtpVerificationForm() {
             </CardTitle>
             <CardDescription className="mt-2 text-sm text-slate-600">
               Enter the 6-digit code that was sent to{" "}
-              {pendingEmail ? <span className="break-all">{pendingEmail}</span> : "your LV email account"}.
+              {pendingEmail ? pendingEmail : "your LV email account"}.
             </CardDescription>
           </div>
         </CardHeader>

@@ -1,35 +1,19 @@
-import { AlertTriangle, BookOpen, FileText, UsersRound } from "lucide-react";
-import { Link } from "react-router-dom";
-import { getProgramHeadDashboard } from "@/api/dashboardData";
-import MetricCard from "@/components/dashboard/MetricCard";
-import PageHeading from "@/components/dashboard/PageHeading";
-import { ResourceState } from "@/components/dashboard/ResourceState";
-import { useApiResource } from "@/hooks/useApiResource";
-import ProgramHeadPageLayout from "./ProgramHeadPageLayout";
+import { ErrorState } from "@/components/common/ErrorState";
+import { Spinner } from "@/components/ui/spinner";
+import ProgramHeadOverview from "./ProgramHeadOverview";
+import { FlaggedRecords, RequestRecords } from "./ProgramHeadRecords";
+import { useProgramHeadRecords } from "./useProgramHeadRecords";
 
-function ProgramHeadDashboard() {
-  const resource = useApiResource(getProgramHeadDashboard);
-  const data = resource.data;
-  return <ProgramHeadPageLayout>
-    <PageHeading title="Dashboard" description={data?.program_name || "Program overview"} />
-    <ResourceState {...resource} onRetry={resource.reload}>
-      {data && <>
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <MetricCard label="Students" value={data.total_students} icon={UsersRound} />
-          <MetricCard label="Classes" value={data.total_classes} icon={BookOpen} />
-          <MetricCard label="Pending requests" value={data.pending_requests} icon={FileText} />
-          <MetricCard label="Warning / IR" value={`${data.warning_count ?? 0} / ${data.ir_count ?? 0}`} icon={AlertTriangle} />
-        </div>
-        <section className="mt-8">
-          <div className="mb-3 flex items-center justify-between"><h2 className="text-lg font-bold">Recent flags</h2><Link to="/program-head/flagged" className="text-sm font-semibold text-blue-700 hover:underline dark:text-blue-300">View all</Link></div>
-          <div className="border border-slate-200 dark:border-slate-800">
-            {(data.recent_flags || []).map((flag) => <div key={flag.id} className="flex justify-between gap-4 border-b border-slate-200 px-4 py-3 text-sm last:border-b-0 dark:border-slate-800"><span>{flag.request?.enrollment?.student?.name || "Student"}</span><span className="font-semibold text-amber-700 dark:text-amber-300">{flag.status}</span></div>)}
-            {!data.recent_flags?.length && <p className="px-4 py-8 text-center text-sm text-slate-500">No recent flags.</p>}
-          </div>
-        </section>
-      </>}
-    </ResourceState>
-  </ProgramHeadPageLayout>;
+export function ProgramHeadDashboard({ view = "dashboard" }) {
+  const { dashboard, flags, requests, errors, loading, refresh } = useProgramHeadRecords();
+  if (loading) return <div className="flex min-h-80 items-center justify-center gap-3 text-sm"><Spinner />Loading program records</div>;
+
+  const needed = view === "flagged" ? ["flags"] : view === "requests" ? ["requests"] : ["dashboard", "flags", "requests"];
+  return <div className="space-y-5">
+    {needed.filter((key) => errors[key]).map((key) => <ErrorState key={key} title={`Could not load ${key}`} message={errors[key]} />)}
+    {Object.keys(errors).length ? <button type="button" onClick={refresh} className="text-sm font-medium text-blue-800 underline dark:text-blue-300">Retry loading</button> : null}
+    {view === "dashboard" ? <ProgramHeadOverview dashboard={dashboard} flags={flags} requests={requests} /> : null}
+    {view === "flagged" ? <FlaggedRecords flags={flags} /> : null}
+    {view === "requests" ? <RequestRecords requests={requests} /> : null}
+  </div>;
 }
-
-export default ProgramHeadDashboard;

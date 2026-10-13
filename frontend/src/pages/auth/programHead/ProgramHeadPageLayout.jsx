@@ -1,15 +1,25 @@
-import { AlertTriangle, FileText, LayoutDashboard, Settings } from "lucide-react";
-import AdminPageLayout from "../admin/AdminPageLayout";
+import { FileBarChart, LayoutDashboard, Settings, UsersRound } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
+import DashboardPageLayout from "@/components/navigation/DashboardPageLayout";
+import RoleSidebar from "@/components/navigation/RoleSidebar";
 
 const navigation = [
   { label: "Dashboard", path: "/dashboard", icon: LayoutDashboard },
-  { label: "Requests", path: "/program-head/requests", icon: FileText },
-  { label: "Flagged Students", path: "/program-head/flagged", icon: AlertTriangle },
+  { label: "Instructors", path: "/program-head/instructors", icon: UsersRound },
+  { label: "Report", path: "/program-head/reports", icon: FileBarChart },
   { label: "Settings", path: "/settings", icon: Settings },
 ];
 
 function ProgramHeadPageLayout({ children }) {
-  return <AdminPageLayout navigation={navigation}>{children}</AdminPageLayout>;
+  const { user } = useAuth();
+
+  return (
+    <RoleSidebar navigation={navigation} compact="program">
+      <DashboardPageLayout name={user?.name || "Program Head"} role="Program Head">
+        {children}
+      </DashboardPageLayout>
+    </RoleSidebar>
+  );
 }
 
 export default ProgramHeadPageLayout;

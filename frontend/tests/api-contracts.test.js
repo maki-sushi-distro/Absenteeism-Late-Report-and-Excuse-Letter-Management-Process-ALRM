@@ -4,6 +4,8 @@ import { getAdminStudent, getAdminStudents } from "../src/api/adminStudents.js";
 import { createInstructor, createStudent } from "../src/api/adminUsers.js";
 import { saveProfileSetup } from "../src/api/profileSetup.js";
 import { createStudentRequest } from "../src/api/studentRequests.js";
+import { createClass, getAdminUsers, updateStaffRole } from "../src/api/admin.js";
+import { getStudentAttendanceSummary } from "../src/api/student.js";
 import {
   createProgram,
   decideInstructorRequest,
@@ -195,4 +197,35 @@ test("instructor decisions and admin mutations send backend-accepted payloads", 
     "/api/admin/users/user-one/status",
     "/api/admin/programs",
   ]);
+});
+
+test("admin role assignment and class creation use registered routes and UUIDs", async () => {
+  const requests = captureJsonRequest({ success: true, data: [] });
+  await getAdminUsers();
+  await updateStaffRole("staff-uuid", "program_head");
+  await createClass({
+    subject_name: "Information Management",
+    section: "A",
+    instructor_id: "instructor-uuid",
+    schedule: "Monday 9:00 AM",
+    program_id: "program-uuid",
+    semester: "1st",
+    school_year: "2026-2027",
+  });
+
+  assert.deepEqual(requests.map(({ url }) => new URL(url, "https://example.test").pathname), [
+    "/api/admin/users",
+    "/api/admin/users/staff-uuid/role",
+    "/api/admin/classes",
+  ]);
+  assert.deepEqual(requests[1].body, { role: "program_head" });
+  assert.equal(requests[2].body.instructor_id, "instructor-uuid");
+  assert.equal(requests[2].body.program_id, "program-uuid");
+  assert.equal(requests[2].body.school_year, "2026-2027");
+});
+
+test("student attendance summary uses the student backend route", async () => {
+  const requests = captureJsonRequest({ success: true, data: [] });
+  await getStudentAttendanceSummary();
+  assert.ok(requests[0].url.endsWith("/api/attendance/summary"));
 });

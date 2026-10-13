@@ -1,11 +1,6 @@
 // src/api/client.js
-
-const rawApiUrl = import.meta.env?.VITE_API_URL ?? "";
-
-// Same-origin via proxy ang gusto natin. Tanggalin ang trailing "/api"
-// at "/" dahil kasama na ang /api sa mga path sa code.
-export const API_URL = rawApiUrl.replace(/\/api\/?$/, "").replace(/\/$/, "");
-
+const backendUrl = (import.meta.env?.VITE_API_URL || "").replace(/\/api\/?$/, "").replace(/\/$/, "");
+export const API_URL = backendUrl;
 const TOKEN_CHANGED_EVENT = "alrm:token-changed";
 
 export function getToken() {
@@ -36,16 +31,18 @@ export function subscribeToTokenChanges(onChange) {
   };
 }
 
+export function clearToken() {
+  setToken(null);
+}
+
 export async function apiFetch(path, options = {}) {
   const token = getToken();
   const headers = new Headers(options.headers);
   if (!headers.has("Accept")) headers.set("Accept", "application/json");
-  if (options.body && !headers.has("Content-Type")) {
+  if (options.body && !(options.body instanceof FormData) && !headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
   }
-  if (token && !headers.has("Authorization")) {
-    headers.set("Authorization", `Bearer ${token}`);
-  }
+  if (token && !headers.has("Authorization")) headers.set("Authorization", `Bearer ${token}`);
 
   const res = await fetch(`${API_URL}${path}`, {
     ...options,
@@ -53,30 +50,79 @@ export async function apiFetch(path, options = {}) {
     headers,
   });
 
-  if (
-    res.status === 401 &&
-    token &&
-    getToken() === token &&
-    headers.get("Authorization") === `Bearer ${token}`
-  ) {
-    // A delayed response from an old session must not clear a newer login.
+  if (res.status === 401 && token && getToken() === token && headers.get("Authorization") === `Bearer ${token}`) {
     setToken(null);
   }
 
   return res;
 }
 
-export function googleLoginUrl(options = {}) {
-  // Gamitin lang ang API_URL kung absolute (http/https).
-  // Kung hindi, same-origin (window.location.origin).
-  const base = /^https?:\/\//.test(API_URL) ? API_URL : window.location.origin;
-  const url = new URL("/api/auth/google/redirect", base);
+export class ApiError extends Error {
+  constructor(message, status, errors = null) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+    this.errors = errors;
+  }
+}
 
-  url.searchParams.set("origin", window.location.origin);
+export function buildQuery(params = {}) {
+  const search = new URLSearchParams();
 
-  if (options.prompt) {
-    url.searchParams.set("prompt", options.prompt);
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== "") {
+      search.set(key, value);
+    }
+  });
+
+  const query = search.toString();
+  return query ? `?${query}` : "";
+}
+
+export async function apiRequest(path, options = {}) {
+  const res = await apiFetch(path.startsWith("/api/") ? path : `/api${path}`, options);
+  const contentType = res.headers.get("content-type") || "";
+  const payload = contentType.includes("application/json")
+    ? await res.json()
+    : null;
+
+  if (!res.ok) {
+    throw new ApiError(
+      payload?.message || "The server could not complete this request.",
+      res.status,
+      payload?.errors || null,
+    );
   }
 
+  return payload?.data ?? payload;
+}
+
+export async function apiDownload(path, filename = "alrm-report.xlsx") {
+  const res = await apiFetch(path.startsWith("/api/") ? path : `/api${path}`);
+
+  if (!res.ok) {
+    const payload = await res.json().catch(() => null);
+    throw new ApiError(
+      payload?.message || "The report could not be downloaded.",
+      res.status,
+      payload?.errors || null,
+    );
+  }
+
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
+export function googleLoginUrl(options = {}) {
+  const base = /^https?:\/\//.test(API_URL) ? API_URL : window.location.origin;
+  const url = new URL("/api/auth/google/redirect", base);
+  url.searchParams.set("origin", window.location.origin);
+  if (options.prompt) url.searchParams.set("prompt", options.prompt);
   return url.toString();
 }

@@ -10,17 +10,17 @@ import ProfileSetup from "./pages/ProfileSetup";
 import AddInstructor from "./pages/auth/admin/AddInstructor";
 import AddStudent from "./pages/auth/admin/AddStudent";
 import Instructors from "./pages/auth/admin/Instructors";
-import UserManagement from "./pages/auth/admin/UserManagement";
-import Programs from "./pages/auth/admin/Programs";
-import Classes from "./pages/auth/admin/Classes";
-import Reports from "./pages/auth/admin/Reports";
+import AdminPageLayout from "./pages/auth/admin/AdminPageLayout";
+import { AdminDashboard as AdminWorkspace } from "./pages/auth/admin/AdminDashboard";
 import StudentProfile from "./pages/auth/admin/StudentProfile";
 import Students from "./pages/auth/admin/Students";
 import Settings from "./pages/auth/Settings";
-import InstructorClassRecords from "./pages/auth/instructor/InstructorClassRecords";
-import InstructorRequests from "./pages/auth/instructor/InstructorRequests";
-import ProgramHeadRequests from "./pages/auth/programHead/ProgramHeadRequests";
-import FlaggedStudents from "./pages/auth/programHead/FlaggedStudents";
+import InstructorPageLayout from "./pages/auth/instructor/InstructorPageLayout";
+import { InstructorDashboard as InstructorWorkspace } from "./pages/auth/instructor/InstructorDashboard";
+import { ProgramHeadDashboard as ProgramHeadWorkspace } from "./pages/auth/programHead/ProgramHeadDashboard";
+import { ProgramHeadInstructors, ProgramHeadInstructorDetail } from "./pages/auth/programHead/ProgramHeadInstructors";
+import { ProgramHeadReports } from "./pages/auth/programHead/ProgramHeadReports";
+import ProgramHeadPageLayout from "./pages/auth/programHead/ProgramHeadPageLayout";
 import StudentRecords from "./pages/auth/student/StudentRecords";
 import StudentRequestForm from "./pages/auth/student/StudentRequestForm";
 import AppErrorBoundary from "./components/AppErrorBoundary";
@@ -70,12 +70,15 @@ function App() {
               </ProtectedRoute>
             }
           />
-          <Route path="/user-management" element={<ProtectedRoute allowedRoles={["admin"]}><UserManagement /></ProtectedRoute>} />
-          <Route path="/programs" element={<ProtectedRoute allowedRoles={["admin"]}><Programs /></ProtectedRoute>} />
-          <Route path="/classes" element={<ProtectedRoute allowedRoles={["admin"]}><Classes /></ProtectedRoute>} />
-          <Route path="/reports" element={<ProtectedRoute allowedRoles={["admin"]}><Reports /></ProtectedRoute>} />
-          <Route path="/program-head/requests" element={<ProtectedRoute allowedRoles={["program"]}><ProgramHeadRequests /></ProtectedRoute>} />
-          <Route path="/program-head/flagged" element={<ProtectedRoute allowedRoles={["program"]}><FlaggedStudents /></ProtectedRoute>} />
+          <Route path="/user-management" element={<ProtectedRoute allowedRoles={["admin"]}><AdminPageLayout><AdminWorkspace view="users" /></AdminPageLayout></ProtectedRoute>} />
+          <Route path="/programs" element={<ProtectedRoute allowedRoles={["admin"]}><AdminPageLayout><AdminWorkspace view="programs" /></AdminPageLayout></ProtectedRoute>} />
+          <Route path="/classes" element={<ProtectedRoute allowedRoles={["admin"]}><AdminPageLayout><AdminWorkspace view="classes" /></AdminPageLayout></ProtectedRoute>} />
+          <Route path="/reports" element={<ProtectedRoute allowedRoles={["admin"]}><AdminPageLayout><AdminWorkspace view="reports" /></AdminPageLayout></ProtectedRoute>} />
+          <Route path="/program-head/requests" element={<ProtectedRoute allowedRoles={["program"]}><ProgramHeadPageLayout><ProgramHeadWorkspace view="requests" /></ProgramHeadPageLayout></ProtectedRoute>} />
+          <Route path="/program-head/flagged" element={<ProtectedRoute allowedRoles={["program"]}><ProgramHeadPageLayout><ProgramHeadWorkspace view="flagged" /></ProgramHeadPageLayout></ProtectedRoute>} />
+          <Route path="/program-head/instructors" element={<ProtectedRoute allowedRoles={["program"]}><ProgramHeadPageLayout><ProgramHeadInstructors /></ProgramHeadPageLayout></ProtectedRoute>} />
+          <Route path="/program-head/instructors/:instructorId" element={<ProtectedRoute allowedRoles={["program"]}><ProgramHeadPageLayout><ProgramHeadInstructorDetail /></ProgramHeadPageLayout></ProtectedRoute>} />
+          <Route path="/program-head/reports" element={<ProtectedRoute allowedRoles={["program"]}><ProgramHeadPageLayout><ProgramHeadReports /></ProgramHeadPageLayout></ProtectedRoute>} />
           <Route
             path="/instructors/add"
             element={
@@ -112,7 +115,7 @@ function App() {
             path="/instructor/class-records"
             element={
               <ProtectedRoute allowedRoles={["instructor"]}>
-                <InstructorClassRecords />
+                <InstructorPageLayout><InstructorWorkspace view="dashboard" /></InstructorPageLayout>
               </ProtectedRoute>
             }
           />
@@ -120,7 +123,7 @@ function App() {
             path="/instructor/class-requests"
             element={
               <ProtectedRoute allowedRoles={["instructor"]}>
-                <InstructorRequests />
+                <InstructorPageLayout><InstructorWorkspace view="requests" /></InstructorPageLayout>
               </ProtectedRoute>
             }
           />

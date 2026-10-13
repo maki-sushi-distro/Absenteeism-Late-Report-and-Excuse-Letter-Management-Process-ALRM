@@ -1,5 +1,4 @@
 import { apiFetch } from "./client.js";
-import { getAdminPrograms } from "./adminUsers.js";
 
 async function readJson(res) {
   try {
@@ -112,7 +111,7 @@ export async function getAdminStudents(filters = {}) {
 }
 
 export async function getAdminStudent(studentId) {
-  const [students, programs] = await Promise.all([getAdminStudents(), getAdminPrograms()]);
+  const students = await getAdminStudents();
   const student = students.find(
     (item) => String(item?.id ?? item?.user_id) === String(studentId),
   );
@@ -123,8 +122,17 @@ export async function getAdminStudent(studentId) {
     throw error;
   }
 
-  return {
-    ...student,
-    program: programs.find((program) => String(program.id) === String(student.program_id)) || null,
-  };
+  if (student.program || !student.program_id) return student;
+
+  try {
+    const path = "/api/admin/programs";
+    const response = await apiFetch(path);
+    const programs = listFrom(await expectJson(response, path));
+    const program = programs.find((item) =>
+      String(item?.id ?? item?.program_id) === String(student.program_id)
+    );
+    return program ? { ...student, program } : student;
+  } catch {
+    return student;
+  }
 }

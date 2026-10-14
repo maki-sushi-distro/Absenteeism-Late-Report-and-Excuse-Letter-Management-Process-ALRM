@@ -34,7 +34,6 @@ class UserApprovalController extends Controller
         protected AuditLoggerService $auditLogger,
     ) {}
 
-    
     public function index(Request $request): JsonResponse
     {
         $request->validate([
@@ -49,7 +48,6 @@ class UserApprovalController extends Controller
         }
 
         if ($request->filled('status')) {
-            // legacy alias: 'inactive' -> 'deactivated'
             $status = $request->query('status') === 'inactive'
                 ? 'deactivated'
                 : $request->query('status');
@@ -57,7 +55,8 @@ class UserApprovalController extends Controller
             $query->where('status', $status);
         }
 
-        $users = $query->withExists(['headedProgram as heads_program'])
+        $users = $query->with('program')
+            ->withExists(['headedProgram as heads_program'])
             ->orderBy('name')
             ->get();
 

@@ -101,7 +101,10 @@ class AuthController extends Controller
             'exp'    => now()->addMinutes(10)->timestamp,
         ]));
 
-        return Socialite::driver('google')
+        /** @var \Laravel\Socialite\Two\GoogleProvider $driver */
+        $driver = Socialite::driver('google');
+
+        return $driver
             ->stateless()
             ->redirectUrl($this->callbackUrlFor($frontendUrl))
             ->with(['state' => $state])
@@ -128,7 +131,10 @@ class AuthController extends Controller
         }
 
         try {
-            $googleUser = Socialite::driver('google')
+            /** @var \Laravel\Socialite\Two\GoogleProvider $driver */
+            $driver = Socialite::driver('google');
+
+            $googleUser = $driver
                 ->stateless()
                 ->redirectUrl($this->callbackUrlFor($frontendUrl))
                 ->user();

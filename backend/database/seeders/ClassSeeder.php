@@ -112,12 +112,6 @@ class ClassSeeder extends Seeder
         'jaderiel.abuela@laverdad.edu.ph',
     ];
 
-    private const string DEV_INSTRUCTOR_EMAIL = 'marwin.mandocdoc@student.laverdad.edu.ph';
-
-    private const string LEGACY_DEV_SECTION = 'DEV';
-
-    private const string DEV_SUBJECT_PREFIX = 'System Integration';
-
     public function run(): void
     {
         $service = $this->makeSheetsService();
@@ -145,7 +139,7 @@ class ClassSeeder extends Seeder
         $updated = 0;
 
         $programs = Program::query()->get()->keyBy('program_name');
-        $devId = User::query()->where('email', self::DEV_INSTRUCTOR_EMAIL)->value('id');
+        $devIds = User::query()->whereIn('email', DevInstructorClassSeeder::DEV_INSTRUCTOR_EMAILS)->pluck('id')->all();
 
         foreach ($parsed as $entry) {
             $program = $programs->get($entry->programName);
@@ -193,11 +187,11 @@ class ClassSeeder extends Seeder
 
             $class = ClassModel::query()
                 ->where($attributes)
-                ->where(function ($q) use ($devId) {
+                ->where(function ($q) use ($devIds) {
                     $q->whereNull('instructor_id');
 
-                    if ($devId !== null) {
-                        $q->orWhere('instructor_id', '!=', $devId);
+                    if ($devIds !== []) {
+                        $q->orWhereNotIn('instructor_id', $devIds);
                     }
                 })
                 ->first();
@@ -217,7 +211,7 @@ class ClassSeeder extends Seeder
             'unmatched_instructors' => array_keys($unmatchedInstructors),
         ]);
 
-        $this->seedDevInstructorClasses();
+        $this->call(DevInstructorClassSeeder::class);
 
         if (! empty($unmatchedInstructors)) {
             $lines = [];
@@ -234,58 +228,6 @@ class ClassSeeder extends Seeder
                     implode("\n", $lines)
             );
         }
-    }
-
-    private function seedDevInstructorClasses(): void
-    {
-        $dev = User::query()->where('email', self::DEV_INSTRUCTOR_EMAIL)->first();
-
-        if ($dev === null) {
-            Log::warning('ClassSeeder: dev instructor account not found, run AdminUserSeeder first.');
-
-            return;
-        }
-
-        $prefix = self::DEV_SUBJECT_PREFIX;
-
-        $removedLegacy = ClassModel::query()
-            ->where('section', self::LEGACY_DEV_SECTION)
-            ->delete();
-
-        $removedOthers = ClassModel::query()
-            ->where('instructor_id', $dev->id)
-            ->where('subject_name', 'not like', $prefix . '%')
-            ->delete();
-
-        $sources = ClassModel::query()
-            ->where('subject_name', 'like', $prefix . '%')
-            ->where(function ($q) use ($dev) {
-                $q->whereNull('instructor_id')->orWhere('instructor_id', '!=', $dev->id);
-            })
-            ->get();
-
-        foreach ($sources as $class) {
-            ClassModel::updateOrCreate(
-                [
-                    'subject_name' => $class->subject_name,
-                    'program_id' => $class->program_id,
-                    'year_level' => $class->year_level,
-                    'semester' => $class->semester,
-                    'school_year' => $class->school_year,
-                    'section' => $class->section,
-                    'instructor_id' => $dev->id,
-                ],
-                [
-                    'schedule' => $class->schedule,
-                ]
-            );
-        }
-
-        Log::info('ClassSeeder: dev classes synced', [
-            'count' => $sources->count(),
-            'removed_legacy_dev_classes' => $removedLegacy,
-            'removed_other_dev_classes' => $removedOthers,
-        ]);
     }
 
     private function makeSheetsService(): GoogleSheets

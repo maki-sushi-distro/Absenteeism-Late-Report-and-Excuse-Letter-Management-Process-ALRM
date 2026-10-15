@@ -112,7 +112,7 @@ class AdminUserSeeder extends Seeder
     public function run(): void
     {
         $allProgramIds = Program::query()->pluck('id')->all();
-        
+
         $manualUsers = [
             new SeedUser(
                 name: 'Jade Riel Abuela',
@@ -122,6 +122,24 @@ class AdminUserSeeder extends Seeder
             new SeedUser(
                 name: 'Marwin Mandocdoc',
                 email: 'marwin.mandocdoc@student.laverdad.edu.ph',
+                role: UserRole::Instructor,
+                programIds: $allProgramIds,
+            ),
+            new SeedUser(
+                name: 'Mac Robert Savandal',
+                email: 'macrobert.savandal@student.laverdad.edu.ph',
+                role: UserRole::Instructor,
+                programIds: $allProgramIds,
+            ),
+            new SeedUser(
+                name: 'Jimuel Jarina',
+                email: 'jimueljarina@student.laverdad.edu.ph',
+                role: UserRole::Instructor,
+                programIds: $allProgramIds,
+            ),
+            new SeedUser(
+                name: 'Rancel Joy Cuervo',
+                email: 'ranceljoycuervo@student.laverdad.edu.ph',
                 role: UserRole::Instructor,
                 programIds: $allProgramIds,
             ),

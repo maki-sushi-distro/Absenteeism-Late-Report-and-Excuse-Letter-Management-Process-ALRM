@@ -17,6 +17,8 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->trustProxies(at: '*');
 
+        $middleware->redirectGuestsTo(fn(Request $request) => null);
+
         $middleware->alias([
             'role'     => \App\Http\Middleware\RoleMiddleware::class,
             'inactive' => \App\Http\Middleware\CheckInactivity::class,

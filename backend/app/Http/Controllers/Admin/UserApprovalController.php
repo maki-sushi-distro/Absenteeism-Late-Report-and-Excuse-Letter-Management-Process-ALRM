@@ -299,9 +299,13 @@ class UserApprovalController extends Controller
             $user->id
         );
 
+        $user->loadExists('headedProgram');
+
         return response()->json([
             'success' => true,
-            'message' => 'Role updated.',
+            'message' => $validated['role'] === 'program_head' && ! $user->headed_program_exists
+                ? 'Role updated. Paalala: wala pang program na naka-assign sa user na ito. Itakda ito sa Programs.'
+                : 'Role updated.',
             'data'    => $user,
         ]);
     }

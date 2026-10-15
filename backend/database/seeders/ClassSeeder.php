@@ -10,13 +10,8 @@ use App\Models\User;
 use Google\Client as GoogleClient;
 use Google\Service\Sheets as GoogleSheets;
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
-/**
- * A single meeting slot for a subject (one day, one time range).
- * Stored as JSON inside ClassModel::schedule.
- */
 final readonly class MeetingSlot
 {
     public function __construct(
@@ -38,11 +33,6 @@ final readonly class MeetingSlot
     }
 }
 
-/**
- * All meeting slots collected for a single subject within one
- * program + year_level + semester + school_year, before it becomes
- * a ClassModel row.
- */
 final class ParsedClass
 {
     /** @var MeetingSlot[] */
@@ -59,11 +49,6 @@ final class ParsedClass
         public readonly string $schoolYear,
     ) {}
 
-    /**
-     * Grouping key — every meeting slot for the same subject, in the
-     * same program/year_level/semester/school_year, collapses into
-     * one Class row under this key.
-     */
     public function key(): string
     {
         return implode('|', [
@@ -78,25 +63,12 @@ final class ParsedClass
 
 class ClassSeeder extends Seeder
 {
-    /**
-     * Google Sheet ID of the class schedule (from the URL, between
-     * /d/ and /edit).
-     */
     private const string SPREADSHEET_ID = '1K2ZHj-hkHKffwbKqdbeza_ZPj77K8uBZZWtOO7pYEFA';
 
     private const string CREDENTIALS_PATH = 'app/google/service-account.json';
 
     private const string RENDER_SECRET_CREDENTIALS_PATH = '/etc/secrets/service-account.json';
 
-    /**
-     * Sheet tab name => program_name in the `programs` table. Must
-     * match ProgramSeeder::PROGRAM_NAMES exactly. Note this is a
-     * different (finer-grained) mapping than
-     * AdminUserSeeder::TAB_TO_PROGRAM_NAME — that seeder reads a
-     * *different* spreadsheet (the instructor roster) where BSA/BSAIS
-     * and BSIS/ACT are combined into single tabs. Here, the class
-     * schedule sheet has one tab per program, so we map 1:1.
-     */
     private const array TAB_TO_PROGRAM_NAME = [
         'BSIS' => 'Bachelor of Science in Information System',
         'ACT' => 'Associate in Computer Technology',
@@ -106,11 +78,6 @@ class ClassSeeder extends Seeder
         'BSSW' => 'Bachelor of Science in Social Work',
     ];
 
-    /**
-     * Day-column index (0-indexed, relative to the sheet's columns
-     * A=0, B=1, ...) => short day code used in the schedule JSON.
-     * Column A is always blank/label, so real data starts at B (index 1).
-     */
     private const array DAY_COLUMNS = [
         1 => 'Mon',
         2 => 'Tue',
@@ -120,12 +87,6 @@ class ClassSeeder extends Seeder
         6 => 'Sat',
     ];
 
-    /**
-     * If a block's subject text OR instructor-line text contains any
-     * of these (case-insensitive), the whole 4-row entry is skipped —
-     * it's an administrative block (clean-up, program meetings,
-     * student activities), not a real subject.
-     */
     private const array SKIP_KEYWORDS = [
         'weekly clean-up',
         'dedicated time for',
@@ -145,18 +106,17 @@ class ClassSeeder extends Seeder
         'Sr.',
     ];
 
-    /**
-     * Minimum similar_text() percentage for a fuzzy instructor-name
-     * match to be accepted automatically. Tuned to catch missing
-     * spaces / capitalization / stray punctuation differences while
-     * staying below the similarity typically seen between two
-     * genuinely different people's names.
-     */
     private const float FUZZY_MATCH_THRESHOLD = 88.0;
 
     private const array ADDITIONAL_INSTRUCTOR_EMAILS = [
         'jaderiel.abuela@laverdad.edu.ph',
     ];
+
+    private const string DEV_INSTRUCTOR_EMAIL = 'marwin.mandocdoc@student.laverdad.edu.ph';
+
+    private const string LEGACY_DEV_SECTION = 'DEV';
+
+    private const string DEV_SUBJECT_PREFIX = 'System Integration';
 
     public function run(): void
     {
@@ -184,69 +144,80 @@ class ClassSeeder extends Seeder
         $created = 0;
         $updated = 0;
 
-        DB::transaction(function () use ($parsed, $instructorMap, &$unmatchedInstructors, &$created, &$updated) {
-            foreach ($parsed as $entry) {
-                $program = Program::query()->firstWhere('program_name', $entry->programName);
+        $programs = Program::query()->get()->keyBy('program_name');
+        $devId = User::query()->where('email', self::DEV_INSTRUCTOR_EMAIL)->value('id');
 
-                if ($program === null) {
-                    Log::warning("ClassSeeder: no program row found for '{$entry->programName}', skipping subject '{$entry->subjectName}'.");
+        foreach ($parsed as $entry) {
+            $program = $programs->get($entry->programName);
 
-                    continue;
-                }
+            if ($program === null) {
+                Log::warning("ClassSeeder: no program row found for '{$entry->programName}', skipping subject '{$entry->subjectName}'.");
 
-                $instructorId = null;
+                continue;
+            }
 
-                if ($entry->instructorName !== null) {
-                    $normalized = $this->normalizeName($entry->instructorName);
+            $instructorId = null;
 
-                    if (isset($instructorMap[$normalized])) {
-                        $instructorId = $instructorMap[$normalized];
+            if ($entry->instructorName !== null) {
+                $normalized = $this->normalizeName($entry->instructorName);
+
+                if (isset($instructorMap[$normalized])) {
+                    $instructorId = $instructorMap[$normalized];
+                } else {
+                    $fuzzy = $this->findClosestInstructorMatch($normalized, $instructorMap);
+
+                    if ($fuzzy !== null) {
+                        [$matchedName, $matchedId, $score] = $fuzzy;
+                        $instructorId = $matchedId;
+
+                        Log::warning("ClassSeeder: fuzzy-matched instructor '{$entry->instructorName}' to '{$matchedName}' ({$score}% similarity) for subject '{$entry->subjectName}'. Verify this is correct.");
                     } else {
-                        $fuzzy = $this->findClosestInstructorMatch($normalized, $instructorMap);
-
-                        if ($fuzzy !== null) {
-                            [$matchedName, $matchedId, $score] = $fuzzy;
-                            $instructorId = $matchedId;
-
-                            Log::warning("ClassSeeder: fuzzy-matched instructor '{$entry->instructorName}' to '{$matchedName}' ({$score}% similarity) for subject '{$entry->subjectName}'. Verify this is correct.");
-                        } else {
-                            $unmatchedInstructors[$entry->instructorName][] = $entry->subjectName;
-                        }
+                        $unmatchedInstructors[$entry->instructorName][] = $entry->subjectName;
                     }
                 }
-
-                $wasNew = ! ClassModel::query()
-                    ->where('subject_name', $entry->subjectName)
-                    ->where('program_id', $program->id)
-                    ->where('year_level', $entry->yearLevel)
-                    ->where('semester', $entry->semester)
-                    ->where('school_year', $entry->schoolYear)
-                    ->exists();
-
-                ClassModel::updateOrCreate(
-                    [
-                        'subject_name' => $entry->subjectName,
-                        'program_id' => $program->id,
-                        'year_level' => $entry->yearLevel,
-                        'semester' => $entry->semester,
-                        'school_year' => $entry->schoolYear,
-                    ],
-                    [
-                        'instructor_id' => $instructorId,
-                        'section' => $this->buildSectionLabel($entry->programAbbreviation, $entry->yearLevel),
-                        'schedule' => array_map(fn(MeetingSlot $s) => $s->toArray(), $entry->slots),
-                    ]
-                );
-
-                $wasNew ? $created++ : $updated++;
             }
-        });
+
+            $attributes = [
+                'subject_name' => $entry->subjectName,
+                'program_id' => $program->id,
+                'year_level' => $entry->yearLevel,
+                'semester' => $entry->semester,
+                'school_year' => $entry->schoolYear,
+                'section' => $this->buildSectionLabel($entry->programAbbreviation, $entry->yearLevel),
+            ];
+
+            $values = [
+                'instructor_id' => $instructorId,
+                'schedule' => array_map(fn(MeetingSlot $s) => $s->toArray(), $entry->slots),
+            ];
+
+            $class = ClassModel::query()
+                ->where($attributes)
+                ->where(function ($q) use ($devId) {
+                    $q->whereNull('instructor_id');
+
+                    if ($devId !== null) {
+                        $q->orWhere('instructor_id', '!=', $devId);
+                    }
+                })
+                ->first();
+
+            if ($class !== null) {
+                $class->update($values);
+            } else {
+                $class = ClassModel::create([...$attributes, ...$values]);
+            }
+
+            $class->wasRecentlyCreated ? $created++ : $updated++;
+        }
 
         Log::info('ClassSeeder: run summary', [
             'created' => $created,
             'updated' => $updated,
             'unmatched_instructors' => array_keys($unmatchedInstructors),
         ]);
+
+        $this->seedDevInstructorClasses();
 
         if (! empty($unmatchedInstructors)) {
             $lines = [];
@@ -265,6 +236,58 @@ class ClassSeeder extends Seeder
         }
     }
 
+    private function seedDevInstructorClasses(): void
+    {
+        $dev = User::query()->where('email', self::DEV_INSTRUCTOR_EMAIL)->first();
+
+        if ($dev === null) {
+            Log::warning('ClassSeeder: dev instructor account not found, run AdminUserSeeder first.');
+
+            return;
+        }
+
+        $prefix = self::DEV_SUBJECT_PREFIX;
+
+        $removedLegacy = ClassModel::query()
+            ->where('section', self::LEGACY_DEV_SECTION)
+            ->delete();
+
+        $removedOthers = ClassModel::query()
+            ->where('instructor_id', $dev->id)
+            ->where('subject_name', 'not like', $prefix . '%')
+            ->delete();
+
+        $sources = ClassModel::query()
+            ->where('subject_name', 'like', $prefix . '%')
+            ->where(function ($q) use ($dev) {
+                $q->whereNull('instructor_id')->orWhere('instructor_id', '!=', $dev->id);
+            })
+            ->get();
+
+        foreach ($sources as $class) {
+            ClassModel::updateOrCreate(
+                [
+                    'subject_name' => $class->subject_name,
+                    'program_id' => $class->program_id,
+                    'year_level' => $class->year_level,
+                    'semester' => $class->semester,
+                    'school_year' => $class->school_year,
+                    'section' => $class->section,
+                    'instructor_id' => $dev->id,
+                ],
+                [
+                    'schedule' => $class->schedule,
+                ]
+            );
+        }
+
+        Log::info('ClassSeeder: dev classes synced', [
+            'count' => $sources->count(),
+            'removed_legacy_dev_classes' => $removedLegacy,
+            'removed_other_dev_classes' => $removedOthers,
+        ]);
+    }
+
     private function makeSheetsService(): GoogleSheets
     {
         $client = new GoogleClient();
@@ -275,7 +298,6 @@ class ClassSeeder extends Seeder
         return new GoogleSheets($client);
     }
 
-
     private function resolveCredentialsPath(): string
     {
         if (file_exists(self::RENDER_SECRET_CREDENTIALS_PATH)) {
@@ -284,7 +306,7 @@ class ClassSeeder extends Seeder
 
         return storage_path(self::CREDENTIALS_PATH);
     }
-    
+
     private function resolveCredentials(): string|array
     {
         $json = env('GOOGLE_SERVICE_ACCOUNT_JSON');
@@ -302,9 +324,6 @@ class ClassSeeder extends Seeder
         return $this->resolveCredentialsPath();
     }
 
-    /**
-     * @return array<int, array<int, string|null>>|null  0-indexed rows/cols
-     */
     private function fetchTabValues(GoogleSheets $service, string $tabName): ?array
     {
         try {
@@ -319,13 +338,6 @@ class ClassSeeder extends Seeder
         }
     }
 
-    /**
-     * Locates every "<PROGRAM> - Nth YEAR" block within a tab and
-     * hands each one off to parseBlock().
-     *
-     * @param  array<int, array<int, string|null>>  $values
-     * @param  array<string, ParsedClass>  $parsed
-     */
     private function parseTab(array $values, string $tabName, string $programName, array &$parsed): void
     {
         $rowCount = count($values);
@@ -341,9 +353,8 @@ class ClassSeeder extends Seeder
 
         foreach ($blockStarts as $i => $block) {
             $startRow = $block['row'];
-            $endRow = $blockStarts[$i + 1]['row'] ?? $rowCount; // exclusive
+            $endRow = $blockStarts[$i + 1]['row'] ?? $rowCount;
 
-            // Semester/school_year line sits one row below the header.
             $semLine = trim((string) ($values[$startRow + 1][1] ?? ''));
 
             if (! preg_match('/(1st|2nd|3rd|4th)\s*Semester,\s*A\.Y\.\s*(\d{4}-\d{4})/i', $semLine, $sm)) {
@@ -355,23 +366,12 @@ class ClassSeeder extends Seeder
             $semester = strtolower($sm[1]);
             $schoolYear = $sm[2];
 
-            // Day header row (MONDAY..SATURDAY) sits two rows below the
-            // header; actual data starts the row after that.
             $dataStart = $startRow + 3;
 
             $this->parseBlock($values, $dataStart, $endRow, $tabName, $programName, $block['yearLevel'], $semester, $schoolYear, $parsed);
         }
     }
 
-    /**
-     * Scans each day-column independently, since meeting entries for
-     * different days in the same block don't share the same row
-     * offset (e.g. Monday's first entry might start 4 rows before
-     * Wednesday's).
-     *
-     * @param  array<int, array<int, string|null>>  $values
-     * @param  array<string, ParsedClass>  $parsed
-     */
     private function parseBlock(
         array $values,
         int $dataStart,
@@ -444,13 +444,6 @@ class ClassSeeder extends Seeder
         return false;
     }
 
-    /**
-     * Builds a placeholder section label from the program's short tab
-     * abbreviation (e.g. "BSSW") and the year level (e.g. "1st"),
-     * producing something like "BSSW 1". The schedule sheet has no
-     * real section data — this just gives every class a readable,
-     * non-null value until actual sectioning is implemented.
-     */
     private function buildSectionLabel(string $abbreviation, string $yearLevel): string
     {
         $yearNumber = preg_replace('/\D/', '', $yearLevel);
@@ -465,9 +458,6 @@ class ClassSeeder extends Seeder
         return sprintf('%02d:%02d', (int) $h, (int) $m);
     }
 
-    /**
-     * @return array<string, string>  normalized full name => user UUID
-     */
     private function buildInstructorNameMap(): array
     {
         return User::query()
@@ -491,27 +481,11 @@ class ClassSeeder extends Seeder
             }
         }
 
-        // Strip trailing professional credentials, e.g. ", MIT", ", MBA", ", RSW".
         $name = preg_replace('/,\s*[A-Za-z.]+$/', '', $name);
 
         return mb_strtolower(preg_replace('/\s+/', ' ', $name));
     }
 
-    /**
-     * Finds the closest instructor name match by whole-string
-     * similarity, used only as a fallback when the exact normalized
-     * match fails (e.g. missing space after an honorific,
-     * inconsistent capitalization, a stray period).
-     *
-     * Deliberately conservative: returns null (no match) unless a
-     * candidate clears FUZZY_MATCH_THRESHOLD. Genuinely different
-     * names — different surname, married-name mismatches, etc. —
-     * should NOT be silently auto-matched; those need a human to
-     * reconcile the source sheets.
-     *
-     * @param  array<string, string>  $instructorMap  normalized name => user UUID
-     * @return array{0: string, 1: string, 2: float}|null  [matched normalized name, user id, similarity %]
-     */
     private function findClosestInstructorMatch(string $normalizedName, array $instructorMap): ?array
     {
         $bestName = null;
@@ -535,15 +509,6 @@ class ClassSeeder extends Seeder
         return null;
     }
 
-    /**
-     * Like findClosestInstructorMatch(), but always returns the best
-     * candidate (regardless of threshold) so the "unmatched
-     * instructors" error can suggest a likely intended match for a
-     * human to confirm. Never used to auto-assign.
-     *
-     * @param  array<string, string>  $instructorMap  normalized name => user UUID
-     * @return array{name: string, score: float}|null
-     */
     private function describeClosestSuggestion(string $rawName, array $instructorMap): ?array
     {
         if (empty($instructorMap)) {

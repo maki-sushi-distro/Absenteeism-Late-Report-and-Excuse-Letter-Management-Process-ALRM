@@ -111,18 +111,20 @@ class AdminUserSeeder extends Seeder
 
     public function run(): void
     {
+        $allProgramIds = Program::query()->pluck('id')->all();
+        
         $manualUsers = [
             new SeedUser(
                 name: 'Jade Riel Abuela',
                 email: 'jaderiel.abuela@laverdad.edu.ph',
                 role: UserRole::Administrator,
             ),
-            // new SeedUser(
-            //     name: '',
-            //     email: '',
-            //     role: UserRole::ProgramHead,
-            //     programIds: [],
-            // ),
+            new SeedUser(
+                name: 'Marwin Mandocdoc',
+                email: 'marwin.mandocdoc@student.laverdad.edu.ph',
+                role: UserRole::Instructor,
+                programIds: $allProgramIds,
+            ),
         ];
 
         $sheet = $this->fetchInstructorsFromGoogleSheets();

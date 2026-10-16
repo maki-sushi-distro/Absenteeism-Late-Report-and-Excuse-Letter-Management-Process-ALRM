@@ -73,14 +73,6 @@ class ExcuseRequestPolicy
     }
 
     /**
-     * Determine whether the user can delete the model.
-     */
-    public function delete(User $user, ExcuseRequest $excuseRequest): bool
-    {
-        return $this->update($user, $excuseRequest);
-    }
-
-    /**
      * Determine whether the user can restore the model.
      */
     public function restore(User $user, ExcuseRequest $excuseRequest): bool

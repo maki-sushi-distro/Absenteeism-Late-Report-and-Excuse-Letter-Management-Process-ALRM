@@ -186,28 +186,6 @@ class RequestController extends Controller
         ]);
     }
 
-
-    public function destroy(ExcuseRequest $request)
-    {
-        $this->authorize('delete', $request);
-
-        if ($request->status !== 'pending') {
-            return response()->json([
-                'success' => false,
-                'message' => 'Only pending requests can be cancelled.',
-                'data'    => null,
-            ], 422);
-        }
-
-        $request->update(['status' => 'cancelled']);
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Request cancelled.',
-            'data'    => $request->fresh(),
-        ]);
-    }
-
     /**
      * NEW: I-stream ang attachment ng request. Ang ExcuseRequestPolicy
      * ang nagpapasya kung sino ang pwedeng tumingin.

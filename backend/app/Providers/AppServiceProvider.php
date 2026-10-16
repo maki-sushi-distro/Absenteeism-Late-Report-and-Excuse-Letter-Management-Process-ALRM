@@ -37,7 +37,7 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(FollowupFlag::class, FollowupFlagPolicy::class);
         Gate::policy(AttendanceTracker::class, AttendanceTrackerPolicy::class);
         Gate::policy(User::class, UserPolicy::class);
-        Gate::policy(UserNotification::class, UserNotificationPolicy::class); // NEW
+        Gate::policy(UserNotification::class, UserNotificationPolicy::class);
 
         Mail::extend('brevo', function () {
             return (new BrevoTransportFactory)->create(
@@ -48,5 +48,10 @@ class AppServiceProvider extends ServiceProvider
                 )
             );
         });
+
+        // Testing safeguard: lahat ng email ay ire-redirect sa isang address lang.
+        if ($to = config('mail.test_recipient')) {
+            Mail::alwaysTo($to);
+        }
     }
 }

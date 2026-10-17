@@ -55,7 +55,12 @@ class ExcuseRequestObserver implements ShouldHandleEventsAfterCommit
         }
 
         try {
-            Mail::to($instructor->email, $instructor->name)
+            $testRecipient = trim((string) config('mail.instructor_test_recipient', ''));
+
+            Mail::to(
+                $testRecipient !== '' ? $testRecipient : $instructor->email,
+                $testRecipient !== '' ? null : $instructor->name,
+            )
                 ->send(new InstructorExcuseRequestMail($excuseRequest, $student, $instructor, $class));
 
             UserNotification::create([

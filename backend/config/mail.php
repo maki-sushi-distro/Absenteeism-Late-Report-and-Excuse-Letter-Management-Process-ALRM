@@ -124,6 +124,9 @@ return [
         explode(',', (string) env('MAIL_INSTRUCTOR_ALLOWLIST', ''))
     )),
 
+    // Redirect only instructor excuse-request emails during testing.
+    'instructor_test_recipient' => env('MAIL_INSTRUCTOR_TEST_RECIPIENT'),
+
     'test_recipient' => env('MAIL_TEST_RECIPIENT'),
 
 ];

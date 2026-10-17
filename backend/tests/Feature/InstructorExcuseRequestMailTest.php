@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Mail\InstructorExcuseRequestMail;
 use App\Models\ClassModel;
 use App\Models\ExcuseRequest;
+use App\Models\Program;
 use App\Models\User;
 use Tests\TestCase;
 
@@ -31,6 +32,8 @@ class InstructorExcuseRequestMailTest extends TestCase
     {
         $absenceHtml = $this->mail()->render();
         $this->assertStringContainsString('Oct 17, 2026', $absenceHtml);
+        $this->assertStringContainsString('Program and Year Level', $absenceHtml);
+        $this->assertStringContainsString('BSIS — 3rd', $absenceHtml);
         $this->assertStringNotContainsString('Minutes late', $absenceHtml);
         $this->assertStringContainsString('&lt;script&gt;', $absenceHtml);
         $this->assertStringNotContainsString('<script>', $absenceHtml);
@@ -53,7 +56,11 @@ class InstructorExcuseRequestMailTest extends TestCase
             ]),
             new User(['name' => 'Test Student']),
             new User(['name' => 'Test Instructor']),
-            new ClassModel(['subject_name' => 'Applications Development', 'section' => 'BSIS 3']),
+            (new ClassModel([
+                'subject_name' => 'Applications Development',
+                'section' => 'BSIS 3',
+                'year_level' => '3rd',
+            ]))->setRelation('program', new Program(['program_name' => 'BSIS'])),
         );
     }
 }

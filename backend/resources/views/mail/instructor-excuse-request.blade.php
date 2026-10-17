@@ -35,7 +35,7 @@
             <tr>
                 <td style="padding:22px 20px; font-size:14px; line-height:1.6; color:#4a5568; overflow-wrap:anywhere; word-break:break-word;">
                     <p style="margin:0 0 12px;"><strong style="color:#0b2a52;">Student</strong><br>{{ $student->name }}</p>
-                    <p style="margin:0 0 12px;"><strong style="color:#0b2a52;">Class</strong><br>{{ $class->subject_name }}@if($class->section) ({{ $class->section }})@endif</p>
+                    <p style="margin:0 0 12px;"><strong style="color:#0b2a52;">Program and Year Level</strong><br>{{ $class->program?->program_name ?? '—' }} — {{ $class->year_level ?? '—' }}</p>
                     <p style="margin:0 0 12px;"><strong style="color:#0b2a52;">Subjects missed</strong><br>{{ $excuseRequest->subjects_missed }}</p>
                     @if($excuseRequest->type === 'late')
                         <p style="margin:0 0 12px;"><strong style="color:#0b2a52;">Minutes late</strong><br>{{ $excuseRequest->minutes_late }}</p>
@@ -53,12 +53,6 @@
         <table role="presentation" cellpadding="0" cellspacing="0"><tr><td align="center" bgcolor="#164a86" style="border-radius:6px;">
             <a href="{{ $reviewUrl }}" style="display:inline-block; padding:15px 30px; border:1px solid #164a86; border-radius:6px; font-size:15px; font-weight:bold; color:#ffffff; text-decoration:none;">Review Request</a>
         </td></tr></table>
-    </td>
-</tr>
-<tr>
-    <td style="padding:0 24px 24px;">
-        <p style="margin:0 0 12px; font-size:13px; line-height:1.6; color:#8a94a6;">Mag-sign in gamit ang instructor account mo upang ma-review ang request.</p>
-        <p style="margin:0; font-size:12px; line-height:1.6; color:#8a94a6; overflow-wrap:anywhere; word-break:break-word;">Kung hindi gumagana ang button, buksan ang link na ito:<br><a href="{{ $reviewUrl }}" style="color:#164a86;">{{ $reviewUrl }}</a></p>
     </td>
 </tr>
 <tr><td style="padding:0 24px;"><hr style="border:none; border-top:1px solid #e6e9f0; margin:0 0 24px;"></td></tr>

@@ -11,6 +11,7 @@ RUN apt-get update && apt-get install -y \
     libzip-dev \
     zip \
     unzip \
+    supervisor \
     && rm -rf /var/lib/apt/lists/*
 
 # Install PHP extensions with GD JPEG support
@@ -43,10 +44,15 @@ COPY . .
 # Generate the optimized autoloader
 RUN composer dump-autoload --optimize
 
+# Run the web server and Laravel queue worker under one process manager.
+COPY docker/supervisord.conf /etc/supervisor/conf.d/alrm.conf
+RUN sed -i 's/\r$//' docker/start.sh \
+    && chmod +x docker/start.sh
+
 # Set Laravel directory permissions
 RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache \
     && chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
 
 EXPOSE 10000
 
-CMD bash -c "sed -i \"s/80/\${PORT:-10000}/g\" /etc/apache2/sites-available/000-default.conf /etc/apache2/ports.conf && php artisan config:cache && php artisan migrate --force && apache2-foreground"
+CMD ["/bin/bash", "/var/www/html/docker/start.sh"]

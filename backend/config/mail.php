@@ -119,6 +119,11 @@ return [
         'name' => env('MAIL_FROM_NAME', env('APP_NAME', 'Laravel')),
     ],
     
+    'instructor_notify_allowlist' => array_filter(array_map(
+        'trim',
+        explode(',', (string) env('MAIL_INSTRUCTOR_ALLOWLIST', ''))
+    )),
+
     'test_recipient' => env('MAIL_TEST_RECIPIENT'),
 
 ];

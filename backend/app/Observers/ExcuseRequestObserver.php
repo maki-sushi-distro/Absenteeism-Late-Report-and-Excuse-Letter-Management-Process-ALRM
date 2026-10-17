@@ -44,9 +44,17 @@ class ExcuseRequestObserver implements ShouldHandleEventsAfterCommit
             return;
         }
 
+        $allowlist = array_map('strtolower', config('mail.instructor_notify_allowlist', []));
+
+        if ($allowlist !== [] && ! in_array(strtolower($instructor->email), $allowlist, true)) {
+            Log::info('Excuse request email skipped: instructor is not in the allowlist.', [
+                'request_id'    => $excuseRequest->id,
+                'instructor_id' => $instructor->id,
+            ]);
+            return;
+        }
+
         try {
-            // ShouldQueue ang Mailable, kaya sa jobs table lang ito papasok;
-            // ang worker ang magpapadala.
             Mail::to($instructor->email, $instructor->name)
                 ->send(new InstructorExcuseRequestMail($excuseRequest, $student, $instructor, $class));
 
@@ -60,7 +68,6 @@ class ExcuseRequestObserver implements ShouldHandleEventsAfterCommit
                 'is_read'    => false,
             ]);
         } catch (Throwable $e) {
-            // Hindi dapat mag-fail ang submission ng student dahil lang sa email.
             report($e);
         }
     }

@@ -48,7 +48,7 @@ Route::middleware(['auth:sanctum', 'active', 'inactive'])->group(function () {
 
     /*
     |----------------------------------------------------------------
-    | Notifications (lahat ng roles)
+    | Notifications  
     |----------------------------------------------------------------
     */
     Route::get('/notifications', [NotificationController::class, 'index']);
@@ -58,8 +58,7 @@ Route::middleware(['auth:sanctum', 'active', 'inactive'])->group(function () {
 
     /*
     |----------------------------------------------------------------
-    | Request attachment (lahat ng roles; ang ExcuseRequestPolicy
-    | ang nagpapasya kung sino ang pwedeng tumingin)
+    | Request attachment 
     |----------------------------------------------------------------
     */
     Route::get('/requests/{request}/evidence', [RequestController::class, 'evidence']);   

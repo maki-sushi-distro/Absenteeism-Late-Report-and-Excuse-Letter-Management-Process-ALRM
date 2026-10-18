@@ -3,6 +3,7 @@
 namespace App\Observers;
 
 use App\Mail\InstructorExcuseRequestMail;
+use App\Mail\StudentRequestUpdatedMail;
 use App\Models\ExcuseRequest;
 use App\Models\UserNotification;
 use Illuminate\Contracts\Events\ShouldHandleEventsAfterCommit;
@@ -68,6 +69,49 @@ class ExcuseRequestObserver implements ShouldHandleEventsAfterCommit
                 'request_id' => $excuseRequest->id,
                 'type'       => 'new_request',
                 'message'    => "{$student->name} submitted a new {$excuseRequest->type} request for {$class->subject_name}.",
+                'channel'    => 'email',
+                'date_sent'  => now(),
+                'is_read'    => false,
+            ]);
+        } catch (Throwable $e) {
+            report($e);
+        }
+    }
+
+    public function updated(ExcuseRequest $excuseRequest): void
+    {
+        if (! $excuseRequest->wasChanged('status')) {
+            return;
+        }
+        if ($excuseRequest->getOriginal('status') !== 'pending') {
+            return;
+        }
+
+        $excuseRequest->loadMissing('enrollment.student', 'enrollment.class');
+
+        $student = $excuseRequest->enrollment?->student;
+        $class   = $excuseRequest->enrollment?->class;
+
+        if (! $student || blank($student->email) || ! $class) {
+            Log::warning('Student update email skipped: missing student/email/class.', [
+                'request_id' => $excuseRequest->id,
+            ]);
+            return;
+        }
+
+        try {
+            $testRecipient = trim((string) config('mail.student_test_recipient', ''));
+
+            Mail::to(
+                $testRecipient !== '' ? $testRecipient : $student->email,
+                $testRecipient !== '' ? null : $student->name,
+            )->send(new StudentRequestUpdatedMail($excuseRequest, $student, $class));
+
+            UserNotification::create([
+                'user_id'    => $student->id,
+                'request_id' => $excuseRequest->id,
+                'type'       => 'request_updated',
+                'message'    => "Your instructor has taken action on your {$excuseRequest->type} request for {$class->subject_name}.",
                 'channel'    => 'email',
                 'date_sent'  => now(),
                 'is_read'    => false,

@@ -4,7 +4,7 @@ namespace App\Mail;
 
 use App\Models\ExcuseRequest;
 use App\Models\User;
-use App\Models\ClassModel; // palitan kung iba ang pangalan ng class model mo
+use App\Models\ClassModel; 
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
@@ -27,7 +27,7 @@ class StudentRequestUpdatedMail extends Mailable
         return new Content(
             view: 'mail.student-request-update',
             with: [
-                'viewUrl' => rtrim(config('app.frontend_url'), '/') . '/requests/' . $this->excuseRequest->id,
+                'viewUrl' => rtrim(config('app.frontend_url'), '/') . '/dashboard',
             ],
         );
     }

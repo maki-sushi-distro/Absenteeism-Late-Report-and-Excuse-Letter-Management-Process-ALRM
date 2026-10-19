@@ -1,15 +1,19 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 import { getStudentAttendanceSummary, getStudentClasses, getStudentRequests } from "@/api/student";
 import { useAuth } from "@/context/AuthContext";
 import { ErrorState } from "@/components/common/ErrorState";
 import { Spinner } from "@/components/ui/spinner";
-import StudentAttendanceTracker from "./StudentAttendanceTracker";
 import StudentDashboardMetrics from "./StudentDashboardMetrics";
 import StudentPageLayout from "./StudentPageLayout";
+import StudentDashboardHeading from "./dashboard/StudentDashboardHeading";
+import RecentNotifications from "./dashboard/RecentNotifications";
+import useStudentPreferences from "./useStudentPreferences";
 
 function StudentDashboard() {
   const { user } = useAuth();
+  const { preferences } = useStudentPreferences(user?.id);
+  const { hash } = useLocation();
   const [data, setData] = useState({ requests: [], attendance: [], classes: [] });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -17,6 +21,8 @@ function StudentDashboard() {
   useEffect(() => {
     let alive = true;
     async function loadData() {
+      setLoading(true);
+      setError("");
       try {
         const [requests, attendance, classes] = await Promise.all([
           getStudentRequests(), getStudentAttendanceSummary(), getStudentClasses(),
@@ -34,24 +40,22 @@ function StudentDashboard() {
     }
     const timer = window.setTimeout(loadData, 0);
     return () => { alive = false; window.clearTimeout(timer); };
-  }, []);
+  }, [user?.id]);
 
-  return <StudentPageLayout>
-    <div className="grid gap-6">
-      <section>
-        <p className="mb-4 text-sm font-black uppercase text-[#0b367f] dark:text-blue-300">Dashboard</p>
-        <h1 className="text-2xl font-black text-slate-950 dark:text-slate-50">Welcome back, {user?.name || "Student"}!</h1>
-        <p className="mt-1 text-lg text-slate-700 dark:text-slate-300">Here&apos;s your student overview</p>
-      </section>
+  useEffect(() => {
+    if (!loading && hash === "#recent-notifications") {
+      document.getElementById("recent-notifications")?.focus();
+    }
+  }, [hash, loading]);
+
+  return <StudentPageLayout contentPadding="px-[50px]">
+    <div className="@container grid w-full gap-0 font-[Arial,sans-serif] text-black dark:text-slate-100">
+      <StudentDashboardHeading user={user} classes={data.classes} />
       {loading ? <div className="flex items-center gap-2 text-sm"><Spinner />Loading student records</div> : null}
       {error ? <ErrorState message={error} /> : null}
       {!loading && !error ? <>
-        <StudentDashboardMetrics {...data} />
-        <StudentAttendanceTracker attendance={data.attendance} />
-        <div className="flex flex-wrap gap-4 text-sm font-semibold text-[#203b82] dark:text-blue-300">
-          <Link to="/student/records">My Records</Link>
-          <Link to="/student/request">New Request</Link>
-        </div>
+        <StudentDashboardMetrics {...data} alertsEnabled={preferences.thresholdAlerts} />
+        <RecentNotifications userId={user?.id} requests={data.requests} />
       </> : null}
     </div>
   </StudentPageLayout>;

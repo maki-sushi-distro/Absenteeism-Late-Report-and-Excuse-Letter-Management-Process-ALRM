@@ -28,6 +28,7 @@ import AdminPageLayout from "./admin/AdminPageLayout";
 import InstructorPageLayout from "./instructor/InstructorPageLayout";
 import ProgramHeadPageLayout from "./programHead/ProgramHeadPageLayout";
 import StudentPageLayout from "./student/StudentPageLayout";
+import StudentSettings from "./student/StudentSettings";
 
 const ROLE_CONFIG = {
   administrator: {
@@ -497,6 +498,10 @@ function Settings() {
 
   if (!config) {
     return <UnknownRoleState role={user?.role} />;
+  }
+
+  if (normalizedRole === "student") {
+    return <StudentPageLayout><StudentSettings key={user?.id} user={user} /></StudentPageLayout>;
   }
 
   return (

@@ -3,8 +3,10 @@ import { createStudentRequest, getStudentClasses, uploadEvidence } from "@/api/s
 import { useAuth } from "@/context/AuthContext";
 import { getStoredProfileSetup } from "@/lib/profileSetup";
 import { buildRequestPayload, proofTypeError } from "./buildPayload";
-import { LAST_STEP, initialForm } from "./constants";
-import { firstInvalidRequestStep, validateStep } from "./validation";
+import { EVIDENCE, LAST_STEP, initialForm } from "./constants";
+import { firstInvalidRequestStep, validateReview, validateStep } from "./validation";
+import { validateEvidenceFile } from "./evidenceValidation";
+import { compressImage } from "./imageCompress";
 import {
   buildInitialForm,
   profileDefaults,
@@ -20,6 +22,8 @@ export default function useRequestForm() {
   const [classesError, setClassesError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [reviewEditing, setReviewEditing] = useState(false);
+  const [reviewProcessing, setReviewProcessing] = useState(false);
   const [error, setError] = useState("");
   const [fieldErrors, setFieldErrors] = useState({});
   const [form, setForm] = useState(() =>
@@ -27,12 +31,12 @@ export default function useRequestForm() {
   );
 
   const uploadedRef = useRef(null);
+  const reviewProcessingRef = useRef(false);
 
   useEffect(() => {
     const defaults = profileDefaults(user, storedProfile);
 
     // Fill profile-backed fields when the authenticated user arrives.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setForm((current) => {
       const program = current.program || defaults.program;
       const level = current.level || defaults.level;
@@ -147,9 +151,42 @@ export default function useRequestForm() {
   }
 
   function previousStep() {
+    if (submitting || reviewProcessing) return;
+    setReviewEditing(false);
     setFieldErrors({});
     setError("");
     setStep((current) => Math.max(current - 1, 0));
+  }
+
+  function startReviewEdit() {
+    if (submitting || submitted || step !== LAST_STEP) return;
+    setFieldErrors({});
+    setError("");
+    setForm((current) => ({ ...current, declaration: false }));
+    setReviewEditing(true);
+  }
+
+  function saveReviewEdit() {
+    if (submitting || reviewProcessingRef.current) return;
+    const errors = validateReview(form, classes, classesError);
+    setFieldErrors(errors);
+    if (Object.keys(errors).length === 0) setReviewEditing(false);
+  }
+
+  async function selectReviewFile(picked) {
+    if (!picked || reviewProcessingRef.current || submitting) return;
+    reviewProcessingRef.current = true;
+    setReviewProcessing(true);
+    try {
+      const file = await compressImage(await validateEvidenceFile(picked));
+      if (file.size > EVIDENCE.maxBytes) throw new Error("File is too large after resizing. Maximum upload size is 2MB.");
+      updateField("evidenceFile", file);
+    } catch (issue) {
+      setFieldErrors((current) => ({ ...current, evidenceFile: issue.message || "Unable to process this file." }));
+    } finally {
+      reviewProcessingRef.current = false;
+      setReviewProcessing(false);
+    }
   }
 
   async function resolveEvidence() {
@@ -166,11 +203,21 @@ export default function useRequestForm() {
 
   async function handleSubmit(event) {
     event.preventDefault();
+    if (submitting || reviewProcessingRef.current) return;
+    if (reviewEditing) {
+      saveReviewEdit();
+      return;
+    }
 
     const invalid = firstInvalidRequestStep(form, classes, classesError);
     if (invalid) {
-      setStep(invalid.step);
-      setFieldErrors(invalid.errors);
+      if (step === LAST_STEP) {
+        setFieldErrors({ ...validateReview(form, classes, classesError), ...validateStep({ step: LAST_STEP, form, classes, classesError }) });
+        if (invalid.step !== LAST_STEP) setReviewEditing(true);
+      } else {
+        setStep(invalid.step);
+        setFieldErrors(invalid.errors);
+      }
       return;
     }
 
@@ -187,7 +234,8 @@ export default function useRequestForm() {
       const proofError = proofTypeError(submitError?.validationErrors || submitError?.body?.errors);
       if (proofError) {
         setFieldErrors((current) => ({ ...current, proof_types: proofError }));
-        setStep(5);
+        if (step === LAST_STEP) setReviewEditing(true);
+        else setStep(5);
       }
     } finally {
       setSubmitting(false);
@@ -207,6 +255,7 @@ export default function useRequestForm() {
     setError("");
     setFieldErrors({});
     setSubmitted(false);
+    setReviewEditing(false);
   }
 
   return {
@@ -225,6 +274,11 @@ export default function useRequestForm() {
     handleRadioClick,
     nextStep,
     previousStep,
+    reviewEditing,
+    reviewProcessing,
+    startReviewEdit,
+    saveReviewEdit,
+    selectReviewFile,
     handleSubmit,
     resetForm,
   };

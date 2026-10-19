@@ -5,17 +5,27 @@ import { Spinner } from "@/components/ui/spinner";
 import ErrorText from "../components/ErrorText";
 import HeaderIdentity from "../components/HeaderIdentity";
 import RequestShell from "../components/RequestShell";
+import RequestSummary from "../components/RequestSummary";
 import SectionBox from "../components/SectionBox";
 
 export default function ReviewStep({
   step,
   form,
   user,
+  classes,
+  classesLoading,
+  classesError,
   error,
   fieldErrors,
   submitting,
   updateField,
   onBack,
+  reviewEditing,
+  reviewProcessing,
+  onStartEdit,
+  onSaveEdit,
+  onFileChange,
+  toggleListField,
 }) {
   return (
     <RequestShell requestType={form.requestType} step={step}>
@@ -27,11 +37,12 @@ export default function ReviewStep({
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
+      <RequestSummary form={form} user={user} classes={classes} classesLoading={classesLoading} classesError={classesError} editing={reviewEditing} onStartEdit={onStartEdit} onSaveEdit={onSaveEdit} disabled={submitting || reviewProcessing} processing={reviewProcessing} fieldErrors={fieldErrors} updateField={updateField} toggleListField={toggleListField} onFileChange={onFileChange} />
       <SectionBox
         invalid={Boolean(fieldErrors.declaration)}
         title="Student Declaration"
       >
-        <p className="rounded-[10px] border border-slate-200 bg-white p-4 text-sm font-semibold leading-relaxed text-slate-700">
+        <p className="text-sm font-semibold leading-relaxed text-slate-700 dark:text-slate-200">
           I hereby certify that the information provided above is true and
           correct. I understand that submission of this form does not
           automatically excuse my{" "}
@@ -41,6 +52,7 @@ export default function ReviewStep({
         <label className="flex items-start gap-2 text-sm text-slate-700">
           <input
             type="checkbox"
+            disabled={reviewEditing || submitting || reviewProcessing}
             checked={form.declaration}
             onChange={(event) =>
               updateField("declaration", event.target.checked)
@@ -56,13 +68,14 @@ export default function ReviewStep({
           type="button"
           variant="outline"
           onClick={onBack}
+          disabled={submitting || reviewProcessing}
           className="h-11 rounded-[9px] border-[1.5px] border-slate-200 px-5 text-sm font-bold text-slate-500 hover:text-slate-950"
         >
           Back
         </Button>
         <Button
           type="submit"
-          disabled={submitting}
+          disabled={submitting || reviewEditing || reviewProcessing}
           className="h-11 rounded-[9px] bg-[#101C4A] px-6 text-sm font-bold text-white hover:bg-[#1B2B6B]"
         >
           {submitting && <Spinner className="mr-2" />}

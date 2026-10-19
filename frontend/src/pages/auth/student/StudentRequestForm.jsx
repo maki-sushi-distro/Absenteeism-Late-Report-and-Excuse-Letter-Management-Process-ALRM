@@ -65,7 +65,16 @@ function StudentRequestForm() {
           {step === 6 && (
             <ReviewStep
               {...common}
+              classes={f.classes}
+              classesLoading={f.classesLoading}
+              classesError={f.classesError}
               error={f.error}
+              reviewEditing={f.reviewEditing}
+              reviewProcessing={f.reviewProcessing}
+              onStartEdit={f.startReviewEdit}
+              onSaveEdit={f.saveReviewEdit}
+              onFileChange={f.selectReviewFile}
+              toggleListField={f.toggleListField}
               submitting={f.submitting}
             />
           )}

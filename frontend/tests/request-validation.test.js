@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { initialForm } from "../src/pages/auth/student/request-form/constants.js";
-import { firstInvalidRequestStep, validateStep } from "../src/pages/auth/student/request-form/validation.js";
+import { firstInvalidRequestStep, validateReview, validateStep } from "../src/pages/auth/student/request-form/validation.js";
 
 const enrolledClass = { class_id: "class-one", subject_name: "Information Management" };
 const check = (form, step, classes = [], classesError = "") =>
@@ -40,7 +40,30 @@ test("declaration is required at final review", () => {
   assert.deepEqual(check({ ...initialForm, declaration: true }, 6), {});
 });
 
-test("final submission returns to a missing guardian name", () => {
+test("inline review reports errors across student and request fields without requiring declaration to save", () => {
+  const form = { ...initialForm, requestType: "late", consent: "agree",
+    studentName: "Alex Student", program: "BS in Information Systems", level: "1st year",
+    guardianName: "Parent 123", contactNumber: "08123456789", dateSubmitted: "2026-10-20",
+    minutesLate: "0", classId: "unknown", reason: "x", declaration: false };
+  const errors = validateReview(form, [enrolledClass]);
+  for (const name of ["guardianName", "contactNumber", "minutesLate", "classId", "reason"]) assert.ok(errors[name], name);
+  assert.equal(errors.declaration, undefined);
+  assert.deepEqual(validateReview({ ...form, guardianName: "Alex Parent", contactNumber: "09123456789",
+    minutesLate: "15", classId: "class-one", reason: "Traffic delay" }, [enrolledClass]), {});
+});
+
+test("inline absence review validates dates and reason selection on the final page", () => {
+  const form = { ...initialForm, requestType: "absence", consent: "agree", studentName: "Alex Student",
+    program: "BS in Information Systems", level: "1st year", guardianName: "Alex Parent",
+    contactNumber: "09123456789", dateSubmitted: "2026-10-20", classId: "class-one",
+    startDateOfAbsence: "2026-10-20", endDateOfAbsence: "2026-10-19", absenceReasons: [] };
+  const errors = validateReview(form, [enrolledClass]);
+  assert.ok(errors.endDateOfAbsence);
+  assert.ok(errors.absenceReasons);
+  assert.deepEqual(validateReview({ ...form, endDateOfAbsence: "2026-10-21", absenceReasons: ["Personal Reason"] }, [enrolledClass]), {});
+});
+
+test("submission validation identifies a missing guardian name", () => {
   const form = { ...initialForm, requestType: "late", consent: "agree",
     studentName: "Alex Student", program: "BS in Information Systems", level: "1st year",
     guardianName: "Alex Parent", contactNumber: "09123456789", dateSubmitted: "2026-10-13",

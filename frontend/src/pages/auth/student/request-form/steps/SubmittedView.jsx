@@ -1,4 +1,5 @@
 import { CheckCircle2 } from "lucide-react";
+import { Link } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import RequestTitle from "../components/RequestTitle";
 import { requestTitle } from "../utils";
@@ -26,6 +27,12 @@ export default function SubmittedView({ requestType, onReset }) {
             >
               Submit another response
             </button>
+            <Link
+              to="/dashboard"
+              className="rounded-sm text-sm font-semibold text-[#101C4A] underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 dark:text-blue-300"
+            >
+              Go back to dashboard
+            </Link>
           </div>
         </CardContent>
       </Card>

@@ -129,3 +129,8 @@ export function firstInvalidRequestStep(form, classes, classesError = "") {
 
   return null;
 }
+
+export function validateReview(form, classes, classesError = "") {
+  return Object.assign({}, ...[0, 2, 3, 4, 5].map((step) =>
+    validateStep({ step, form, classes, classesError })));
+}

@@ -1,5 +1,4 @@
 import { Bell, ChevronDown, UserCircle } from "lucide-react";
-import ThemeToggle from "@/components/ThemeToggle";
 import { useAuth } from "@/context/AuthContext";
 import { SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import Sidebar from "./Sidebar";
@@ -16,7 +15,6 @@ function AdminPageLayout({ children }) {
           </div>
 
           <div className="flex items-center gap-3 text-slate-950 dark:text-slate-100">
-            <ThemeToggle />
             <button
               type="button"
               aria-label="Notifications"

@@ -12,7 +12,6 @@ import {
 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import LVLogo from "@/assets/LV_Logo.png";
-import ThemeToggle from "@/components/ThemeToggle";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/context/AuthContext";
 
@@ -127,7 +126,6 @@ function HttpErrorPage({ status = 404, description, onRetry }) {
               </p>
             </div>
           </div>
-          <ThemeToggle />
         </div>
       </header>
 

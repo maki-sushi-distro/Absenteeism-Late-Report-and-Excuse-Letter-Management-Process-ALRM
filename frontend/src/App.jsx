@@ -1,6 +1,5 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
-import { ThemeProvider } from "./context/ThemeContext";
 import { ProtectedRoute } from "./routes/ProtectedRoute";
 import Login from "./pages/login";
 import { AuthCallback } from "./pages/AuthCallback";
@@ -22,6 +21,7 @@ import { ProgramHeadInstructors, ProgramHeadInstructorDetail } from "./pages/aut
 import { ProgramHeadReports } from "./pages/auth/programHead/ProgramHeadReports";
 import ProgramHeadPageLayout from "./pages/auth/programHead/ProgramHeadPageLayout";
 import StudentRecords from "./pages/auth/student/StudentRecords";
+import StudentNotificationsPage from "./pages/auth/student/StudentNotificationsPage";
 import StudentRequestForm from "./pages/auth/student/StudentRequestForm";
 import AppErrorBoundary from "./components/AppErrorBoundary";
 import HttpErrorPage from "./pages/HttpErrorPage";
@@ -30,7 +30,6 @@ import "./App.css";
 function App() {
   return (
     <BrowserRouter>
-      <ThemeProvider>
         <AuthProvider>
           <AppErrorBoundary>
             <Routes>
@@ -135,6 +134,7 @@ function App() {
               </ProtectedRoute>
             }
           />
+          <Route path="/student/notifications" element={<ProtectedRoute allowedRoles={["student"]}><StudentNotificationsPage /></ProtectedRoute>} />
           <Route
             path="/student/request"
             element={
@@ -161,7 +161,6 @@ function App() {
             </Routes>
           </AppErrorBoundary>
         </AuthProvider>
-      </ThemeProvider>
     </BrowserRouter>
   );
 }

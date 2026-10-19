@@ -1,13 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { ChevronDown, ChevronLeft, ChevronRight, Search, X } from "lucide-react";
 import { apiFetch } from "@/api/client";
 import { getStudentRequest, openEvidence, updateStudentRequest } from "@/api/studentRequests";
 import { useAuth } from "@/context/AuthContext";
+import StatusBadge from "@/components/dashboard/StatusBadge";
 import StudentPageLayout from "./StudentPageLayout";
 import { proofOptions } from "./request-form/constants";
-import { buildRequestEditForm, buildRequestUpdatePayload, proofTypeError, requestReason } from "./request-form/buildPayload";
-
-const PAGE_SIZE = 10;
+import { buildRequestEditForm, buildRequestUpdatePayload, proofTypeError } from "./request-form/buildPayload";
+import { paginateRecords } from "./records/pagination";
+import { filterRecords, reasonOf, recordDate, subjectOf, typeOf } from "./records/recordData";
+import RecordsTabs from "./records/RecordsTabs";
+import RecordActions from "./records/RecordActions";
 
 // Keep My Records data handling, filters, and UI together in this student page.
 async function fetchRecords(signal) {
@@ -22,20 +26,6 @@ async function fetchRecords(signal) {
   return records;
 }
 
-function subjectOf(record) {
-  return record.enrollment?.class?.subject_name || record.subjects_missed || "Unknown subject";
-}
-
-function typeOf(record) {
-  return record.type === "absence" ? "Absent" : record.type === "late" ? "Late" : "Unknown";
-}
-
-function recordDate(record) {
-  return record.type === "absence"
-    ? record.start_date_of_absence || record.date_submitted || record.created_at
-    : record.date_submitted || record.created_at;
-}
-
 function formatDate(value) {
   if (!value) return "—";
   // Calendar dates stay on the submitted day, independently of browser timezone.
@@ -46,15 +36,6 @@ function formatDate(value) {
   return new Intl.DateTimeFormat("en-US", {
     month: "short", day: "2-digit", year: "numeric", timeZone: "Asia/Singapore",
   }).format(date);
-}
-
-function reviewStatus(value) {
-  const labels = { pending: "Pending", approved: "Approved", noted: "Noted", invalid: "Invalid", cancelled: "Cancelled" };
-  return labels[value] || value || "—";
-}
-
-function reasonOf(record) {
-  return requestReason(record) || "No reason provided.";
 }
 
 function RequestEditForm({ record, onSaved, onCancel }) {
@@ -146,12 +127,15 @@ function RequestEditForm({ record, onSaved, onCancel }) {
 
 export default function StudentRecords() {
   const { user } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requestedId = searchParams.get("request");
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [reload, setReload] = useState(0);
   const [search, setSearch] = useState("");
   const [subject, setSubject] = useState("");
+  const [recordType, setRecordType] = useState("absence");
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState(null);
   const [editing, setEditing] = useState(false);
@@ -181,22 +165,33 @@ export default function StudentRecords() {
     return () => controller.abort();
   }, [reload, user?.id]);
 
-  const subjects = useMemo(() => [...new Set(records.map(subjectOf))].sort(), [records]);
-  const visibleRecords = useMemo(() => {
-    const query = search.trim().toLowerCase();
-    return records.filter((record) => {
-      const name = subjectOf(record);
-      return (!subject || name === subject)
-        && (!query || `${name} ${typeOf(record)} ${reasonOf(record)}`.toLowerCase().includes(query));
-    }).sort((a, b) => String(recordDate(b) || "").localeCompare(String(recordDate(a) || "")));
-  }, [records, search, subject]);
+  useEffect(() => {
+    const record = records.find((item) => item.id === requestedId);
+    if (!record) return;
+    const timer = window.setTimeout(() => {
+      if (["absence", "late"].includes(record.type)) setRecordType(record.type);
+      setSubject("");
+      setPage(1);
+      setSelected(record);
+      setEditing(false);
+      setAttachmentError("");
+      if (!dialogRef.current.open) dialogRef.current.showModal();
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [records, requestedId]);
 
-  const totalPages = Math.max(1, Math.ceil(visibleRecords.length / PAGE_SIZE));
-  const currentPage = Math.min(page, totalPages);
-  const firstRecord = (currentPage - 1) * PAGE_SIZE;
-  const pageRecords = visibleRecords.slice(firstRecord, firstRecord + PAGE_SIZE);
-  const firstPageButton = Math.max(1, Math.min(currentPage - 2, totalPages - 4));
-  const pageButtons = Array.from({ length: Math.min(5, totalPages) }, (_, index) => firstPageButton + index);
+  const typeRecords = useMemo(() => records.filter((record) => record.type === recordType), [records, recordType]);
+  const subjects = useMemo(() => [...new Set(typeRecords.map(subjectOf))].sort(), [typeRecords]);
+  const visibleRecords = useMemo(() => filterRecords(records, recordType, search, subject), [records, recordType, search, subject]);
+
+  const { totalPages, currentPage, firstRecord, pageRecords, pageButtons } = paginateRecords(visibleRecords, page);
+
+  function changeRecordType(value) {
+    if (!["absence", "late"].includes(value)) return;
+    setRecordType(value);
+    setSubject("");
+    setPage(1);
+  }
 
   function refresh() {
     setLoading(true);
@@ -229,9 +224,11 @@ export default function StudentRecords() {
   const paginationClass = "inline-flex h-8 min-w-8 items-center justify-center gap-1 rounded-md border border-[#CBD4E6] px-2 text-xs font-medium text-[#173D83] hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700 dark:text-blue-300 dark:hover:bg-slate-800";
 
   return (
-    <StudentPageLayout>
-      <section aria-label="My Records" className="grid w-full max-w-[960px] gap-2">
+    <StudentPageLayout contentPadding="px-5 sm:px-[50px]">
+      <section aria-label="My Records" className="grid min-w-0 w-full gap-2">
         <h1 className="sr-only">My Records</h1>
+        <RecordsTabs value={recordType} onValueChange={changeRecordType}>
+        <div className="grid min-w-0 gap-2">
         <div className="flex flex-wrap items-center gap-3">
           <div className="relative w-[220px] max-w-full">
             <Search aria-hidden="true" className="pointer-events-none absolute left-2.5 top-2 size-4 text-slate-400" />
@@ -262,13 +259,13 @@ export default function StudentRecords() {
               ) : error ? (
                 <tr><td colSpan={4} className="px-4 py-10 text-center text-slate-500">Records could not be loaded.</td></tr>
               ) : visibleRecords.length === 0 ? (
-                <tr><td colSpan={4} className="px-4 py-10 text-center text-slate-500">{records.length ? "No records match your search or subject filter." : "You have no submitted absence or late requests yet."}</td></tr>
+                <tr><td colSpan={4} className="px-4 py-10 text-center text-slate-500">{typeRecords.length ? "No records match your search or subject filter." : `You have no submitted ${recordType === "absence" ? "absence" : "late"} requests yet.`}</td></tr>
               ) : pageRecords.map((record) => (
                 <tr key={record.id} className="border-b border-[#C5CEE0] hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-900">
                   <td className="break-words px-4 py-3">{subjectOf(record)}</td>
                   <td className="whitespace-nowrap px-4 py-3">{formatDate(recordDate(record))}</td>
-                  <td className="px-4 py-3">{typeOf(record)}</td>
-                  <td className="px-4 py-3"><button type="button" onClick={() => viewRecord(record)} className="whitespace-nowrap font-medium text-[#0969FF] hover:underline dark:text-blue-400">View Record<span className="sr-only"> for {subjectOf(record)}, {formatDate(recordDate(record))}</span></button></td>
+                  <td className="px-4 py-3"><StatusBadge value={record.status} /></td>
+                  <td className="px-4 py-3"><RecordActions record={record} onView={viewRecord} description={`${subjectOf(record)}, ${formatDate(recordDate(record))}`} /></td>
                 </tr>
               ))}
             </tbody>
@@ -279,8 +276,8 @@ export default function StudentRecords() {
             <p aria-live="polite" className="text-xs text-slate-500">
               {visibleRecords.length ? `Showing ${firstRecord + 1}–${firstRecord + pageRecords.length} of ${visibleRecords.length} records` : "0 records"}
             </p>
-            <nav aria-label="Records pagination" className="flex items-center gap-1.5">
-              <button type="button" onClick={() => setPage(currentPage - 1)} disabled={currentPage === 1} className={paginationClass}>
+            <nav aria-label="Records pagination" className="flex flex-wrap items-center gap-1.5">
+              <button type="button" onClick={() => setPage(Math.max(1, currentPage - 1))} disabled={currentPage === 1} className={paginationClass}>
                 <ChevronLeft aria-hidden="true" className="size-3.5" />Previous
               </button>
               {pageButtons.map((number) => (
@@ -288,15 +285,19 @@ export default function StudentRecords() {
                   {number}
                 </button>
               ))}
-              <button type="button" onClick={() => setPage(currentPage + 1)} disabled={currentPage === totalPages} className={paginationClass}>
+              <button type="button" onClick={() => setPage(Math.min(totalPages, currentPage + 1))} disabled={currentPage === totalPages} className={paginationClass}>
                 Next<ChevronRight aria-hidden="true" className="size-3.5" />
               </button>
             </nav>
           </div>
         )}
+        </div>
+        </RecordsTabs>
       </section>
 
-      <dialog ref={dialogRef} aria-labelledby="record-dialog-title" onClick={(event) => {
+      <dialog ref={dialogRef} aria-labelledby="record-dialog-title" onClose={() => {
+        if (requestedId) setSearchParams((params) => { params.delete("request"); return params; }, { replace: true });
+      }} onClick={(event) => {
         if (event.target !== event.currentTarget) return;
         const bounds = event.currentTarget.getBoundingClientRect();
         if (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom) event.currentTarget.close();
@@ -313,8 +314,8 @@ export default function StudentRecords() {
           }} /> : <>
           <dl className="grid grid-cols-[auto_1fr] gap-x-5 gap-y-3 text-sm">
             <dt className="text-slate-500">Subject</dt><dd className="font-semibold">{subjectOf(selected)}</dd>
-            <dt className="text-slate-500">Status</dt><dd>{typeOf(selected)}</dd>
-            <dt className="text-slate-500">Review status</dt><dd>{reviewStatus(selected.status)}</dd>
+            <dt className="text-slate-500">Request type</dt><dd>{typeOf(selected)}</dd>
+            <dt className="text-slate-500">Status</dt><dd><StatusBadge value={selected.status} /></dd>
             <dt className="text-slate-500">Date submitted</dt><dd>{formatDate(selected.date_submitted || selected.created_at)}</dd>
             {selected.type === "absence" ? <>
               <dt className="text-slate-500">Absence dates</dt><dd>{formatDate(selected.start_date_of_absence)}{selected.end_date_of_absence && selected.end_date_of_absence !== selected.start_date_of_absence ? ` – ${formatDate(selected.end_date_of_absence)}` : ""}</dd>

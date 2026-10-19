@@ -8,16 +8,9 @@ import {
 } from "lucide-react";
 import {
   AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogMedia,
-  AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import LogoutConfirmation from "@/components/navigation/RoleSidebar/LogoutConfirmation";
 import {
   Sidebar as AppSidebar,
   SidebarContent,
@@ -155,31 +148,7 @@ function StudentSidebar({ children }) {
                   </span>
                 </AlertDialogTrigger>
 
-                <AlertDialogContent className="rounded-[8px]">
-                  <AlertDialogHeader>
-                    <AlertDialogMedia className="bg-red-50 text-red-600 dark:bg-red-950/40 dark:text-red-300">
-                      <LogOut className="size-5" strokeWidth={2.25} />
-                    </AlertDialogMedia>
-                    <AlertDialogTitle className="font-black text-slate-950 dark:text-slate-50">
-                      Logout of ALRM?
-                    </AlertDialogTitle>
-                    <AlertDialogDescription>
-                      You will need to sign in again with your LV email account
-                      before accessing your dashboard.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel className="h-9 rounded-[5px] border-slate-300 font-bold text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800">
-                      Cancel
-                    </AlertDialogCancel>
-                    <AlertDialogAction
-                      onClick={handleLogout}
-                      className="h-9 rounded-[5px] bg-red-600 font-bold text-white hover:bg-red-700"
-                    >
-                      Logout
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
+                <LogoutConfirmation onLogout={handleLogout} />
               </AlertDialog>
             </SidebarMenuItem>
           </SidebarMenu>

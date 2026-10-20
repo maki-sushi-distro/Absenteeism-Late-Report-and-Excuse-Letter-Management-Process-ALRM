@@ -14,6 +14,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
+import LoadingSkeleton from "@/components/loading/LoadingSkeleton";
 import { useAuth } from "@/context/AuthContext";
 import {
   ASSOCIATE_YEAR_LEVELS,
@@ -309,7 +310,7 @@ function ProfileSetup() {
 
               <div className="grid min-w-0 gap-2">
                 <Label htmlFor="setup-program">Program</Label>
-                <select
+                {programsLoading ? <LoadingSkeleton variant="field" label="Loading programs..." /> : <select
                   id="setup-program"
                   value={form.programId}
                   onChange={(event) =>
@@ -331,7 +332,7 @@ function ProfileSetup() {
                       {programLabel(program)}
                     </option>
                   ))}
-                </select>
+                </select>}
                 {programsError && (
                   <div className="flex flex-wrap items-center gap-2 text-xs text-red-600">
                     <span>{programsError}</span>

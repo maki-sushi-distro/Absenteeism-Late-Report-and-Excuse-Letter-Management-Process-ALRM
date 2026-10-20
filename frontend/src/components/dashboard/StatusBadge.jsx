@@ -9,7 +9,7 @@ const colors = {
 };
 
 function StatusBadge({ value }) {
-  return <span className={`inline-flex rounded-md border px-2 py-1 text-xs font-semibold capitalize ${colors[value] || "border-slate-300 bg-slate-100 text-slate-700 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"}`}>{value || "—"}</span>;
+  return <span data-slot="status-badge" className={`inline-flex h-8 w-24 shrink-0 items-center justify-center whitespace-nowrap rounded-md border px-1 text-sm font-semibold capitalize ${colors[value] || "border-slate-300 bg-slate-100 text-slate-700 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"}`}>{value || "—"}</span>;
 }
 
 export default StatusBadge;

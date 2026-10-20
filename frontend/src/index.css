@@ -130,6 +130,25 @@
     }
 }
 
+/* Keep one Lucide arrow and enough text clearance on all native dropdowns. */
+select:not([multiple]):not([size]),
+select:not([multiple])[size="1"] {
+  appearance: none;
+  padding-right: 2.5rem;
+  background-image: url("./assets/select-chevron.svg");
+  background-position: right 0.75rem center;
+  background-repeat: no-repeat;
+  background-size: 1rem;
+}
+
+@media (forced-colors: active) {
+  select:not([multiple]):not([size]),
+  select:not([multiple])[size="1"] {
+    appearance: auto;
+    background-image: none;
+  }
+}
+
 @layer utilities {
   :where(.dark .alrm-dashboard-scope) .bg-white {
     background-color: rgb(15 23 42);

@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { getPostLoginPath } from "../api/authSecurity";
 import { exchangeOtpCode, getOtpTokenFromResponse } from "../api/otp";
 import { useAuth } from "../context/AuthContext";
+import LoadingSkeleton from "@/components/loading/LoadingSkeleton";
 
 export function AuthCallback() {
   const [searchParams] = useSearchParams();
@@ -51,8 +52,8 @@ export function AuthCallback() {
   }
 
   return (
-    <div className="grid min-h-screen place-items-center bg-background text-foreground">
-      <p role="status">Restoring your session...</p>
+    <div className="grid min-h-screen place-items-center bg-background px-6 text-foreground">
+      <LoadingSkeleton variant="profile" rows={4} label="Restoring your session..." className="max-w-md" />
     </div>
   );
 }

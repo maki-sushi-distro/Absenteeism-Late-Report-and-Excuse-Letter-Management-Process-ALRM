@@ -29,6 +29,7 @@ import InstructorPageLayout from "./instructor/InstructorPageLayout";
 import ProgramHeadPageLayout from "./programHead/ProgramHeadPageLayout";
 import StudentPageLayout from "./student/StudentPageLayout";
 import StudentSettings from "./student/StudentSettings";
+import LoadingSkeleton from "@/components/loading/LoadingSkeleton";
 
 const ROLE_CONFIG = {
   administrator: {
@@ -489,9 +490,7 @@ function Settings() {
   if (loading) {
     return (
       <SettingsLayout role={user?.role}>
-        <p className="text-sm font-medium text-slate-600">
-          Loading settings...
-        </p>
+        <LoadingSkeleton variant="profile" label="Loading settings..." rows={6} />
       </SettingsLayout>
     );
   }

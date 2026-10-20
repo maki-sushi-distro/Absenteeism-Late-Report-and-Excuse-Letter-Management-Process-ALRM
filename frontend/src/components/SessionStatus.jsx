@@ -1,4 +1,4 @@
-import { Spinner } from '@/components/ui/spinner';
+import LoadingSkeleton from '@/components/loading/LoadingSkeleton';
 import { useAuth } from '@/context/AuthContext';
 import HttpErrorPage from '@/pages/HttpErrorPage';
 
@@ -16,10 +16,8 @@ export default function SessionStatus() {
   }
 
   return (
-    <main className="grid min-h-screen place-items-center bg-background px-5 text-foreground">
-      <p role="status" className="flex items-center gap-2">
-        <Spinner /> Restoring your session...
-      </p>
+    <main className="min-h-screen bg-background px-5 py-10 text-foreground">
+      <LoadingSkeleton label="Restoring your session..." className="mx-auto max-w-6xl" />
     </main>
   );
 }

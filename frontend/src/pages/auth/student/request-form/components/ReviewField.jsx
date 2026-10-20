@@ -1,8 +1,9 @@
 import { Input } from "@/components/ui/input";
 import ErrorText from "./ErrorText";
 import { controlClass } from "../utils";
+import LoadingSkeleton from "@/components/loading/LoadingSkeleton";
 
-export default function ReviewField({ name, label, value, onChange, error, options, multiline, wide, ...props }) {
+export default function ReviewField({ name, label, value, onChange, error, options, multiline, wide, loading, ...props }) {
   const id = `review-${name}`;
   const shared = {
     ...props, id, name, value: value ?? "",
@@ -12,7 +13,7 @@ export default function ReviewField({ name, label, value, onChange, error, optio
   };
   return <div className={`grid min-w-0 content-start gap-2 ${wide ? "sm:col-span-2" : ""}`}>
     <label htmlFor={id} className="text-xs font-medium text-slate-600 dark:text-slate-300">{label}</label>
-    {options ? <select {...shared}>
+    {loading ? <LoadingSkeleton variant="field" label={`Loading ${label.toLowerCase()}...`} /> : options ? <select {...shared}>
       <option value="">Select {label.toLowerCase()}</option>
       {options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
     </select> : multiline ? <textarea {...shared} rows={4} /> : <Input {...shared} />}

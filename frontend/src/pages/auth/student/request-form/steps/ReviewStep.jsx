@@ -2,6 +2,7 @@ import { AlertCircle } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
+import UploadProgress from "@/components/loading/UploadProgress";
 import ErrorText from "../components/ErrorText";
 import HeaderIdentity from "../components/HeaderIdentity";
 import RequestShell from "../components/RequestShell";
@@ -18,6 +19,7 @@ export default function ReviewStep({
   error,
   fieldErrors,
   submitting,
+  uploading,
   updateField,
   onBack,
   reviewEditing,
@@ -38,6 +40,7 @@ export default function ReviewStep({
         </Alert>
       )}
       <RequestSummary form={form} user={user} classes={classes} classesLoading={classesLoading} classesError={classesError} editing={reviewEditing} onStartEdit={onStartEdit} onSaveEdit={onSaveEdit} disabled={submitting || reviewProcessing} processing={reviewProcessing} fieldErrors={fieldErrors} updateField={updateField} toggleListField={toggleListField} onFileChange={onFileChange} />
+      {uploading && <UploadProgress label="Uploading supporting document..." />}
       <SectionBox
         invalid={Boolean(fieldErrors.declaration)}
         title="Student Declaration"
@@ -78,8 +81,8 @@ export default function ReviewStep({
           disabled={submitting || reviewEditing || reviewProcessing}
           className="h-11 rounded-[9px] bg-[#101C4A] px-6 text-sm font-bold text-white hover:bg-[#1B2B6B]"
         >
-          {submitting && <Spinner className="mr-2" />}
-          Submit
+          {submitting && !uploading && <Spinner className="mr-2" />}
+          {uploading ? "Uploading..." : submitting ? "Submitting..." : "Submit"}
         </Button>
       </div>
     </RequestShell>

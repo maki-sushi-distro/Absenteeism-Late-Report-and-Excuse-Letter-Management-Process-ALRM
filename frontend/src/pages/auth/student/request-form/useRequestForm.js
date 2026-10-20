@@ -21,6 +21,7 @@ export default function useRequestForm() {
   const [classesLoading, setClassesLoading] = useState(true);
   const [classesError, setClassesError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [reviewEditing, setReviewEditing] = useState(false);
   const [reviewProcessing, setReviewProcessing] = useState(false);
@@ -195,10 +196,14 @@ export default function useRequestForm() {
 
     if (uploadedRef.current?.file === file) return uploadedRef.current;
 
-    const result = await uploadEvidence(file);
-    uploadedRef.current = { file, path: result.path, type: result.type };
-
-    return uploadedRef.current;
+    setUploading(true);
+    try {
+      const result = await uploadEvidence(file);
+      uploadedRef.current = { file, path: result.path, type: result.type };
+      return uploadedRef.current;
+    } finally {
+      setUploading(false);
+    }
   }
 
   async function handleSubmit(event) {
@@ -266,6 +271,7 @@ export default function useRequestForm() {
     classesLoading,
     classesError,
     submitting,
+    uploading,
     submitted,
     error,
     fieldErrors,

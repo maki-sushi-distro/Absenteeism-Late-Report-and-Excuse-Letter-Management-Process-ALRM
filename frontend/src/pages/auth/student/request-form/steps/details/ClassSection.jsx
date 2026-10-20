@@ -1,6 +1,7 @@
 import ErrorText from "../../components/ErrorText";
 import SectionBox from "../../components/SectionBox";
 import { classLabel, controlClass } from "../../utils";
+import LoadingSkeleton from "@/components/loading/LoadingSkeleton";
 
 export default function ClassSection({
   form,
@@ -23,7 +24,7 @@ export default function ClassSection({
           Subject/Class*
         </p>
       )}
-      <select
+      {classesLoading ? <LoadingSkeleton variant="field" label="Loading classes..." /> : <select
         value={form.classId}
         onChange={(event) => updateField("classId", event.target.value)}
         disabled={classesLoading}
@@ -41,7 +42,7 @@ export default function ClassSection({
             {classLabel(item)}
           </option>
         ))}
-      </select>
+      </select>}
       {classesError && (
         <p className="text-xs font-semibold text-red-600">{classesError}</p>
       )}

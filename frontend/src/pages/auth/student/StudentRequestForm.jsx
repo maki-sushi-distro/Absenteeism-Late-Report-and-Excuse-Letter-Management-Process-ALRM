@@ -38,7 +38,7 @@ function StudentRequestForm() {
   return (
     <StudentPageLayout>
       <RequestPageCanvas>
-        <form className="grid gap-4" onSubmit={f.handleSubmit}>
+        <form className="grid gap-4" aria-busy={f.submitting} onSubmit={f.handleSubmit}>
           {step === 0 && <RequestTypeStep {...common} />}
           {step === 1 && <InstructionsStep {...common} />}
           {step === 2 && (
@@ -76,6 +76,7 @@ function StudentRequestForm() {
               onFileChange={f.selectReviewFile}
               toggleListField={f.toggleListField}
               submitting={f.submitting}
+              uploading={f.uploading}
             />
           )}
         </form>

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { ChevronDown, ChevronLeft, ChevronRight, Search, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Search, X } from "lucide-react";
 import { apiFetch } from "@/api/client";
 import { getStudentRequest, openEvidence, updateStudentRequest } from "@/api/studentRequests";
 import { useAuth } from "@/context/AuthContext";
@@ -12,6 +12,7 @@ import { paginateRecords } from "./records/pagination";
 import { filterRecords, reasonOf, recordDate, subjectOf, typeOf } from "./records/recordData";
 import RecordsTabs from "./records/RecordsTabs";
 import RecordActions from "./records/RecordActions";
+import LoadingSkeleton from "@/components/loading/LoadingSkeleton";
 
 // Keep My Records data handling, filters, and UI together in this student page.
 async function fetchRecords(signal) {
@@ -93,7 +94,7 @@ function RequestEditForm({ record, onSaved, onCancel }) {
   return (
     <form onSubmit={save} className="grid gap-4">
       {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
-      {loading ? <p role="status" className="text-sm text-slate-500">{error ? "Edit form could not be loaded." : "Loading request details..."}</p> : <>
+      {loading ? error ? <p className="text-sm text-slate-500">Edit form could not be loaded.</p> : <LoadingSkeleton variant="form" rows={4} label="Loading request details..." /> : <>
         <label className="grid gap-2 text-sm font-semibold">{form.type === "absence" ? "Reason of absence" : "Reason"}
           <textarea required maxLength={500} value={form.reason} onChange={(event) => change("reason", event.target.value)} aria-invalid={Boolean(errors.reason)} rows={3} className={control} />
           {fieldError("reason") && <span role="alert" className="font-normal text-red-600">{fieldError("reason")}</span>}
@@ -220,8 +221,8 @@ export default function StudentRecords() {
     }
   }
 
-  const inputClass = "h-8 rounded-[5px] border border-[#9FAFCE] bg-white text-xs text-slate-900 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100";
-  const paginationClass = "inline-flex h-8 min-w-8 items-center justify-center gap-1 rounded-md border border-[#CBD4E6] px-2 text-xs font-medium text-[#173D83] hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700 dark:text-blue-300 dark:hover:bg-slate-800";
+  const inputClass = "h-10 rounded-[5px] border border-[#9FAFCE] bg-white text-sm text-slate-900 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100";
+  const paginationClass = "inline-flex h-9 min-w-9 items-center justify-center gap-1 rounded-md border border-[#CBD4E6] px-3 text-sm font-medium text-[#173D83] hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700 dark:text-blue-300 dark:hover:bg-slate-800";
 
   return (
     <StudentPageLayout contentPadding="px-5 sm:px-[50px]">
@@ -231,7 +232,7 @@ export default function StudentRecords() {
         <div className="grid min-w-0 gap-2">
         <div className="flex flex-wrap items-center gap-3">
           <div className="relative w-[220px] max-w-full">
-            <Search aria-hidden="true" className="pointer-events-none absolute left-2.5 top-2 size-4 text-slate-400" />
+            <Search aria-hidden="true" className="pointer-events-none absolute left-2.5 top-3 size-4 text-slate-400" />
             <input aria-label="Search records" placeholder="Search Name..." value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} className={`${inputClass} w-full pl-8 pr-3`} />
           </div>
           <div className="relative w-[190px] max-w-full">
@@ -239,13 +240,13 @@ export default function StudentRecords() {
               <option value="">All subjects</option>
               {subjects.map((name) => <option key={name} value={name}>{name}</option>)}
             </select>
-            <ChevronDown aria-hidden="true" className="pointer-events-none absolute right-2.5 top-2 size-4 text-slate-700 dark:text-slate-300" />
           </div>
         </div>
         {error && <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300">{error} <button type="button" onClick={refresh} className="ml-2 font-semibold underline">Try again</button></div>}
         <div aria-busy={loading} className="overflow-x-auto">
-          <table className="w-full min-w-[540px] table-fixed border-collapse text-left text-xs">
-            <thead className="text-xs font-bold text-[#101C4A] dark:text-blue-200">
+          <table className="w-full min-w-[820px] table-auto border-collapse text-left text-sm leading-5">
+            <colgroup><col /><col className="w-[20%]" /><col className="w-[18%]" /><col className="w-[228px]" /></colgroup>
+            <thead className="text-sm font-bold text-[#101C4A] dark:text-blue-200">
               <tr className="border-b border-[#AEBBD5] dark:border-slate-700">
                 <th scope="col" className="px-4 py-3">Subject</th>
                 <th scope="col" className="px-4 py-3">Date</th>
@@ -255,17 +256,17 @@ export default function StudentRecords() {
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={4} className="px-4 py-10 text-center text-slate-500"><span role="status">Loading your records...</span></td></tr>
+                <tr><td colSpan={4} className="px-4 py-3"><LoadingSkeleton variant="table" columns={4} rows={10} label="Loading your records..." /></td></tr>
               ) : error ? (
                 <tr><td colSpan={4} className="px-4 py-10 text-center text-slate-500">Records could not be loaded.</td></tr>
               ) : visibleRecords.length === 0 ? (
                 <tr><td colSpan={4} className="px-4 py-10 text-center text-slate-500">{typeRecords.length ? "No records match your search or subject filter." : `You have no submitted ${recordType === "absence" ? "absence" : "late"} requests yet.`}</td></tr>
               ) : pageRecords.map((record) => (
                 <tr key={record.id} className="border-b border-[#C5CEE0] hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-900">
-                  <td className="break-words px-4 py-3">{subjectOf(record)}</td>
-                  <td className="whitespace-nowrap px-4 py-3">{formatDate(recordDate(record))}</td>
-                  <td className="px-4 py-3"><StatusBadge value={record.status} /></td>
-                  <td className="px-4 py-3"><RecordActions record={record} onView={viewRecord} description={`${subjectOf(record)}, ${formatDate(recordDate(record))}`} /></td>
+                  <td className="break-words px-4 py-4">{subjectOf(record)}</td>
+                  <td className="whitespace-nowrap px-4 py-4">{formatDate(recordDate(record))}</td>
+                  <td className="px-4 py-4"><StatusBadge value={record.status} /></td>
+                  <td className="px-4 py-4 text-right"><RecordActions record={record} onView={viewRecord} description={`${subjectOf(record)}, ${formatDate(recordDate(record))}`} /></td>
                 </tr>
               ))}
             </tbody>
@@ -273,7 +274,7 @@ export default function StudentRecords() {
         </div>
         {!loading && !error && (
           <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-            <p aria-live="polite" className="text-xs text-slate-500">
+            <p aria-live="polite" className="text-sm text-slate-500">
               {visibleRecords.length ? `Showing ${firstRecord + 1}–${firstRecord + pageRecords.length} of ${visibleRecords.length} records` : "0 records"}
             </p>
             <nav aria-label="Records pagination" className="flex flex-wrap items-center gap-1.5">

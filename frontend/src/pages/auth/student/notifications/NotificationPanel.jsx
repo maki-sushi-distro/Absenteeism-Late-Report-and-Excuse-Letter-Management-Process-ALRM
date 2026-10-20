@@ -2,6 +2,7 @@ import { RefreshCw } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { Link } from "react-router-dom";
 import StatusBadge from "@/components/dashboard/StatusBadge";
+import LoadingSkeleton from "@/components/loading/LoadingSkeleton";
 
 export default function NotificationPanel({ activity = [], loading, error, onRefresh, onClose, readIds, onRead, showFooter = true, emptyMessage = "No recent request updates." }) {
   return <div className="grid min-w-0 gap-3">
@@ -11,7 +12,7 @@ export default function NotificationPanel({ activity = [], loading, error, onRef
         <RefreshCw aria-hidden="true" className={`size-4 ${loading ? "animate-spin" : ""}`} />
       </button>
     </div>
-    {loading ? <p role="status" className="py-6 text-center text-sm text-slate-500 dark:text-slate-400">Loading notifications...</p>
+    {loading ? <LoadingSkeleton variant="list" rows={showFooter ? 3 : 6} label="Loading notifications..." />
       : error ? <div role="alert" className="rounded-md bg-red-50 p-3 text-sm text-red-700 dark:bg-red-950 dark:text-red-200">
         <p>{error}</p><button type="button" onClick={onRefresh} className="mt-2 font-semibold underline">Try again</button>
       </div>

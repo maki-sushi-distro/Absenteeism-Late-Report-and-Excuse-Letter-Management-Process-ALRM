@@ -19,9 +19,9 @@ export default function StudentSettings({ user }) {
 
   return <div className="mx-auto max-w-6xl">
     <h1 className="text-xl font-bold">Settings</h1>
-    <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">Manage your student profile information, notification preferences, and account security.</p>
+    <p className="mt-1 text-sm leading-relaxed text-slate-600 dark:text-slate-400">Manage your student profile information, notification preferences, and account security.</p>
     <StudentProfileSection user={user} classes={state.classes} loading={state.loading} />
-    {state.error && <div role="alert" className="mb-5 flex flex-wrap items-center gap-2 text-sm text-red-600 dark:text-red-400">{state.error}<button type="button" onClick={() => setRetry((value) => value + 1)} className="font-medium underline">Try again</button></div>}
+    {state.error && <div role="alert" className="mb-5 flex flex-wrap items-center gap-2 text-sm text-red-600 dark:text-red-400">{state.error}<button type="button" onClick={() => { setState((current) => ({ ...current, loading: true, error: "" })); setRetry((value) => value + 1); }} className="font-medium underline">Try again</button></div>}
     <StudentNotificationPreferences key={user?.id} userId={user?.id} />
   </div>;
 }

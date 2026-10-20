@@ -9,6 +9,7 @@ import SectionBox from "../components/SectionBox";
 import { EVIDENCE, proofOptions } from "../constants";
 import { compressImage } from "../imageCompress";
 import { validateEvidenceFile } from "../evidenceValidation";
+import UploadProgress from "@/components/loading/UploadProgress";
 
 function FileThumbnail({ file }) {
   const imageRef = useRef(null);
@@ -194,10 +195,10 @@ export default function AttachmentStep({
           onDrop={handleDrop}
           className={`flex min-h-48 flex-col items-center justify-center gap-4 rounded-xl border border-dashed px-4 py-7 text-center transition-colors ${dragging ? "border-blue-600 bg-blue-50" : "border-[#B8C8E5] bg-[#F7F9FE]"}`}
         >
-          <CloudUpload aria-hidden="true" className="size-12 text-[#66799E]" strokeWidth={1.7} />
-          <p role="status" className="text-base font-medium text-[#0B1229]">
-            {processing ? "Checking your file..." : dragging ? "Drop your file here" : "Drag and drop your file here"}
-          </p>
+          {processing ? <UploadProgress label="Checking your file..." className="flex-col" /> : <CloudUpload aria-hidden="true" className="size-12 text-[#66799E]" strokeWidth={1.7} />}
+          {!processing && <p role="status" className="text-base font-medium text-[#0B1229]">
+            {dragging ? "Drop your file here" : "Drag and drop your file here"}
+          </p>}
           <button
             type="button"
             onClick={() => inputRef.current?.click()}

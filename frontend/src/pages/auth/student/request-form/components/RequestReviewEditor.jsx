@@ -18,7 +18,7 @@ export default function RequestReviewEditor({ form, user, classes, classesLoadin
     { name: "guardianName", label: "Parent/Guardian's name", maxLength: LIMITS.guardianName },
     { name: "contactNumber", label: "Contact number", type: "tel", onChange: (value) => updateField("contactNumber", normalizePhoneInput(value)) },
     { name: "dateSubmitted", label: "Date submitted", type: "date" },
-    { name: "classId", label: "Subject/Class", options: classes.map((item) => ({ value: item.class_id, label: classLabel(item) })), disabled: classesLoading, error: fieldErrors.classId || classesError },
+    { name: "classId", label: "Subject/Class", options: classes.map((item) => ({ value: item.class_id, label: classLabel(item) })), loading: classesLoading, disabled: classesLoading, error: fieldErrors.classId || classesError },
     ...(isAbsence ? [
       { name: "startDateOfAbsence", label: "Start date of absence", type: "date" },
       { name: "endDateOfAbsence", label: "End date of absence", type: "date", min: form.startDateOfAbsence || undefined },

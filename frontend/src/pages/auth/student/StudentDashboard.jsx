@@ -3,7 +3,7 @@ import { useLocation } from "react-router-dom";
 import { getStudentAttendanceSummary, getStudentClasses, getStudentRequests } from "@/api/student";
 import { useAuth } from "@/context/AuthContext";
 import { ErrorState } from "@/components/common/ErrorState";
-import { Spinner } from "@/components/ui/spinner";
+import LoadingSkeleton from "@/components/loading/LoadingSkeleton";
 import StudentDashboardMetrics from "./StudentDashboardMetrics";
 import StudentPageLayout from "./StudentPageLayout";
 import StudentDashboardHeading from "./dashboard/StudentDashboardHeading";
@@ -50,8 +50,8 @@ function StudentDashboard() {
 
   return <StudentPageLayout contentPadding="px-[50px]">
     <div className="@container grid w-full gap-0 font-[Arial,sans-serif] text-black dark:text-slate-100">
-      <StudentDashboardHeading user={user} classes={data.classes} />
-      {loading ? <div className="flex items-center gap-2 text-sm"><Spinner />Loading student records</div> : null}
+      {!loading && <StudentDashboardHeading user={user} classes={data.classes} />}
+      {loading ? <LoadingSkeleton variant="dashboard" columns={3} label="Loading student dashboard..." className="mt-6" /> : null}
       {error ? <ErrorState message={error} /> : null}
       {!loading && !error ? <>
         <StudentDashboardMetrics {...data} alertsEnabled={preferences.thresholdAlerts} />

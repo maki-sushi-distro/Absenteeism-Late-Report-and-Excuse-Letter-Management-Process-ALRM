@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { AlertCircle, ChevronDown, Search, UserRound } from "lucide-react";
+import { AlertCircle, Search, UserRound } from "lucide-react";
 import { getAdminPrograms } from "@/api/adminUsers";
 import { getAdminStudents } from "@/api/adminStudents";
+import LoadingSkeleton from "@/components/loading/LoadingSkeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -13,7 +14,6 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 import { Input } from "@/components/ui/input";
-import { Spinner } from "@/components/ui/spinner";
 import {
   Table,
   TableBody,
@@ -93,7 +93,6 @@ function SelectFilter({ label, value, onChange, children }) {
       >
         {children}
       </select>
-      <ChevronDown className="pointer-events-none absolute right-4 top-1/2 size-4 -translate-y-1/2 text-slate-900" />
     </div>
   );
 }
@@ -112,20 +111,22 @@ function StudentFilters({ filters, loadingPrograms, onChange, programs }) {
         />
       </div>
 
-      <SelectFilter
-        label="Filter course"
-        value={filters.programId}
-        onChange={(event) => onChange("programId", event.target.value)}
-      >
-        <option value="">
-          {loadingPrograms ? "Loading Courses..." : "Filter Course"}
-        </option>
-        {programs.map((program, index) => (
-          <option key={programRecordId(program) || index} value={programRecordId(program)}>
-            {programLabel(program)}
-          </option>
-        ))}
-      </SelectFilter>
+      {loadingPrograms ? (
+        <LoadingSkeleton variant="field" label="Loading courses" className="h-10" />
+      ) : (
+        <SelectFilter
+          label="Filter course"
+          value={filters.programId}
+          onChange={(event) => onChange("programId", event.target.value)}
+        >
+          <option value="">Filter Course</option>
+          {programs.map((program, index) => (
+            <option key={programRecordId(program) || index} value={programRecordId(program)}>
+              {programLabel(program)}
+            </option>
+          ))}
+        </SelectFilter>
+      )}
 
       <SelectFilter
         label="Filter year"
@@ -146,12 +147,7 @@ function StudentFilters({ filters, loadingPrograms, onChange, programs }) {
 function StudentsTable({ loading, onOpenStudent, students }) {
   if (loading) {
     return (
-      <div className="flex min-h-[260px] items-center justify-center rounded-[5px] border border-slate-200">
-        <Spinner className="mr-2" />
-        <span className="text-sm font-medium text-slate-600">
-          Loading students...
-        </span>
-      </div>
+      <LoadingSkeleton variant="table" columns={4} label="Loading students" />
     );
   }
 

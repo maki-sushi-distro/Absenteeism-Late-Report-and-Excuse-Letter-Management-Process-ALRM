@@ -8,6 +8,7 @@ import {
   UserCircle,
 } from "lucide-react";
 import { getAdminStudent } from "@/api/adminStudents";
+import LoadingSkeleton from "@/components/loading/LoadingSkeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -20,7 +21,6 @@ import {
 } from "@/components/ui/empty";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
-import { Spinner } from "@/components/ui/spinner";
 import {
   Table,
   TableBody,
@@ -403,7 +403,6 @@ function RequestFilters({ search, status, onSearchChange, onStatusChange }) {
             </option>
           ))}
         </select>
-        <ChevronDown className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-[#203b82]" />
       </div>
     </div>
   );
@@ -564,12 +563,7 @@ function StudentProfile() {
         </div>
 
         {loading && (
-          <div className="flex min-h-[320px] items-center justify-center rounded-[5px] border border-slate-200">
-            <Spinner className="mr-2" />
-            <span className="text-sm font-medium text-slate-600">
-              Loading student profile...
-            </span>
-          </div>
+          <LoadingSkeleton variant="profile" label="Loading student profile" />
         )}
 
         {!loading && error && (

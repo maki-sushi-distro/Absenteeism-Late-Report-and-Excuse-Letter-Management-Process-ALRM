@@ -14,10 +14,10 @@ import {
 import { EmptyState } from "@/components/common/EmptyState";
 import { ErrorState } from "@/components/common/ErrorState";
 import { StatusBadge } from "@/components/common/StatusBadge";
+import LoadingSkeleton from "@/components/loading/LoadingSkeleton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Spinner } from "@/components/ui/spinner";
 
 const emptyProgramForm = { program_name: "", program_head_id: "" };
 const emptyClassForm = { subject_name: "", section: "", instructor_id: "", schedule: "", program_id: "", semester: "1st", school_year: "" };
@@ -148,10 +148,11 @@ export function AdminDashboard({ view = "dashboard" }) {
 
   if (loading) {
     return (
-      <div className="flex min-h-80 items-center justify-center gap-3 text-sm text-slate-600">
-        <Spinner />
-        Loading administrator dashboard
-      </div>
+      <LoadingSkeleton
+        variant={view === "dashboard" ? "dashboard" : view === "users" ? "table" : view === "reports" ? "form" : "list"}
+        columns={view === "dashboard" ? 4 : 5}
+        label="Loading administrator data"
+      />
     );
   }
 

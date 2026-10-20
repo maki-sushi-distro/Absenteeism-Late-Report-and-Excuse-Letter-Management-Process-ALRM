@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { AlertCircle, CheckCircle2, ChevronDown, IdCard, Mail, User } from "lucide-react";
+import { AlertCircle, CheckCircle2, IdCard, Mail, User } from "lucide-react";
+import LoadingSkeleton from "@/components/loading/LoadingSkeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -68,11 +69,13 @@ function TextField({
   );
 }
 
-function SelectField({ error, label, name, onChange, value, children }) {
+function SelectField({ error, label, loading = false, name, onChange, value, children }) {
   return (
     <Field data-invalid={Boolean(error)}>
       <FieldLabel htmlFor={name}>{label}</FieldLabel>
-      <div className="relative">
+      {loading ? (
+        <LoadingSkeleton variant="field" label={`Loading ${label}`} className="h-11" />
+      ) : <div className="relative">
         <select
           id={name}
           name={name}
@@ -83,8 +86,7 @@ function SelectField({ error, label, name, onChange, value, children }) {
         >
           {children}
         </select>
-        <ChevronDown className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-slate-500" />
-      </div>
+      </div>}
       <FieldError>{error}</FieldError>
     </Field>
   );
@@ -235,15 +237,12 @@ function AdminUserForm({
                         key={field.name}
                         name={field.name}
                         label={field.label}
+                        loading={loadingPrograms}
                         value={values[field.name]}
                         onChange={handleChange}
                         error={errors[field.name]}
                       >
-                        <option value="">
-                          {loadingPrograms
-                            ? "Loading programs..."
-                            : "Select program"}
-                        </option>
+                        <option value="">Select program</option>
                         {programOptions.map((option) => (
                           <option key={option.value} value={option.value}>
                             {option.label}

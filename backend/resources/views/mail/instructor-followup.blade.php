@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="fil">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -27,7 +27,7 @@
                         <p style="margin:0 0 12px; font-size:12px; letter-spacing:1.5px; text-transform:uppercase; color:#164a86; font-weight:bold;">Follow-up Reminder</p>
                         <h1 style="margin:0 0 8px; font-size:20px; color:#0b2a52;">Hello {{ $instructor->name }},</h1>
                         <p style="margin:0 0 24px; font-size:15px; line-height:1.6; color:#4a5568;">
-                            Nag-follow up si <strong>{{ $student->name }}</strong> sa kanyang <strong>{{ $excuseRequest->type === 'late' ? 'late' : 'absence' }}</strong> excuse request para sa <strong>{{ $class->subject_name }}</strong> na wala pang aksyon. Ito na ang follow-up #{{ $followupCount }}.
+                            <strong>{{ $student->name }}</strong> followed up on their <strong>{{ $excuseRequest->type === 'late' ? 'late' : 'absence' }}</strong> excuse request for <strong>{{ $class->subject_name }}</strong>, which has not yet been acted on. This is follow-up #{{ $followupCount }}.
                         </p>
                     </td>
                 </tr>

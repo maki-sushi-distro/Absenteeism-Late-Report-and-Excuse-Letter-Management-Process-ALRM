@@ -4,7 +4,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Artisan;
 use App\Http\Controllers\Auth\ProfileController;
-use App\Http\Controllers\ProgramHead\FollowupFlagController;
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\Student\ClassController;
@@ -12,8 +11,10 @@ use App\Http\Controllers\Student\RequestController;
 use App\Http\Controllers\Student\EvidenceController;   
 use App\Http\Controllers\Student\AttendanceController;
 use App\Http\Controllers\Student\StudentDashboardController;
+use App\Http\Controllers\Student\FollowUpController;
 use App\Http\Controllers\Instructor\InstructorRequestController;
 use App\Http\Controllers\Instructor\InstructorDashboardController;
+use App\Http\Controllers\Instructor\FollowupController as InstructorFollowupController;
 use App\Http\Controllers\ProgramHead\ProgramHeadDashboardController;
 use App\Http\Controllers\Admin\AdminDashboardController;
 use App\Http\Controllers\Admin\UserApprovalController;
@@ -81,6 +82,8 @@ Route::middleware(['auth:sanctum', 'active', 'inactive'])->group(function () {
         Route::get('/requests/{request}', [RequestController::class, 'show']);
         Route::patch('/requests/{request}', [RequestController::class, 'update']);
         Route::delete('/requests/{request}', [RequestController::class, 'destroy']);
+        Route::post('/requests/{request}/follow-up', [FollowUpController::class, 'store'])
+            ->middleware('throttle:5,1');
 
         Route::get('/attendance/summary', [AttendanceController::class, 'summary']);
     });
@@ -94,6 +97,10 @@ Route::middleware(['auth:sanctum', 'active', 'inactive'])->group(function () {
         Route::get('/requests', [InstructorRequestController::class, 'index']);
         Route::patch('/requests/{request}/decision', [InstructorRequestController::class, 'decide']);
         Route::get('/dashboard', [InstructorDashboardController::class, 'index']);
+
+        // Follow-ups galing sa students
+        Route::get('/followups', [InstructorFollowupController::class, 'index']);
+        Route::patch('/followups/{followupFlag}/resolve', [InstructorFollowupController::class, 'resolve']);
     });
 
     /*
@@ -105,9 +112,6 @@ Route::middleware(['auth:sanctum', 'active', 'inactive'])->group(function () {
         Route::get('/dashboard', [ProgramHeadDashboardController::class, 'index']);
         Route::get('/students/flagged', [ProgramHeadDashboardController::class, 'flaggedStudents']);
         Route::get('/requests', [ProgramHeadDashboardController::class, 'requests']);
-
-        Route::get('/followup-flags', [FollowupFlagController::class, 'index']);
-        Route::patch('/followup-flags/{followupFlag}/resolve', [FollowupFlagController::class, 'resolve']);
     });
 
     /*

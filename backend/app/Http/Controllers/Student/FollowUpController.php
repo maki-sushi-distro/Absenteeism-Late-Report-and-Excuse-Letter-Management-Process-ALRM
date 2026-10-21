@@ -19,11 +19,13 @@ class FollowUpController extends Controller
     public function __construct(protected AuditLoggerService $auditLogger) {}
 
     /**
+     * Student follow-up sa instructor para sa pending request.
+     *
      * POST /api/requests/{request}/follow-up
      */
     public function store(ExcuseRequest $request): JsonResponse
     {
-        $request->load('enrollment.student', 'enrollment.class.instructor');
+        $request->load('enrollment.student', 'enrollment.class.instructor', 'enrollment.class.program');
 
         $enrollment = $request->enrollment;
         $class      = $enrollment->class;
@@ -41,7 +43,9 @@ class FollowUpController extends Controller
             return $this->fail('No instructor found for this class.', 422);
         }
 
-        $last = FollowupFlag::where('request_id', $request->id)->latest('flagged_date')->first();
+        $last = FollowupFlag::where('request_id', $request->id)
+            ->latest('flagged_date')
+            ->first();
 
         if ($last && $last->flagged_date->gt(now()->subHours(self::COOLDOWN_HOURS))) {
             return $this->fail(
@@ -62,10 +66,40 @@ class FollowUpController extends Controller
 
         $count = FollowupFlag::where('request_id', $request->id)->count();
 
+        $this->sendEmail($instructor, $enrollment->student, $class, $request, $flag, $count);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Follow-up sent to your instructor.',
+            'data'    => $flag,
+        ], 201);
+    }
+
+    private function sendEmail($instructor, $student, $class, ExcuseRequest $request, FollowupFlag $flag, int $count): void
+    {
+        $testRecipient = config('mail.instructor_test_recipient');
+        $allowlist     = config('mail.instructor_notify_allowlist', []);
+
+        if ($testRecipient) {
+            $recipient = $testRecipient;
+        } elseif (! empty($allowlist) && ! in_array($instructor->email, $allowlist, true)) {
+            $recipient = null;
+        } else {
+            $recipient = $instructor->email;
+        }
+
+        if (! $recipient) {
+            Log::info('Follow-up email skipped (instructor not in allowlist)', [
+                'flag_id'    => $flag->id,
+                'instructor' => $instructor->email,
+            ]);
+            return;
+        }
+
         try {
-            Mail::to($instructor->email)->send(new InstructorFollowUpMail(
+            Mail::to($recipient)->send(new InstructorFollowUpMail(
                 instructor: $instructor,
-                student: $enrollment->student,
+                student: $student,
                 class: $class,
                 excuseRequest: $request,
                 reviewUrl: rtrim(config('app.frontend_url'), '/') . '/instructor/requests',
@@ -74,12 +108,6 @@ class FollowUpController extends Controller
         } catch (\Throwable $e) {
             Log::error('Follow-up email failed: ' . $e->getMessage());
         }
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Follow-up sent to your instructor.',
-            'data'    => $flag,
-        ], 201);
     }
 
     private function fail(string $message, int $code): JsonResponse

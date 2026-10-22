@@ -10,8 +10,6 @@
     <tr>
         <td align="center">
             <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px; width:100%; background-color:#ffffff; border-radius:12px; overflow:hidden; box-shadow:0 4px 18px rgba(15,32,67,0.08);">
-
-                {{-- Header --}}
                 <tr>
                     <td align="center" style="background-color:#0b2a52; background-image:linear-gradient(135deg,#0b2a52,#164a86); padding:32px 24px;">
                         <img src="{{ asset('images/mail/lv-logo.png') }}" alt="La Verdad Christian College" width="72" height="72" style="display:block; border:0; outline:none; text-decoration:none; border-radius:50%; background:#ffffff; padding:6px;">
@@ -20,8 +18,6 @@
                         </p>
                     </td>
                 </tr>
-
-                {{-- Update message --}}
                 <tr>
                     <td style="padding:36px 24px 8px;">
                         <p style="margin:0 0 12px; font-size:12px; letter-spacing:1.5px; text-transform:uppercase; color:#164a86; font-weight:bold;">Request Update</p>
@@ -39,8 +35,6 @@
                     </td>
                 </tr>
                 <tr><td style="padding:0 24px;"><hr style="border:none; border-top:1px solid #e6e9f0; margin:0 0 24px;"></td></tr>
-
-                {{-- Signature block --}}
                 <tr>
                     <td style="padding:0 40px 32px; font-family:'Times New Roman', Times, serif;">
                         <p style="margin:0 0 4px; font-style:italic; font-size:13px; color:#1f3864;">"Wisdom Based on the Truth is Priceless."</p>

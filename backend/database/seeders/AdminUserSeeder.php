@@ -112,7 +112,9 @@ class AdminUserSeeder extends Seeder
 
     public function run(): void
     {
-        $allProgramIds = Program::query()->pluck('id')->all();
+        $allProgramIds = Program::query()
+            ->where('program_name', '!=', 'General Education')
+            ->pluck('id')->all();
 
         $manualUsers = [
             new SeedUser(
@@ -373,13 +375,16 @@ class AdminUserSeeder extends Seeder
         }
 
         $hasLoggedInWithGoogle = ! $isNew && $model->google_id !== null;
+        $homeProgramId = in_array($user->email, DevInstructorClassSeeder::DEV_INSTRUCTOR_EMAILS, true)
+            ? Program::query()->where('program_name', DevInstructorClassSeeder::DEV_HOME_PROGRAM_NAME)->firstOrFail()->id
+            : ($user->programIds[0] ?? null);
 
         $model->forceFill([
             'name' => $hasLoggedInWithGoogle ? $model->name : $user->name,
             'role' => $user->role->value,
             'status' => self::APPROVED_STATUS,
             'deactivated_at' => null,
-            'program_id' => $user->programIds[0] ?? null,
+            'program_id' => $homeProgramId,
         ]);
 
         $model->save();

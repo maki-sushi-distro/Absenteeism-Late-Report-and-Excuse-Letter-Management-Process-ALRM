@@ -75,6 +75,14 @@ class RequestController extends Controller
             ], 403);
         }
 
+        if (! $enrollment->class->instructor()->exists()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'This class has no assigned instructor. Please select another class or contact an administrator.',
+                'data' => null,
+            ], 422);
+        }
+
         $excuseRequest = DB::transaction(function () use ($httpRequest, $validated, $enrollment) {
             User::whereKey($httpRequest->user()->id)->lockForUpdate()->firstOrFail();
             $duplicate = ExcuseRequest::where('enrollment_id', $enrollment->id)

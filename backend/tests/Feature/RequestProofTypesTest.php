@@ -10,9 +10,10 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 use Mockery;
-use Tests\TestCase;
+use Mockery\MockInterface;
+use Tests\SecurityTestCase;
 
-class RequestProofTypesTest extends TestCase
+class RequestProofTypesTest extends SecurityTestCase
 {
     public function test_migration_preserves_existing_requests_and_rolls_back(): void
     {
@@ -43,18 +44,10 @@ class RequestProofTypesTest extends TestCase
             'proof_types' => ['Medical Certificate', 'Letter from Parent/Guardian'],
             'evidence_type' => 'image/jpeg',
         ];
-        /** @var ExcuseRequest&\Mockery\MockInterface $model */
-        $model = Mockery::mock(ExcuseRequest::class)->makePartial();
-        $model->status = 'pending';
-        $saved = new ExcuseRequest();
-        $model->shouldReceive('update')->once()->with($payload)->andReturnUsing(function (array $values) use ($saved) {
-            $saved->fill($values);
-            return true;
-        });
-        $model->shouldReceive('fresh')->once()->andReturn($saved);
-
-        $response = $this->controller()->update(Request::create('/', 'PATCH', $payload), $model);
-        $data = $response->getData(true)['data'];
+        $owner = $this->user();
+        $model = $this->requestFor($owner);
+        $response = $this->bearer($owner)->patchJson('/api/requests/'.$model->id, $payload)->assertOk();
+        $data = $response->json('data');
 
         $this->assertSame($payload['proof_types'], $data['proof_types']);
         $this->assertSame('image/jpeg', $data['evidence_type']);
@@ -64,7 +57,7 @@ class RequestProofTypesTest extends TestCase
     public function test_update_rejects_unknown_duplicate_and_non_array_proof_types(): void
     {
         foreach ([['image/jpeg'], ['Others', 'Others'], 'Medical Certificate', ['unknown'], ['invalid_key' => 'Others']] as $proofTypes) {
-            /** @var ExcuseRequest&\Mockery\MockInterface $model */
+            /** @var ExcuseRequest&MockInterface $model */
             $model = Mockery::mock(ExcuseRequest::class)->makePartial();
             $model->status = 'pending';
             $model->shouldNotReceive('update');
@@ -82,24 +75,17 @@ class RequestProofTypesTest extends TestCase
     {
         foreach ([[], ['proof_types' => []], ['proof_types' => null]] as $extra) {
             $payload = $this->payload() + $extra;
-            /** @var ExcuseRequest&\Mockery\MockInterface $model */
-            $model = Mockery::mock(ExcuseRequest::class)->makePartial();
-            $model->status = 'pending';
-            $saved = new ExcuseRequest(['proof_types' => ['Medical Certificate']]);
-            $model->shouldReceive('update')->once()->with($payload)->andReturnUsing(function (array $values) use ($saved) {
-                $saved->fill($values);
-                return true;
-            });
-            $model->shouldReceive('fresh')->once()->andReturn($saved);
-
-            $response = $this->controller()->update(Request::create('/', 'PATCH', $payload), $model);
-            $this->assertSame(array_key_exists('proof_types', $extra) ? $extra['proof_types'] : ['Medical Certificate'], $response->getData(true)['data']['proof_types']);
+            $owner = $this->user();
+            $model = $this->requestFor($owner);
+            $model->update(['proof_types' => ['Medical Certificate']]);
+            $response = $this->bearer($owner)->patchJson('/api/requests/'.$model->id, $payload)->assertOk();
+            $this->assertSame(array_key_exists('proof_types', $extra) ? $extra['proof_types'] : ['Medical Certificate'], $response->json('data.proof_types'));
         }
     }
 
     private function controller(): RequestController
     {
-        /** @var RequestController&\Mockery\MockInterface $controller */
+        /** @var RequestController&MockInterface $controller */
         $controller = Mockery::mock(RequestController::class)->makePartial();
         $controller->shouldReceive('authorize')->once()->with('update', Mockery::type(ExcuseRequest::class))->andReturnNull();
 

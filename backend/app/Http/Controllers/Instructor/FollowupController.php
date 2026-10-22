@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Instructor;
 use App\Http\Controllers\Controller;
 use App\Models\FollowupFlag;
 use App\Services\AuditLoggerService;
+use App\Support\BoundedCollection;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
 
@@ -18,10 +19,9 @@ class FollowupController extends Controller
         $flags = FollowupFlag::with('request.enrollment.student', 'request.enrollment.class')
             ->where('escalated_to', Auth::id())
             ->where('status', 'open')
-            ->latest('flagged_date')
-            ->get();
+            ->latest('flagged_date');
 
-        return response()->json(['success' => true, 'message' => null, 'data' => $flags]);
+        return BoundedCollection::respond($flags);
     }
 
     /** PATCH /api/instructor/followups/{followupFlag}/resolve */

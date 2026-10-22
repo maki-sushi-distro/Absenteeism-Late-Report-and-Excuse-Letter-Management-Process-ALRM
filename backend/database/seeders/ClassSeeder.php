@@ -7,6 +7,7 @@ namespace Database\Seeders;
 use App\Models\ClassModel;
 use App\Models\Program;
 use App\Models\User;
+use App\Support\ExternalApiClient;
 use Google\Client as GoogleClient;
 use Google\Service\Sheets as GoogleSheets;
 use Illuminate\Database\Seeder;
@@ -182,7 +183,7 @@ class ClassSeeder extends Seeder
 
             $values = [
                 'instructor_id' => $instructorId,
-                'schedule' => array_map(fn(MeetingSlot $s) => $s->toArray(), $entry->slots),
+                'schedule' => array_map(fn (MeetingSlot $s) => $s->toArray(), $entry->slots),
             ];
 
             $class = ClassModel::query()
@@ -219,12 +220,12 @@ class ClassSeeder extends Seeder
                 $suggestion = $this->describeClosestSuggestion($name, $instructorMap);
                 $suffix = $suggestion !== null ? " — did you mean \"{$suggestion['name']}\" ({$suggestion['score']}% similar)?" : '';
 
-                $lines[] = "  - \"{$name}\" (subjects: " . implode(', ', array_unique($subjects)) . ')' . $suffix;
+                $lines[] = "  - \"{$name}\" (subjects: ".implode(', ', array_unique($subjects)).')'.$suffix;
             }
 
             throw new \RuntimeException(
-                "ClassSeeder: the following instructor names in the schedule could not be matched to any user in the `users` table (roles: instructor, program_head). " .
-                    "Fix the roster sheet or the schedule sheet's spelling, then re-run:\n" .
+                'ClassSeeder: the following instructor names in the schedule could not be matched to any user in the `users` table (roles: instructor, program_head). '.
+                    "Fix the roster sheet or the schedule sheet's spelling, then re-run:\n".
                     implode("\n", $lines)
             );
         }
@@ -232,7 +233,8 @@ class ClassSeeder extends Seeder
 
     private function makeSheetsService(): GoogleSheets
     {
-        $client = new GoogleClient();
+        $client = new GoogleClient;
+        $client->setHttpClient(ExternalApiClient::make());
         $client->setApplicationName('ClassSeeder');
         $client->setScopes([GoogleSheets::SPREADSHEETS_READONLY]);
         $client->setAuthConfig($this->resolveCredentials());
@@ -300,7 +302,7 @@ class ClassSeeder extends Seeder
             $semLine = trim((string) ($values[$startRow + 1][1] ?? ''));
 
             if (! preg_match('/(1st|2nd|3rd|4th)\s*Semester,\s*A\.Y\.\s*(\d{4}-\d{4})/i', $semLine, $sm)) {
-                Log::warning("ClassSeeder ({$programName}): could not parse semester/school_year near row " . ($startRow + 2) . ', skipping block.');
+                Log::warning("ClassSeeder ({$programName}): could not parse semester/school_year near row ".($startRow + 2).', skipping block.');
 
                 continue;
             }
@@ -375,7 +377,7 @@ class ClassSeeder extends Seeder
 
     private function isSkippable(string $subject, string $instructor): bool
     {
-        $haystack = mb_strtolower($subject . ' ' . $instructor);
+        $haystack = mb_strtolower($subject.' '.$instructor);
 
         foreach (self::SKIP_KEYWORDS as $keyword) {
             if (str_contains($haystack, $keyword)) {
@@ -390,7 +392,7 @@ class ClassSeeder extends Seeder
     {
         $yearNumber = preg_replace('/\D/', '', $yearLevel);
 
-        return trim($abbreviation . ' ' . $yearNumber);
+        return trim($abbreviation.' '.$yearNumber);
     }
 
     private function normalizeTime(string $time): string
@@ -408,7 +410,7 @@ class ClassSeeder extends Seeder
                     ->orWhereIn('email', self::ADDITIONAL_INSTRUCTOR_EMAILS);
             })
             ->get(['id', 'name'])
-            ->mapWithKeys(fn(User $u) => [$this->normalizeName($u->name) => $u->id])
+            ->mapWithKeys(fn (User $u) => [$this->normalizeName($u->name) => $u->id])
             ->all();
     }
 
@@ -417,7 +419,7 @@ class ClassSeeder extends Seeder
         $name = trim($name);
 
         foreach (self::HONORIFIC_PREFIXES as $prefix) {
-            if (stripos($name, $prefix . ' ') === 0) {
+            if (stripos($name, $prefix.' ') === 0) {
                 $name = trim(substr($name, strlen($prefix)));
                 break;
             }

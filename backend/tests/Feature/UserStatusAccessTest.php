@@ -7,17 +7,14 @@ use App\Models\OtpCode;
 use App\Models\TrustedDevice;
 use App\Models\User;
 use Illuminate\Database\QueryException;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
-use Tests\TestCase;
+use Tests\SecurityTestCase;
 
-class UserStatusAccessTest extends TestCase
+class UserStatusAccessTest extends SecurityTestCase
 {
-    use RefreshDatabase;
-
     protected function setUp(): void
     {
         parent::setUp();
@@ -30,7 +27,7 @@ class UserStatusAccessTest extends TestCase
     private function makeUser(?string $status, string $role = 'student', array $extra = []): User
     {
         return User::factory()->create(array_merge([
-            'role'   => $role,
+            'role' => $role,
             'status' => $status,
         ], $extra));
     }
@@ -47,7 +44,7 @@ class UserStatusAccessTest extends TestCase
 
     public function test_deactivated_user_with_valid_token_is_rejected_and_token_revoked(): void
     {
-        $user  = $this->makeUser('deactivated');
+        $user = $this->makeUser('deactivated');
         $token = $user->createToken('alrm-spa')->plainTextToken;
 
         $this->withToken($token)->getJson('/api/me')->assertForbidden();
@@ -60,10 +57,10 @@ class UserStatusAccessTest extends TestCase
         $this->expectException(QueryException::class);
 
         DB::table('users')->insert([
-            'id'         => (string) Str::uuid(),
-            'name'       => 'Null Status',
-            'email'      => 'null.status@example.com',
-            'status'     => null,
+            'id' => (string) Str::uuid(),
+            'name' => 'Null Status',
+            'email' => 'null.status@example.com',
+            'status' => null,
             'created_at' => now(),
             'updated_at' => now(),
         ]);
@@ -71,7 +68,7 @@ class UserStatusAccessTest extends TestCase
 
     public function test_pending_user_can_still_reach_me(): void
     {
-        $user  = $this->makeUser('pending');
+        $user = $this->makeUser('pending');
         $token = $user->createToken('alrm-spa')->plainTextToken;
 
         $this->withToken($token)->getJson('/api/me')->assertOk();
@@ -79,7 +76,7 @@ class UserStatusAccessTest extends TestCase
 
     public function test_can_login_fails_closed_for_null_status_in_memory(): void
     {
-        $user = new User();
+        $user = new User;
         $user->status = null;
 
         $this->assertFalse($user->canLogin());
@@ -90,14 +87,17 @@ class UserStatusAccessTest extends TestCase
         $user = $this->makeUser('deactivated');
 
         OtpCode::create([
-            'user_id'    => $user->id,
-            'code'       => '123456',
+            'user_id' => $user->id,
+            'code' => '123456',
             'expires_at' => now()->addMinutes(5),
         ]);
 
+        $pending = Str::random(40);
+        Cache::put('auth_pending:'.$pending, $user->id, 600);
         $this->postJson('/api/auth/otp/verify', [
+            'pending' => $pending,
             'user_id' => $user->id,
-            'code'    => '123456',
+            'code' => '123456',
         ])->assertForbidden();
 
         $this->assertSame(0, $user->tokens()->count());
@@ -107,7 +107,9 @@ class UserStatusAccessTest extends TestCase
     {
         $user = $this->makeUser('deactivated');
 
-        $this->postJson('/api/auth/otp/resend', ['user_id' => $user->id])
+        $pending = Str::random(40);
+        Cache::put('auth_pending:'.$pending, $user->id, 600);
+        $this->postJson('/api/auth/otp/resend', ['user_id' => $user->id, 'pending' => $pending])
             ->assertForbidden();
 
         $this->assertSame(0, OtpCode::where('user_id', $user->id)->count());
@@ -115,11 +117,12 @@ class UserStatusAccessTest extends TestCase
 
     public function test_exchange_refuses_code_for_user_deactivated_after_login(): void
     {
-        $user  = $this->makeUser('deactivated');
+        $user = $this->makeUser('deactivated');
         $token = $user->createToken('alrm-spa')->plainTextToken;
-        Cache::put('auth_exchange:abc123', $token, 60);
+        $code = Str::random(40);
+        Cache::put('auth_exchange:'.$code, $token, 60);
 
-        $this->postJson('/api/auth/exchange', ['code' => 'abc123'])
+        $this->postJson('/api/auth/exchange', ['code' => $code])
             ->assertForbidden();
 
         $this->assertSame(0, $user->tokens()->count());
@@ -127,17 +130,17 @@ class UserStatusAccessTest extends TestCase
 
     public function test_admin_deactivation_revokes_tokens_and_trusted_devices(): void
     {
-        $admin  = $this->makeUser('approved', 'administrator');
+        $admin = $this->makeUser('approved', 'administrator');
         $target = $this->makeUser('approved', 'instructor', ['google_id' => 'g-target']);
 
         $target->createToken('alrm-spa');
         TrustedDevice::create([
-            'user_id'      => $target->id,
-            'token_hash'   => Hash::make('secret'),
-            'user_agent'   => 'phpunit',
-            'ip_address'   => '127.0.0.1',
+            'user_id' => $target->id,
+            'token_hash' => Hash::make('secret'),
+            'user_agent' => 'phpunit',
+            'ip_address' => '127.0.0.1',
             'last_used_at' => now(),
-            'expires_at'   => now()->addDay(),
+            'expires_at' => now()->addDay(),
         ]);
 
         $adminToken = $admin->createToken('alrm-spa')->plainTextToken;
@@ -154,7 +157,7 @@ class UserStatusAccessTest extends TestCase
 
     public function test_admin_endpoint_still_accepts_legacy_inactive_value(): void
     {
-        $admin  = $this->makeUser('approved', 'administrator');
+        $admin = $this->makeUser('approved', 'administrator');
         $target = $this->makeUser('approved', 'instructor', ['google_id' => 'g-legacy']);
 
         $adminToken = $admin->createToken('alrm-spa')->plainTextToken;

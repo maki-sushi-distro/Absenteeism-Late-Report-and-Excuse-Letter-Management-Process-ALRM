@@ -4,9 +4,10 @@ namespace App\Http\Controllers\ProgramHead;
 
 use App\Http\Controllers\Controller;
 use App\Models\AttendanceTracker;
+use App\Models\Enrollment;
 use App\Models\ExcuseRequest;
 use App\Models\FollowupFlag;
-use App\Models\Enrollment;
+use App\Support\BoundedCollection;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
@@ -26,7 +27,7 @@ class ProgramHeadDashboardController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'No program is assigned to this account.',
-                'data'    => null,
+                'data' => null,
             ], 403);
         }
 
@@ -35,17 +36,17 @@ class ProgramHeadDashboardController extends Controller
         });
 
         $data = [
-            'program_name'     => $program->program_name,
+            'program_name' => $program->program_name,
             'total_students' => Enrollment::whereHas('class', function ($q) use ($program) {
                 $q->where('program_id', $program->id);
             })->distinct('student_id')->count('student_id'),
-            'total_classes'    => $program->classes()->count(),
+            'total_classes' => $program->classes()->count(),
             'pending_requests' => ExcuseRequest::whereHas('enrollment.class', function ($q) use ($program) {
                 $q->where('program_id', $program->id);
             })->where('status', 'pending')->count(),
-            'warning_count'    => (clone $trackerQuery)->where('status', 'warning')->count(),
-            'ir_count'         => (clone $trackerQuery)->where('status', 'IR')->count(),
-            'recent_flags'     => FollowupFlag::where('escalated_to', Auth::id())
+            'warning_count' => (clone $trackerQuery)->where('status', 'warning')->count(),
+            'ir_count' => (clone $trackerQuery)->where('status', 'IR')->count(),
+            'recent_flags' => FollowupFlag::where('escalated_to', Auth::id())
                 ->with('request.enrollment.student', 'request.enrollment.class')
                 ->latest('flagged_date')
                 ->take(5)
@@ -55,7 +56,7 @@ class ProgramHeadDashboardController extends Controller
         return response()->json([
             'success' => true,
             'message' => null,
-            'data'    => $data,
+            'data' => $data,
         ]);
     }
 
@@ -79,13 +80,9 @@ class ProgramHeadDashboardController extends Controller
             $query->where('status', $request->query('status'));
         }
 
-        $flags = $query->latest('flagged_date')->get();
+        $flags = $query->latest('flagged_date');
 
-        return response()->json([
-            'success' => true,
-            'message' => null,
-            'data'    => $flags,
-        ]);
+        return BoundedCollection::respond($flags);
     }
 
     /**
@@ -100,7 +97,7 @@ class ProgramHeadDashboardController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'No program is assigned to this account.',
-                'data'    => null,
+                'data' => null,
             ], 403);
         }
 
@@ -115,12 +112,8 @@ class ProgramHeadDashboardController extends Controller
             $query->where('status', $request->query('status'));
         }
 
-        $requests = $query->latest()->get();
+        $requests = $query->latest();
 
-        return response()->json([
-            'success' => true,
-            'message' => null,
-            'data'    => $requests,
-        ]);
+        return BoundedCollection::respond($requests);
     }
 }

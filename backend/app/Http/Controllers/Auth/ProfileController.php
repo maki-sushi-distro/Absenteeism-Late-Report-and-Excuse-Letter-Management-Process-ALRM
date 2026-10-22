@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\UserResource;
 use App\Models\ClassModel;
 use App\Models\Enrollment;
 use App\Models\Program;
@@ -19,7 +20,7 @@ class ProfileController extends Controller
     {
         return response()->json([
             'success' => true,
-            'data'    => Program::query()
+            'data' => Program::query()
                 ->where('program_name', '!=', 'General Education')
                 ->orderBy('program_name')
                 ->get(['id', 'program_name']),
@@ -47,12 +48,12 @@ class ProfileController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Your profile is already complete. Please contact an administrator to change your program or year level.',
-                'data'    => null,
+                'data' => null,
             ], 409);
         }
 
         $validated = $request->validate([
-            'program_id'        => ['required', 'string', 'uuid', 'exists:programs,id'],
+            'program_id' => ['required', 'string', 'uuid', 'exists:programs,id'],
             'school_student_id' => [
                 Rule::requiredIf($isStudent),
                 'nullable',
@@ -60,23 +61,21 @@ class ProfileController extends Controller
                 'max:50',
                 Rule::unique('users', 'school_student_id')->ignore($user->id),
             ],
-            'year_level'        => [
+            'year_level' => [
                 Rule::requiredIf($isStudent),
                 'nullable',
                 Rule::in(['1st', '2nd', '3rd', '4th']),
             ],
-            'role'              => ['prohibited'],
-            'status'            => ['prohibited'],
+            'role' => ['prohibited'],
+            'status' => ['prohibited'],
         ]);
 
         if ($isStudent) {
             DB::transaction(function () use ($user, $validated) {
-                // forceFill so this keeps working after program_id is
-                // removed from User's #[Fillable] (mass-assignment fix).
                 $user->forceFill([
-                    'program_id'        => $validated['program_id'],
+                    'program_id' => $validated['program_id'],
                     'school_student_id' => $validated['school_student_id'],
-                    'year_level'        => $validated['year_level'],
+                    'year_level' => $validated['year_level'],
                 ])->save();
 
                 $this->autoEnrollStudent(
@@ -93,7 +92,7 @@ class ProfileController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Profile completed.',
-            'data'    => $user->fresh('program', 'programs'),
+            'data' => new UserResource($user->fresh('program', 'programs')),
         ]);
     }
 
@@ -110,7 +109,7 @@ class ProfileController extends Controller
             Enrollment::firstOrCreate(
                 [
                     'student_id' => $user->id,
-                    'class_id'   => $class->id,
+                    'class_id' => $class->id,
                 ],
                 [
                     'year_level' => $yearLevel,

@@ -3,26 +3,14 @@
 namespace App\Http\Controllers;
 
 use App\Models\UserNotification;
+use App\Support\BoundedCollection;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
 /**
- * Shared notification endpoints for ANY authenticated role (student,
- * instructor, program_head, administrator). Lives outside the
- * role-specific controller folders (Admin/, Instructor/, Student/,
- * ProgramHead/) on purpose — "see my own notifications" isn't a
- * role-gated capability, it's a capability every authenticated user has
- * for their own data.
- *
- * IMPORTANT: every method here is scoped to Auth::id() at the query
- * level (not just via Policy) — this is deliberate defense-in-depth.
- * Route-model-binding a UserNotification by {notification} and relying
- * on the Policy alone would still work, but scoping the query up front
- * means a user can never even discover another user's notification IDs
- * via enumeration/timing, and a 404 (not found) is returned instead of
- * a 403 (forbidden) for someone else's notification — so we don't leak
- * "this ID exists, you're just not allowed to see it."
+ * Shared notification endpoints for authenticated users. Lists and bulk writes
+ * are scoped by user ID; single-record writes require the ownership policy.
  */
 class NotificationController extends Controller
 {
@@ -41,13 +29,9 @@ class NotificationController extends Controller
             $query->where('is_read', false);
         }
 
-        $notifications = $query->latest('date_sent')->get();
+        $notifications = $query->latest('date_sent');
 
-        return response()->json([
-            'success' => true,
-            'message' => null,
-            'data'    => $notifications,
-        ]);
+        return BoundedCollection::respond($notifications);
     }
 
     /**
@@ -66,7 +50,7 @@ class NotificationController extends Controller
         return response()->json([
             'success' => true,
             'message' => null,
-            'data'    => ['unread_count' => $count],
+            'data' => ['unread_count' => $count],
         ]);
     }
 
@@ -87,7 +71,7 @@ class NotificationController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Notification marked as read.',
-            'data'    => $notification,
+            'data' => $notification,
         ]);
     }
 
@@ -109,7 +93,7 @@ class NotificationController extends Controller
         return response()->json([
             'success' => true,
             'message' => "{$updated} notification(s) marked as read.",
-            'data'    => null,
+            'data' => null,
         ]);
     }
 }

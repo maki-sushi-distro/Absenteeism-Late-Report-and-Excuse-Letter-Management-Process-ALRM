@@ -8,6 +8,7 @@ COPY docker/php-security.ini /usr/local/etc/php/conf.d/zz-alrm-security.ini
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
+    ca-certificates \
     git \
     curl \
     libpng-dev \

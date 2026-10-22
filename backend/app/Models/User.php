@@ -2,10 +2,11 @@
 
 namespace App\Models;
 
-use Database\Factories\UserFactory;
 use App\Enums\UserStatus;
+use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
+use Illuminate\Database\Eloquent\Attributes\Visible;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -31,12 +32,15 @@ use Laravel\Sanctum\HasApiTokens;
     'contact_number',
 ])]
 #[Hidden(['password', 'remember_token'])]
+#[Visible(['id', 'name', 'email', 'role', 'program_id', 'school_student_id',
+    'status', 'year_level', 'program', 'programs', 'heads_program', 'headed_program_exists'])]
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, Notifiable, HasApiTokens, HasUuids;
+    use HasApiTokens, HasFactory, HasUuids, Notifiable;
 
     protected $keyType = 'string';
+
     public $incrementing = false;
 
     protected function casts(): array

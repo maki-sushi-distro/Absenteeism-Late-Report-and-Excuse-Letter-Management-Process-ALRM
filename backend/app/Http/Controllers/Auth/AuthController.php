@@ -3,18 +3,23 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
-use Laravel\Sanctum\PersonalAccessToken;
-use App\Support\TrustedDeviceManager;
+use App\Http\Resources\UserResource;
 use App\Models\User;
+use App\Support\ExternalApiClient;
+use App\Support\SingleUseCode;
+use App\Support\TrustedDeviceManager;
+use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
-use Illuminate\Contracts\Encryption\DecryptException;
+use Laravel\Sanctum\PersonalAccessToken;
 use Laravel\Socialite\Facades\Socialite;
+use Laravel\Socialite\Two\GoogleProvider;
 
 class AuthController extends Controller
 {
@@ -25,10 +30,10 @@ class AuthController extends Controller
      */
     private function allowedOrigins(): array
     {
-        return array_filter([
+        return array_values(array_filter([
             rtrim((string) config('app.frontend_url', 'http://localhost:5173'), '/'),
             rtrim((string) config('app.frontend_url_prod'), '/'),
-        ]);
+        ]));
     }
 
     /**
@@ -45,8 +50,8 @@ class AuthController extends Controller
             return null;
         }
 
-        $normalized = ($parsed['scheme'] ?? 'https') . '://' . $parsed['host']
-            . (isset($parsed['port']) ? ':' . $parsed['port'] : '');
+        $normalized = ($parsed['scheme'] ?? 'https').'://'.$parsed['host']
+            .(isset($parsed['port']) ? ':'.$parsed['port'] : '');
 
         foreach ($this->allowedOrigins() as $allowed) {
             if (rtrim($allowed, '/') === $normalized) {
@@ -63,7 +68,7 @@ class AuthController extends Controller
      */
     private function callbackUrlFor(string $frontendUrl): string
     {
-        return rtrim($frontendUrl, '/') . '/api/auth/google/callback';
+        return rtrim($frontendUrl, '/').'/api/auth/google/callback';
     }
 
     /**
@@ -71,8 +76,8 @@ class AuthController extends Controller
      */
     private function makeExchangeCode(User $user): string
     {
-        $token = $user->createToken('alrm-spa')->plainTextToken;
-        $code  = Str::random(40);
+        $token = $user->createToken('alrm-spa', ['*'], now()->addHours(8))->plainTextToken;
+        $code = Str::random(40);
         Cache::put("auth_exchange:{$code}", $token, now()->addSeconds(60));
 
         return $code;
@@ -85,6 +90,7 @@ class AuthController extends Controller
      */
     public function redirect(Request $request): RedirectResponse
     {
+        $request->validate(['origin' => ['sometimes', 'string', 'max:2048']]);
         $origin = $request->query('origin')
             ?? $request->headers->get('referer');
 
@@ -95,20 +101,24 @@ class AuthController extends Controller
             abort(500, 'No valid frontend URL configured.');
         }
 
+        $nonce = Str::random(64);
+        Cache::put('oauth_state:'.hash('sha256', $nonce), true, now()->addMinutes(10));
         $state = Crypt::encryptString(json_encode([
             'origin' => $frontendUrl,
-            'nonce'  => Str::random(32),
-            'exp'    => now()->addMinutes(10)->timestamp,
+            'nonce' => $nonce,
+            'exp' => now()->addMinutes(10)->timestamp,
         ]));
 
-        /** @var \Laravel\Socialite\Two\GoogleProvider $driver */
+        /** @var GoogleProvider $driver */
         $driver = Socialite::driver('google');
 
         return $driver
             ->stateless()
             ->redirectUrl($this->callbackUrlFor($frontendUrl))
             ->with(['state' => $state])
-            ->redirect();
+            ->redirect()
+            ->cookie('alrm_oauth', $nonce, 10, '/api/auth/google', null,
+                app()->environment('production'), true, false, 'lax');
     }
 
     /**
@@ -122,31 +132,47 @@ class AuthController extends Controller
      */
     public function callback(Request $request): RedirectResponse
     {
-        $defaultFrontend = $this->allowedOrigins()[0] ?? null;
-
-        $frontendUrl = $this->decodeState($request->query('state')) ?? $defaultFrontend;
+        $frontendUrl = $this->decodeState($request);
 
         if (! $frontendUrl) {
-            abort(500, 'No valid frontend URL configured.');
+            $defaultFrontend = $this->allowedOrigins()[0] ?? null;
+            abort_unless($defaultFrontend, 500, 'No valid frontend URL configured.');
+
+            return redirect()->away($defaultFrontend.'/login?error=oauth_failed')
+                ->withoutCookie('alrm_oauth', '/api/auth/google');
         }
 
+        return $this->completeCallback($request, $frontendUrl)
+            ->withoutCookie('alrm_oauth', '/api/auth/google');
+    }
+
+    private function completeCallback(Request $request, string $frontendUrl): RedirectResponse
+    {
         try {
-            /** @var \Laravel\Socialite\Two\GoogleProvider $driver */
+            /** @var GoogleProvider $driver */
             $driver = Socialite::driver('google');
+            $driver->setHttpClient(ExternalApiClient::make());
 
             $googleUser = $driver
                 ->stateless()
                 ->redirectUrl($this->callbackUrlFor($frontendUrl))
                 ->user();
         } catch (\Throwable $e) {
-            Log::warning('Google OAuth callback failed', ['error' => $e->getMessage()]);
+            Log::warning('Google OAuth callback failed', ['exception' => get_class($e)]);
 
             return redirect()->away(
-                $frontendUrl . '/login?error=oauth_failed'
+                $frontendUrl.'/login?error=oauth_failed'
             );
         }
 
         $email = strtolower((string) $googleUser->getEmail());
+        $googleId = (string) $googleUser->getId();
+        $raw = $googleUser->getRaw();
+        if (! filter_var($email, FILTER_VALIDATE_EMAIL) || strlen($email) > 255
+            || $googleId === '' || strlen($googleId) > 255
+            || ($raw['email_verified'] ?? $raw['verified_email'] ?? false) !== true) {
+            return redirect()->away($frontendUrl.'/login?error=oauth_failed');
+        }
         $domain = substr(strrchr($email, '@') ?: '', 1);
 
         $studentDomain = strtolower((string) config('institution.student_domain'));
@@ -154,7 +180,7 @@ class AuthController extends Controller
 
         if (! in_array($domain, [$studentDomain, $staffDomain], true)) {
             return redirect()->away(
-                $frontendUrl . '/login?error=invalid_domain'
+                $frontendUrl.'/login?error=invalid_domain'
             );
         }
 
@@ -167,19 +193,23 @@ class AuthController extends Controller
 
         if (! $isNewUser && ! $user->canLogin()) {
             return redirect()->away(
-                $frontendUrl . '/login?error=account_disabled'
+                $frontendUrl.'/login?error=account_disabled'
             );
         }
 
-        $user->google_id = $googleUser->getId();
+        if ($user->google_id !== null && ! hash_equals((string) $user->google_id, $googleId)) {
+            return redirect()->away($frontendUrl.'/login?error=oauth_failed');
+        }
+
+        $user->google_id = $googleId;
 
         if ($isNewUser) {
-            $user->name = $googleUser->getName() ?: $user->name;
+            $user->name = mb_substr($googleUser->getName() ?: $email, 0, 255);
             $user->role = $isStudent ? 'student' : self::DEFAULT_STAFF_ROLE;
             $user->status = $isStudent ? 'approved' : 'pending';
             $user->password = null;
         } elseif ($isFirstLogin && $user->status === 'pending') {
-            $user->name = $googleUser->getName() ?: $user->name;
+            $user->name = mb_substr($googleUser->getName() ?: $email, 0, 255);
             $user->status = 'approved';
             $user->password = null;
         }
@@ -189,7 +219,7 @@ class AuthController extends Controller
             $code = $this->makeExchangeCode($user);
 
             return redirect()->away(
-                $frontendUrl . '/auth/otp?exchange_code=' . urlencode($code)
+                $frontendUrl.'/auth/otp?exchange_code='.urlencode($code)
             );
         }
 
@@ -201,20 +231,19 @@ class AuthController extends Controller
         }
 
         return redirect()->away(
-            $frontendUrl . '/auth/otp?user_id=' . urlencode($user->id)
-                . '&pending=' . urlencode($pending)
-                . '&checked=1'
+            $frontendUrl.'/auth/otp?user_id='.urlencode($user->id)
+                .'&pending='.urlencode($pending)
+                .'&checked=1'
         );
     }
 
     /**
-     * Decrypt + validate the signed state. Returns null on any failure
-     * (tampered, expired, or origin no longer in allowlist) so callers
-     * fall back to the default frontend instead of trusting attacker input.
+     * Require an unexpired, browser-bound state and consume its nonce once.
      */
-    private function decodeState(?string $state): ?string
+    private function decodeState(Request $request): ?string
     {
-        if (! $state) {
+        $state = $request->query('state');
+        if (! is_string($state) || $state === '' || strlen($state) > 4096) {
             return null;
         }
 
@@ -222,22 +251,31 @@ class AuthController extends Controller
             $payload = json_decode(Crypt::decryptString($state), true);
         } catch (DecryptException) {
             Log::warning('OAuth state failed decryption — possible tampering.');
+
             return null;
         }
 
-        if (! is_array($payload) || empty($payload['origin']) || empty($payload['exp'])) {
+        if (! is_array($payload) || ! is_string($payload['origin'] ?? null)
+            || ! is_int($payload['exp'] ?? null) || ! is_string($payload['nonce'] ?? null)) {
             return null;
         }
 
-        if (now()->timestamp > $payload['exp']) {
+        if (now()->timestamp >= $payload['exp']) {
             Log::warning('OAuth state expired.');
+
             return null;
         }
 
+        $cookie = $request->cookie('alrm_oauth');
+        if (! is_string($cookie) || strlen($cookie) !== 64
+            || ! hash_equals($payload['nonce'], $cookie)) {
+            return null;
+        }
 
         foreach ($this->allowedOrigins() as $allowed) {
             if (rtrim($allowed, '/') === rtrim($payload['origin'], '/')) {
-                return rtrim($payload['origin'], '/');
+                return SingleUseCode::consume('oauth_state:'.hash('sha256', $cookie))
+                    ? rtrim($payload['origin'], '/') : null;
             }
         }
 
@@ -253,17 +291,28 @@ class AuthController extends Controller
      */
     public function checkTrusted(Request $request): JsonResponse
     {
-        $request->validate(['pending' => 'required|string']);
+        $request->validate(['pending' => 'required|string|size:40']);
+
+        return DB::transaction(fn () => $this->checkTrustedLocked($request));
+    }
+
+    private function checkTrustedLocked(Request $request): JsonResponse
+    {
 
         $pending = (string) $request->input('pending');
-        $userId  = Cache::get("auth_pending:{$pending}");
-        $user    = $userId ? User::find($userId) : null;
+        $userId = Cache::get("auth_pending:{$pending}");
+        $user = $userId ? User::whereKey($userId)->lockForUpdate()->first() : null;
+
+        // Recheck after obtaining the same user lock used by OTP verification.
+        if ($user && Cache::get("auth_pending:{$pending}") !== $user->id) {
+            $user = null;
+        }
 
         if (! $user) {
             return response()->json([
                 'success' => false,
                 'message' => 'Your login session expired. Please sign in again.',
-                'data'    => null,
+                'data' => null,
             ], 410);
         }
 
@@ -271,7 +320,7 @@ class AuthController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Your account is not active. Please contact an administrator.',
-                'data'    => null,
+                'data' => null,
             ], 403);
         }
 
@@ -281,8 +330,8 @@ class AuthController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Trusted device.',
-                'data'    => [
-                    'trusted'       => true,
+                'data' => [
+                    'trusted' => true,
                     'exchange_code' => $this->makeExchangeCode($user),
                 ],
             ]);
@@ -295,7 +344,7 @@ class AuthController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'OTP required.',
-            'data'    => ['trusted' => false],
+            'data' => ['trusted' => false],
         ]);
     }
 
@@ -307,16 +356,16 @@ class AuthController extends Controller
     public function exchange(Request $request): JsonResponse
     {
         $request->validate([
-            'code' => 'required|string',
+            'code' => 'required|string|size:40',
         ]);
 
-        $token = Cache::pull("auth_exchange:{$request->string('code')}");
+        $token = SingleUseCode::consume("auth_exchange:{$request->string('code')}");
 
         if (! $token) {
             return response()->json([
                 'success' => false,
                 'message' => 'Invalid or expired code.',
-                'data'    => null,
+                'data' => null,
             ], 401);
         }
 
@@ -329,16 +378,16 @@ class AuthController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Your account is not active. Please contact an administrator.',
-                'data'    => null,
+                'data' => null,
             ], 403);
         }
 
         return response()->json([
             'success' => true,
             'message' => 'OK',
-            'data'    => [
+            'data' => [
                 'token' => $token,
-                'user'  => $user->load('program', 'programs'),
+                'user' => UserResource::forExchange($user->load('program', 'programs')),
             ],
         ]);
     }
@@ -350,7 +399,7 @@ class AuthController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Logged out.',
-            'data'    => null,
+            'data' => null,
         ]);
     }
 
@@ -359,7 +408,7 @@ class AuthController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'OK',
-            'data'    => $request->user()->load('program', 'programs'),
+            'data' => new UserResource($request->user()->load('program', 'programs')),
         ]);
     }
 }

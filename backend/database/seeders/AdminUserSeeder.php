@@ -7,6 +7,7 @@ namespace Database\Seeders;
 use App\Models\Program;
 use App\Models\TrustedDevice;
 use App\Models\User;
+use App\Support\ExternalApiClient;
 use Google\Client as GoogleClient;
 use Google\Service\Sheets as GoogleSheets;
 use Illuminate\Database\Seeder;
@@ -88,13 +89,13 @@ class AdminUserSeeder extends Seeder
      * and saveUser()).
      */
     private const array TAB_TO_PROGRAM_NAME = [
-        'GEN ED'   => 'General Education',
-        'BSSW'     => 'Bachelor of Science in Social Work',
-        'BSA'      => 'Bachelor of Science in Accountancy',
-        'BSAIS'    => 'Bachelor of Science in Accounting Information System',
-        'BSIS'     => 'Bachelor of Science in Information System',
-        'ACT'      => 'Associate in Computer Technology',
-        'BAB'      => 'Bachelor of Arts in Broadcasting',
+        'GEN ED' => 'General Education',
+        'BSSW' => 'Bachelor of Science in Social Work',
+        'BSA' => 'Bachelor of Science in Accountancy',
+        'BSAIS' => 'Bachelor of Science in Accounting Information System',
+        'BSIS' => 'Bachelor of Science in Information System',
+        'ACT' => 'Associate in Computer Technology',
+        'BAB' => 'Bachelor of Arts in Broadcasting',
     ];
 
     /**
@@ -152,18 +153,18 @@ class AdminUserSeeder extends Seeder
 
         if (! $sheetTrusted) {
             $message = 'AdminUserSeeder: Google Sheet could not be fully read. '
-                . 'Seeding manual users only; no sheet user was created, updated or deactivated, '
-                . 'and no program head was changed.';
+                .'Seeding manual users only; no sheet user was created, updated or deactivated, '
+                .'and no program head was changed.';
 
             Log::error($message, ['failed_tabs' => $failedTabs, 'sheet_users_found' => count($sheetUsers)]);
-            $this->command?->error($message . ' Failed: ' . ($failedTabs === [] ? '(sheet returned no users)' : implode(', ', $failedTabs)));
+            $this->command?->error($message.' Failed: '.($failedTabs === [] ? '(sheet returned no users)' : implode(', ', $failedTabs)));
 
             $sheetUsers = [];
         }
 
-        $sheetEmails = array_map(fn(SeedUser $u) => $u->email, $sheetUsers);
+        $sheetEmails = array_map(fn (SeedUser $u) => $u->email, $sheetUsers);
 
-        $manualEmails = array_map(fn(SeedUser $u) => $u->email, $manualUsers);
+        $manualEmails = array_map(fn (SeedUser $u) => $u->email, $manualUsers);
 
         $merged = [];
 
@@ -172,6 +173,7 @@ class AdminUserSeeder extends Seeder
 
             if (! $existing) {
                 $merged[$user->email] = $user;
+
                 continue;
             }
 
@@ -259,7 +261,8 @@ class AdminUserSeeder extends Seeder
         $failedTabs = [];
 
         try {
-            $client = new GoogleClient();
+            $client = new GoogleClient;
+            $client->setHttpClient(ExternalApiClient::make());
             $client->setApplicationName('AdminUserSeeder');
             $client->setScopes([GoogleSheets::SPREADSHEETS_READONLY]);
             $client->setAuthConfig($this->resolveCredentials());
@@ -282,15 +285,20 @@ class AdminUserSeeder extends Seeder
             }
 
             try {
-                $range = "'{$tabName}'!A2:C";
+                $range = "'{$tabName}'!A2:C10001";
                 $response = $service->spreadsheets_values->get(self::SPREADSHEET_ID, $range);
 
-                foreach ($response->getValues() ?? [] as $row) {
+                $rows = $response->getValues() ?? [];
+                if (count($rows) >= 10000) {
+                    throw new \RuntimeException('Roster exceeds the reviewed row limit.');
+                }
+                foreach ($rows as $row) {
                     $roleLabel = trim($row[0] ?? '');
                     $name = trim($row[1] ?? '');
                     $email = strtolower(trim($row[2] ?? ''));
 
-                    if ($name === '' || $email === '') {
+                    if ($name === '' || mb_strlen($name) > 255 || strlen($email) > 255
+                        || ! filter_var($email, FILTER_VALIDATE_EMAIL)) {
                         continue;
                     }
 
@@ -328,7 +336,7 @@ class AdminUserSeeder extends Seeder
         }
 
         $users = array_map(
-            fn(string $email, array $data) => new SeedUser(
+            fn (string $email, array $data) => new SeedUser(
                 name: $data['name'],
                 email: $email,
                 role: $data['role'],
@@ -440,7 +448,7 @@ class AdminUserSeeder extends Seeder
 
         $toDeactivate = User::query()
             ->whereIn('role', self::SHEET_MANAGED_ROLES)
-            ->where('email', 'like', '%@' . $staffDomain)
+            ->where('email', 'like', '%@'.$staffDomain)
             ->whereNotIn('email', $sheetEmails)
             ->whereNotIn('email', $manualEmails)
             ->where('status', '!=', self::DEACTIVATED_STATUS)

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Program;
 use App\Services\AuditLoggerService;
+use App\Support\BoundedCollection;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
@@ -28,18 +29,15 @@ class ProgramController extends Controller
     public function __construct(
         protected AuditLoggerService $auditLogger,
     ) {}
+
     /**
      * GET /api/admin/programs
      */
     public function index()
     {
-        $programs = Program::with('programHead')->withCount(['classes', 'users'])->get();
+        $programs = Program::with('programHead')->withCount(['classes', 'users']);
 
-        return response()->json([
-            'success' => true,
-            'message' => null,
-            'data'    => $programs,
-        ]);
+        return BoundedCollection::respond($programs);
     }
 
     /**
@@ -48,18 +46,17 @@ class ProgramController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'program_name'    => ['required', 'string', 'max:255', 'unique:programs,program_name'],
+            'program_name' => ['required', 'string', 'max:255', 'unique:programs,program_name'],
             'program_head_id' => ['nullable', 'string', 'uuid', Rule::exists('users', 'id')->whereIn('role', self::HEAD_ELIGIBLE_ROLES)],
         ]);
 
         $program = Program::create($validated);
         $this->auditLogger->log('created_program', 'programs', $program->id);
 
-
         return response()->json([
             'success' => true,
             'message' => 'Program created.',
-            'data'    => $program,
+            'data' => $program,
         ], 201);
     }
 
@@ -71,7 +68,7 @@ class ProgramController extends Controller
         return response()->json([
             'success' => true,
             'message' => null,
-            'data'    => $program->load('programHead', 'classes', 'users'),
+            'data' => $program->load('programHead', 'classes', 'users'),
         ]);
     }
 
@@ -81,18 +78,17 @@ class ProgramController extends Controller
     public function update(Request $request, Program $program)
     {
         $validated = $request->validate([
-            'program_name'    => ['sometimes', 'string', 'max:255', Rule::unique('programs', 'program_name')->ignore($program->id)],
+            'program_name' => ['sometimes', 'string', 'max:255', Rule::unique('programs', 'program_name')->ignore($program->id)],
             'program_head_id' => ['sometimes', 'nullable', 'string', 'uuid', Rule::exists('users', 'id')->whereIn('role', self::HEAD_ELIGIBLE_ROLES)],
         ]);
 
         $program->update($validated);
         $this->auditLogger->log('updated_program', 'programs', $program->id);
 
-
         return response()->json([
             'success' => true,
             'message' => 'Program updated.',
-            'data'    => $program,
+            'data' => $program,
         ]);
     }
 
@@ -105,7 +101,7 @@ class ProgramController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Cannot delete a program that still has classes or users.',
-                'data'    => null,
+                'data' => null,
             ], 409);
         }
 
@@ -114,11 +110,10 @@ class ProgramController extends Controller
 
         $this->auditLogger->log('deleted_program', 'programs', $programId);
 
-
         return response()->json([
             'success' => true,
             'message' => 'Program deleted.',
-            'data'    => null,
+            'data' => null,
         ]);
     }
 }

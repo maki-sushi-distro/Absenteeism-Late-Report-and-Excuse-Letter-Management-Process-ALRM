@@ -1,27 +1,26 @@
 <?php
 
+use App\Http\Controllers\Admin\AdminDashboardController;
+use App\Http\Controllers\Admin\ClassManagementController;
+use App\Http\Controllers\Admin\ProgramController;
+use App\Http\Controllers\Admin\ReportController;
+use App\Http\Controllers\Admin\UserApprovalController;
+use App\Http\Controllers\Auth\AuthController;
+use App\Http\Controllers\Auth\OtpController;
+use App\Http\Controllers\Auth\ProfileController;
+use App\Http\Controllers\Instructor\FollowupController as InstructorFollowupController;
+use App\Http\Controllers\Instructor\InstructorDashboardController;
+use App\Http\Controllers\Instructor\InstructorRequestController;
+use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\ProgramHead\ProgramHeadDashboardController;
+use App\Http\Controllers\Student\AttendanceController;
+use App\Http\Controllers\Student\ClassController;
+use App\Http\Controllers\Student\EvidenceController;
+use App\Http\Controllers\Student\FollowUpController;
+use App\Http\Controllers\Student\RequestController;
+use App\Http\Controllers\Student\StudentDashboardController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
-use Illuminate\Support\Facades\Artisan;
-use App\Http\Controllers\Auth\ProfileController;
-use App\Http\Controllers\Auth\AuthController;
-use App\Http\Controllers\NotificationController;
-use App\Http\Controllers\Student\ClassController;
-use App\Http\Controllers\Student\RequestController;
-use App\Http\Controllers\Student\EvidenceController;   
-use App\Http\Controllers\Student\AttendanceController;
-use App\Http\Controllers\Student\StudentDashboardController;
-use App\Http\Controllers\Student\FollowUpController;
-use App\Http\Controllers\Instructor\InstructorRequestController;
-use App\Http\Controllers\Instructor\InstructorDashboardController;
-use App\Http\Controllers\Instructor\FollowupController as InstructorFollowupController;
-use App\Http\Controllers\ProgramHead\ProgramHeadDashboardController;
-use App\Http\Controllers\Admin\AdminDashboardController;
-use App\Http\Controllers\Admin\UserApprovalController;
-use App\Http\Controllers\Admin\ProgramController;
-use App\Http\Controllers\Admin\ClassManagementController;
-use App\Http\Controllers\Admin\ReportController;
-use App\Http\Controllers\Auth\OtpController;
 
 /*
 |--------------------------------------------------------------------------
@@ -29,19 +28,19 @@ use App\Http\Controllers\Auth\OtpController;
 |--------------------------------------------------------------------------
 */
 
-Route::prefix('auth')->group(function () {
+Route::prefix('auth')->middleware('throttle:login')->group(function () {
     Route::get('/google/redirect', [AuthController::class, 'redirect']);
     Route::get('/google/callback', [AuthController::class, 'callback']);
     Route::post('/exchange', [AuthController::class, 'exchange']);
     Route::post('/otp/check-trusted', [AuthController::class, 'checkTrusted'])
-        ->middleware('throttle:10,1');
+        ->middleware('throttle:otp');
     Route::post('/otp/verify', [OtpController::class, 'verify'])
-        ->middleware('throttle:10,1');
+        ->middleware('throttle:otp');
     Route::post('/otp/resend', [OtpController::class, 'resend'])
-        ->middleware('throttle:10,1');
+        ->middleware('throttle:otp');
 });
 
-Route::middleware(['auth:sanctum', 'active', 'inactive'])->group(function () {
+Route::middleware(['auth:sanctum', 'active'])->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/me', [AuthController::class, 'me']);
     Route::get('/complete-profile/programs', [ProfileController::class, 'programs']);
@@ -49,7 +48,7 @@ Route::middleware(['auth:sanctum', 'active', 'inactive'])->group(function () {
 
     /*
     |----------------------------------------------------------------
-    | Notifications  
+    | Notifications
     |----------------------------------------------------------------
     */
     Route::get('/notifications', [NotificationController::class, 'index']);
@@ -59,10 +58,10 @@ Route::middleware(['auth:sanctum', 'active', 'inactive'])->group(function () {
 
     /*
     |----------------------------------------------------------------
-    | Request attachment 
+    | Request attachment
     |----------------------------------------------------------------
     */
-    Route::get('/requests/{request}/evidence', [RequestController::class, 'evidence']);   
+    Route::get('/requests/{request}/evidence', [RequestController::class, 'evidence']);
 
     /*
     |----------------------------------------------------------------
@@ -70,14 +69,14 @@ Route::middleware(['auth:sanctum', 'active', 'inactive'])->group(function () {
     |----------------------------------------------------------------
     */
     Route::middleware('role:student')->group(function () {
-        Route::get('/dashboard', [StudentDashboardController::class, 'index']);  
+        Route::get('/dashboard', [StudentDashboardController::class, 'index']);
 
         Route::get('/classes', [ClassController::class, 'index']);
 
-        Route::post('/requests/evidence', [EvidenceController::class, 'store'])   
+        Route::post('/requests/evidence', [EvidenceController::class, 'store'])
             ->middleware('throttle:20,1');
 
-        Route::post('/requests', [RequestController::class, 'store']);
+        Route::post('/requests', [RequestController::class, 'store'])->middleware('throttle:submissions');
         Route::get('/requests', [RequestController::class, 'index']);
         Route::get('/requests/{request}', [RequestController::class, 'show']);
         Route::patch('/requests/{request}', [RequestController::class, 'update']);
@@ -128,7 +127,7 @@ Route::middleware(['auth:sanctum', 'active', 'inactive'])->group(function () {
         Route::apiResource('programs', ProgramController::class);
         Route::apiResource('classes', ClassManagementController::class);
 
-        Route::get('/reports/export', [ReportController::class, 'export']);
+        Route::get('/reports/export', [ReportController::class, 'export'])->middleware('throttle:exports');
         Route::get('/reports/preview', [ReportController::class, 'preview']);
     });
 });

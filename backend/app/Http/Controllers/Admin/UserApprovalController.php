@@ -3,9 +3,11 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\UserResource;
 use App\Models\TrustedDevice;
 use App\Models\User;
 use App\Services\AuditLoggerService;
+use App\Support\BoundedCollection;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -37,7 +39,7 @@ class UserApprovalController extends Controller
     public function index(Request $request): JsonResponse
     {
         $request->validate([
-            'role'   => ['sometimes', 'string', Rule::in(self::CREATABLE_ROLES)],
+            'role' => ['sometimes', 'string', Rule::in(self::CREATABLE_ROLES)],
             'status' => ['sometimes', 'string', Rule::in(['pending', 'approved', 'deactivated', 'inactive'])],
         ]);
 
@@ -57,14 +59,9 @@ class UserApprovalController extends Controller
 
         $users = $query->with('program')
             ->withExists(['headedProgram as heads_program'])
-            ->orderBy('name')
-            ->get();
+            ->orderBy('name');
 
-        return response()->json([
-            'success' => true,
-            'message' => 'OK',
-            'data'    => $users,
-        ]);
+        return BoundedCollection::respond($users, UserResource::class);
     }
 
     /**
@@ -83,26 +80,26 @@ class UserApprovalController extends Controller
     public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'name'  => ['required', 'string', 'max:255'],
+            'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255', 'unique:users,email'],
-            'role'  => ['required', 'string', Rule::in(self::CREATABLE_ROLES)],
+            'role' => ['required', 'string', Rule::in(self::CREATABLE_ROLES)],
         ]);
 
-        $email  = strtolower($validated['email']);
+        $email = strtolower($validated['email']);
         $domain = substr(strrchr($email, '@') ?: '', 1);
 
         $studentDomain = config('institution.student_domain');
         $staffDomain = config('institution.staff_domain');
 
         $isStudentDomain = $domain === $studentDomain;
-        $isStaffDomain   = $domain === $staffDomain;
+        $isStaffDomain = $domain === $staffDomain;
 
         if (! $isStudentDomain && ! $isStaffDomain) {
             return response()->json([
                 'success' => false,
                 'message' => 'Email must be an institutional address (@'
-                    . $studentDomain . ' or @' . $staffDomain . ').',
-                'data'    => null,
+                    .$studentDomain.' or @'.$staffDomain.').',
+                'data' => null,
             ], 422);
         }
 
@@ -113,24 +110,24 @@ class UserApprovalController extends Controller
                 'message' => $isStudentDomain
                     ? 'This email is on the student domain and can only be pre-registered as student.'
                     : 'This email is on the staff domain and cannot be pre-registered as student.',
-                'data'    => null,
+                'data' => null,
             ], 422);
         }
 
         $user = User::create([
-            'name'     => $validated['name'],
-            'email'    => $email,
-            'role'     => $validated['role'],
-            'status'   => 'pending',
+            'name' => $validated['name'],
+            'email' => $email,
+            'role' => $validated['role'],
+            'status' => 'pending',
             'password' => null,
         ]);
 
-        $this->auditLogger->log('pre_registered_user:' . $validated['role'], 'users', $user->id);
+        $this->auditLogger->log('pre_registered_user:'.$validated['role'], 'users', $user->id);
 
         return response()->json([
             'success' => true,
             'message' => 'User pre-registered. They will be activated automatically on their first Google sign-in.',
-            'data'    => $user,
+            'data' => new UserResource($user),
         ], 201);
     }
 
@@ -151,7 +148,7 @@ class UserApprovalController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Only pending or deactivated accounts can be deleted. Deactivate this user first.',
-                'data'    => null,
+                'data' => null,
             ], 409);
         }
 
@@ -168,7 +165,7 @@ class UserApprovalController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'User removed.',
-            'data'    => null,
+            'data' => null,
         ]);
     }
 
@@ -191,7 +188,7 @@ class UserApprovalController extends Controller
                 return response()->json([
                     'success' => false,
                     'message' => 'This account has not logged in yet (still pending). Delete the roster entry instead if it was a mistake.',
-                    'data'    => null,
+                    'data' => null,
                 ], 409);
             }
 
@@ -199,7 +196,7 @@ class UserApprovalController extends Controller
                 return response()->json([
                     'success' => false,
                     'message' => 'A self-registered account awaiting approval can only be approved through this endpoint. Delete it instead to reject the registration.',
-                    'data'    => null,
+                    'data' => null,
                 ], 409);
             }
         }
@@ -208,7 +205,7 @@ class UserApprovalController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'You cannot change your own account status through this endpoint.',
-                'data'    => null,
+                'data' => null,
             ], 403);
         }
 
@@ -218,7 +215,7 @@ class UserApprovalController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => "User is already '{$newStatus}'.",
-                'data'    => null,
+                'data' => null,
             ], 409);
         }
 
@@ -241,14 +238,14 @@ class UserApprovalController extends Controller
 
         $message = match (true) {
             $previousStatus === 'pending' => 'User approved.',
-            $newStatus === 'deactivated'  => 'User deactivated.',
-            default                       => 'User reactivated.',
+            $newStatus === 'deactivated' => 'User deactivated.',
+            default => 'User reactivated.',
         };
 
         return response()->json([
             'success' => true,
             'message' => $message,
-            'data'    => $user,
+            'data' => new UserResource($user),
         ]);
     }
 
@@ -268,7 +265,7 @@ class UserApprovalController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'This endpoint only reassigns existing staff roles (instructor, program_head, administrator).',
-                'data'    => null,
+                'data' => null,
             ], 409);
         }
 
@@ -276,7 +273,7 @@ class UserApprovalController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'You cannot change your own role through this endpoint.',
-                'data'    => null,
+                'data' => null,
             ], 403);
         }
 
@@ -286,7 +283,7 @@ class UserApprovalController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => "User already has the '{$validated['role']}' role.",
-                'data'    => null,
+                'data' => null,
             ], 409);
         }
 
@@ -306,7 +303,7 @@ class UserApprovalController extends Controller
             'message' => $validated['role'] === 'program_head' && ! $user->headed_program_exists
                 ? 'Role updated. Paalala: wala pang program na naka-assign sa user na ito. Itakda ito sa Programs.'
                 : 'Role updated.',
-            'data'    => $user,
+            'data' => new UserResource($user),
         ]);
     }
 }

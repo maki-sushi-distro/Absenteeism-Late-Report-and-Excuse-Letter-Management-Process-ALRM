@@ -4,11 +4,14 @@ namespace App\Http\Controllers\Instructor;
 
 use App\Http\Controllers\Controller;
 use App\Models\AttendanceTracker;
+use App\Models\Enrollment;
 use App\Models\ExcuseRequest;
 use App\Models\FollowupFlag;
 use App\Models\UserNotification;
 use App\Services\AuditLoggerService;
+use App\Support\BoundedCollection;
 use Illuminate\Http\Request as HttpRequest;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
@@ -26,14 +29,9 @@ class InstructorRequestController extends Controller
         $requests = ExcuseRequest::whereHas('enrollment.class', function ($q) {
             $q->where('instructor_id', Auth::id());
         })->with('enrollment.student', 'enrollment.class')
-            ->latest()
-            ->get();
+            ->latest();
 
-        return response()->json([
-            'success' => true,
-            'message' => null,
-            'data'    => $requests,
-        ]);
+        return BoundedCollection::respond($requests);
     }
 
     /**
@@ -43,67 +41,63 @@ class InstructorRequestController extends Controller
      */
     public function decide(HttpRequest $httpRequest, ExcuseRequest $request)
     {
-        $this->authorize('decide', $request);
-
-        if ($request->status !== 'pending') {
-            return response()->json([
-                'success' => false,
-                'message' => 'This request has already been decided.',
-                'data'    => null,
-            ], 409);
-        }
-
         $validated = $httpRequest->validate([
             'status' => ['required', 'in:approved,noted,invalid'],
         ]);
 
-        $request->update([
-            'status'        => $validated['status'],
-            'reviewed_by'   => Auth::id(),
-            'date_reviewed' => now(),
-        ]);
+        return DB::transaction(function () use ($request, $validated) {
+            $request = ExcuseRequest::whereKey($request->id)->lockForUpdate()->firstOrFail();
+            $this->authorize('decide', $request);
+            abort_if($request->status !== 'pending', 409, 'This request has already been decided.');
+            Enrollment::whereKey($request->enrollment_id)->lockForUpdate()->firstOrFail();
 
-        $this->auditLogger->log(
-            'decided_request_' . $validated['status'],
-            'requests',
-            $request->id
-        );
+            $request->update([
+                'status' => $validated['status'],
+                'reviewed_by' => Auth::id(),
+                'date_reviewed' => now(),
+            ]);
 
-        if ($validated['status'] === 'invalid') {
-            $this->applyToTracker($request);
-        }
+            $this->auditLogger->log(
+                'decided_request_'.$validated['status'],
+                'requests',
+                $request->id
+            );
 
-        // Notification for the student (includes request date + instructor name)
-        $request->loadMissing('enrollment.class.instructor');
+            if ($validated['status'] === 'invalid') {
+                $this->applyToTracker($request);
+            }
 
-        $instructorName = $request->enrollment->class->instructor?->name ?? 'your instructor';
-        $typeLabel      = $request->type === 'late' ? 'late' : 'absence';
+            $request->loadMissing('enrollment.class.instructor');
 
-        $dateLabel = $request->start_date_of_absence
-            ? ' for ' . \Illuminate\Support\Carbon::parse($request->start_date_of_absence)->format('M j')
-            : '';
+            $instructorName = $request->enrollment->class->instructor?->name ?? 'your instructor';
+            $typeLabel = $request->type === 'late' ? 'late' : 'absence';
 
-        $statusLabel = match ($validated['status']) {
-            'approved' => 'approved',
-            'noted'    => 'noted',
-            'invalid'  => 'marked invalid',
-        };
+            $dateLabel = $request->start_date_of_absence
+                ? ' for '.Carbon::parse($request->start_date_of_absence)->format('M j')
+                : '';
 
-        UserNotification::create([
-            'user_id'    => $request->enrollment->student_id,
-            'request_id' => $request->id,
-            'type'       => 'request_decision',
-            'message'    => "Your {$typeLabel} request{$dateLabel} was {$statusLabel} by {$instructorName}.",
-            'channel'    => 'in_app',
-            'date_sent'  => now(),
-            'is_read'    => false,
-        ]);
+            $statusLabel = match ($validated['status']) {
+                'approved' => 'approved',
+                'noted' => 'noted',
+                'invalid' => 'marked invalid',
+            };
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Decision recorded.',
-            'data'    => $request->fresh(),
-        ]);
+            UserNotification::create([
+                'user_id' => $request->enrollment->student_id,
+                'request_id' => $request->id,
+                'type' => 'request_decision',
+                'message' => "Your {$typeLabel} request{$dateLabel} was {$statusLabel} by {$instructorName}.",
+                'channel' => 'in_app',
+                'date_sent' => now(),
+                'is_read' => false,
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Decision recorded.',
+                'data' => $request->fresh(),
+            ]);
+        });
     }
 
     /**
@@ -122,11 +116,11 @@ class InstructorRequestController extends Controller
 
             if (! $tracker) {
                 $tracker = AttendanceTracker::create([
-                    'enrollment_id'      => $request->enrollment_id,
-                    'total_lates'        => 0,
-                    'total_absences'     => 0,
+                    'enrollment_id' => $request->enrollment_id,
+                    'total_lates' => 0,
+                    'total_absences' => 0,
                     'converted_absences' => 0,
-                    'status'             => 'safe',
+                    'status' => 'safe',
                 ]);
                 $tracker = AttendanceTracker::where('enrollment_id', $request->enrollment_id)
                     ->lockForUpdate()
@@ -151,15 +145,15 @@ class InstructorRequestController extends Controller
             return; // walang bagong threshold na naabot
         }
 
-        $student     = $request->enrollment->student;
-        $instructor  = $request->enrollment->class->instructor;
+        $student = $request->enrollment->student;
+        $instructor = $request->enrollment->class->instructor;
         $programHead = $student->program?->programHead;
 
         $recipients = array_filter([$instructor, $programHead]);
 
         $subject = $request->enrollment->class->subject_name;
-        $used    = $tracker->unitsUsed();
-        $limit   = $tracker->allowedUnits();
+        $used = $tracker->unitsUsed();
+        $limit = $tracker->allowedUnits();
 
         if ($tracker->status === 'warning') {
             $this->notifyAll(
@@ -172,10 +166,10 @@ class InstructorRequestController extends Controller
 
         if ($tracker->status === 'IR') {
             FollowupFlag::create([
-                'request_id'   => $request->id,
+                'request_id' => $request->id,
                 'flagged_date' => now(),
                 'escalated_to' => $programHead?->id,
-                'status'       => 'open',
+                'status' => 'open',
             ]);
 
             $this->notifyAll(
@@ -194,13 +188,13 @@ class InstructorRequestController extends Controller
     {
         foreach ($recipients as $recipient) {
             UserNotification::create([
-                'user_id'    => $recipient->id,
+                'user_id' => $recipient->id,
                 'request_id' => $request->id,
-                'type'       => $type,
-                'message'    => $message,
-                'channel'    => 'in_app',
-                'date_sent'  => now(),
-                'is_read'    => false,
+                'type' => $type,
+                'message' => $message,
+                'channel' => 'in_app',
+                'date_sent' => now(),
+                'is_read' => false,
             ]);
         }
     }

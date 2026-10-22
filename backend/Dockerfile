@@ -1,4 +1,10 @@
-FROM php:8.4-apache
+FROM php:8.4.27-apache
+
+# Check the actual runtime before installing dependencies or serving requests.
+COPY docker/check-runtime.php /usr/local/bin/alrm-check-runtime.php
+RUN php /usr/local/bin/alrm-check-runtime.php
+
+COPY docker/php-security.ini /usr/local/etc/php/conf.d/zz-alrm-security.ini
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
@@ -28,6 +34,10 @@ RUN a2enmod rewrite
 ENV APACHE_DOCUMENT_ROOT=/var/www/html/public
 RUN sed -ri -e 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/sites-available/*.conf
 RUN sed -ri -e 's!/var/www/!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/apache2.conf /etc/apache2/conf-available/*.conf
+
+# Copy after path rewrites so the explicit public directory is preserved.
+COPY docker/apache-security.conf /etc/apache2/conf-available/alrm-security.conf
+RUN a2enconf alrm-security && apache2ctl -t
 
 # Install Composer
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer

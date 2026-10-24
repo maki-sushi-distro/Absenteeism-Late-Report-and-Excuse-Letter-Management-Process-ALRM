@@ -7,6 +7,7 @@ use App\Models\Enrollment;
 use App\Models\ExcuseRequest;
 use App\Models\RequestAttachment;
 use App\Models\User;
+use App\Services\AuditLoggerService;
 use App\Support\BoundedCollection;
 use Illuminate\Http\Request as HttpRequest;
 use Illuminate\Support\Facades\Auth;
@@ -16,6 +17,8 @@ use Illuminate\Validation\ValidationException;
 
 class RequestController extends Controller
 {
+    public function __construct(protected AuditLoggerService $auditLogger) {}
+
     /**
      * TODO (Future Feature): Draft Requests
      *
@@ -129,6 +132,8 @@ class RequestController extends Controller
                 'contact_number' => $validated['contact_number'],
             ]);
 
+            $this->auditLogger->log('submitted_request', 'requests', $excuseRequest->id);
+
             return $excuseRequest;
         });
 
@@ -198,13 +203,15 @@ class RequestController extends Controller
             $request = ExcuseRequest::whereKey($request->id)->lockForUpdate()->firstOrFail();
             $this->authorize('update', $request);
             abort_if($request->status !== 'pending', 409, 'This request has already been reviewed.');
-            // Evidence replacement must go through the dedicated upload/link flow.
-            // Never accept an arbitrary attachment identifier in a general edit.
+            
             if (array_key_exists('evidence_file_url', $validated)) {
                 abort_if($validated['evidence_file_url'] !== $request->evidence_file_url,
                     422, 'Evidence cannot be replaced through this endpoint.');
             }
             $request->update($validated);
+            if ($request->wasChanged()) {
+                $this->auditLogger->log('updated_request', 'requests', $request->id);
+            }
 
             return response()->json([
                 'success' => true,
@@ -220,6 +227,7 @@ class RequestController extends Controller
             $request = ExcuseRequest::whereKey($request->id)->lockForUpdate()->firstOrFail();
             $this->authorize('update', $request);
             $request->update(['status' => 'cancelled']);
+            $this->auditLogger->log('cancelled_request', 'requests', $request->id);
 
             return response()->json([
                 'success' => true,

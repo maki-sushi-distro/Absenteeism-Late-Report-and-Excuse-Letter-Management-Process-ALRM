@@ -8,6 +8,7 @@ use App\Http\Controllers\Admin\UserApprovalController;
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Auth\OtpController;
 use App\Http\Controllers\Auth\ProfileController;
+use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\Instructor\FollowupController as InstructorFollowupController;
 use App\Http\Controllers\Instructor\InstructorDashboardController;
 use App\Http\Controllers\Instructor\InstructorRequestController;
@@ -108,6 +109,7 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     |----------------------------------------------------------------
     */
     Route::prefix('program-head')->middleware('role:program_head')->group(function () {
+        Route::get('/audit-logs', [AuditLogController::class, 'index']);
         Route::get('/dashboard', [ProgramHeadDashboardController::class, 'index']);
         Route::get('/students/flagged', [ProgramHeadDashboardController::class, 'flaggedStudents']);
         Route::get('/requests', [ProgramHeadDashboardController::class, 'requests']);
@@ -119,6 +121,7 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     |----------------------------------------------------------------
     */
     Route::prefix('admin')->middleware('role:administrator')->group(function () {
+        Route::get('/audit-logs', [AuditLogController::class, 'index']);
         Route::get('/dashboard', [AdminDashboardController::class, 'index']);
         Route::apiResource('users', UserApprovalController::class)->only(['index', 'store', 'destroy']);
         Route::patch('/users/{user}/role', [UserApprovalController::class, 'updateRole']);

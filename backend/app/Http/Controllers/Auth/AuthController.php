@@ -20,6 +20,7 @@ use Illuminate\Support\Str;
 use Laravel\Sanctum\PersonalAccessToken;
 use Laravel\Socialite\Facades\Socialite;
 use Laravel\Socialite\Two\GoogleProvider;
+use Laravel\Socialite\Two\User as SocialiteUser;
 
 class AuthController extends Controller
 {
@@ -153,6 +154,7 @@ class AuthController extends Controller
             $driver = Socialite::driver('google');
             $driver->setHttpClient(ExternalApiClient::make());
 
+            /** @var SocialiteUser $googleUser */
             $googleUser = $driver
                 ->stateless()
                 ->redirectUrl($this->callbackUrlFor($frontendUrl))

@@ -4,8 +4,10 @@ namespace App\Http\Controllers\Student;
 
 use App\Http\Controllers\Controller;
 use App\Mail\InstructorFollowUpMail;
+use App\Models\ClassModel;
 use App\Models\ExcuseRequest;
 use App\Models\FollowupFlag;
+use App\Models\User;
 use App\Services\AuditLoggerService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
@@ -79,7 +81,7 @@ class FollowUpController extends Controller
         });
     }
 
-    private function sendEmail($instructor, $student, $class, ExcuseRequest $request, FollowupFlag $flag, int $count): void
+    private function sendEmail(User $instructor, User $student, ClassModel $class, ExcuseRequest $request, FollowupFlag $flag, int $count): void
     {
         $testRecipient = config('mail.instructor_test_recipient');
         $allowlist = config('mail.instructor_notify_allowlist', []);

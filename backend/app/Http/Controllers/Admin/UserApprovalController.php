@@ -8,6 +8,7 @@ use App\Models\TrustedDevice;
 use App\Models\User;
 use App\Services\AuditLoggerService;
 use App\Support\BoundedCollection;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -43,6 +44,7 @@ class UserApprovalController extends Controller
             'status' => ['sometimes', 'string', Rule::in(['pending', 'approved', 'deactivated', 'inactive'])],
         ]);
 
+        /** @var Builder<User> $query */
         $query = User::query()->whereNotNull('role');
 
         if ($request->filled('role')) {
@@ -57,6 +59,7 @@ class UserApprovalController extends Controller
             $query->where('status', $status);
         }
 
+        /** @var Builder<User> $users */
         $users = $query->with('program')
             ->withExists(['headedProgram as heads_program'])
             ->orderBy('name');

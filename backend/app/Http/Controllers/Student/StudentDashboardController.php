@@ -6,8 +6,10 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\StudentDashboardResource;
 use App\Models\AttendanceTracker;
 use App\Models\ExcuseRequest;
+use App\Models\User;
 use App\Models\UserNotification;
 use App\Services\AcademicPeriod;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -18,8 +20,10 @@ class StudentDashboardController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
+        /** @var User $student */
         $student = $request->user();
 
+        /** @var Collection<int, AttendanceTracker> $trackers */
         $trackers = AttendanceTracker::query()
             ->whereHas('enrollment', fn($q) => $q->where('student_id', $student->id))
             ->with('enrollment.class')
@@ -41,8 +45,8 @@ class StudentDashboardController extends Controller
             default                                  => 'safe',
         };
 
-        // Subject na pinakamalapit sa limit
-        $closest = $trackers->sortByDesc(fn($t) => $t->usageRatio())->first();
+        /** @var AttendanceTracker|null $closest */
+        $closest = $trackers->sortByDesc(fn (AttendanceTracker $tracker): float => $tracker->usageRatio())->first();
 
         $notifications = UserNotification::query()
             ->where('user_id', $student->id);

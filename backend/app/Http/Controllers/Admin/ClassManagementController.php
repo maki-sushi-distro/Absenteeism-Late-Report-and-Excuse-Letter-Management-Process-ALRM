@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Services\AcademicPeriod;
 use App\Services\AuditLoggerService;
 use App\Support\BoundedCollection;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
@@ -132,13 +133,18 @@ class ClassManagementController extends Controller
             return;
         }
 
-        User::query()
+        /** @var Builder<User> $students */
+        $students = User::query()
             ->where('role', 'student')
             ->where('program_id', $class->program_id)
-            ->where('year_level', $class->year_level)
-            ->each(fn (User $student) => Enrollment::firstOrCreate(
+            ->where('year_level', $class->year_level);
+
+        $students->each(function ($student) use ($class): void {
+            /** @var User $student */
+            Enrollment::firstOrCreate(
                 ['student_id' => $student->id, 'class_id' => $class->id],
                 ['year_level' => $class->year_level],
-            ));
+            );
+        });
     }
 }

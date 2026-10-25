@@ -3,14 +3,13 @@ import { createStudentRequest, getStudentClasses, uploadEvidence } from "@/api/s
 import { useAuth } from "@/context/AuthContext";
 import { getStoredProfileSetup } from "@/lib/profileSetup";
 import { buildRequestPayload, proofTypeError } from "./buildPayload";
-import { EVIDENCE, LAST_STEP, initialForm } from "./constants";
+import { EVIDENCE, LAST_STEP, LIMITS, initialForm } from "./constants";
 import { firstInvalidRequestStep, validateReview, validateStep } from "./validation";
 import { validateEvidenceFile } from "./evidenceValidation";
 import { compressImage } from "./imageCompress";
 import {
   buildInitialForm,
   profileDefaults,
-  yearOptionsForProgram,
 } from "./utils";
 
 export default function useRequestForm() {
@@ -37,16 +36,13 @@ export default function useRequestForm() {
   useEffect(() => {
     const defaults = profileDefaults(user, storedProfile);
 
-    // Fill profile-backed fields when the authenticated user arrives.
+    // Keep identity tied to the saved profile, including after a refresh.
     setForm((current) => {
-      const program = current.program || defaults.program;
-      const level = current.level || defaults.level;
-
       return {
         ...current,
-        studentName: current.studentName || defaults.studentName,
-        program,
-        level: yearOptionsForProgram(program).includes(level) ? level : "",
+        studentName: defaults.studentName,
+        program: defaults.program,
+        level: defaults.level,
         guardianName: current.guardianName || defaults.guardianName,
         contactNumber: current.contactNumber || defaults.contactNumber,
       };
@@ -81,17 +77,10 @@ export default function useRequestForm() {
   }, []);
 
   function updateField(name, value) {
+    if (["studentName", "program", "level"].includes(name)) return;
+    if (name === "guardianName" && /\p{N}/u.test(value)) return;
+    if (["guardianName", "reason"].includes(name) && value.length > LIMITS[name]) return;
     setForm((current) => {
-      if (name === "program") {
-        const allowedYears = yearOptionsForProgram(value);
-
-        return {
-          ...current,
-          program: value,
-          level: allowedYears.includes(current.level) ? current.level : "",
-        };
-      }
-
       if (name !== "requestType") return { ...current, [name]: value };
 
       return {

@@ -2,18 +2,20 @@ import { Link } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { ArrowRight, BookOpen, GraduationCap, TriangleAlert } from "lucide-react";
 import { monthlyActivity, requestStudent } from "./programHeadData";
+import { ErrorState } from "@/components/common/ErrorState";
+import { ActivityChartPlaceholder, MetricPlaceholder, ProgramHeaderPlaceholder, SectionPlaceholder } from "@/components/loading/DashboardSkeleton/StaffDashboardPlaceholder";
 
 const panel = "border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900";
 
-function Summary({ dashboard, flags }) {
+function Summary({ dashboard, flags, errors, resourceLoading, ready }) {
   const metrics = [
-    { label: "Classes", value: dashboard?.total_classes, icon: BookOpen },
-    { label: "Total students", value: dashboard?.total_students, icon: GraduationCap },
-    { label: "Students at risk", value: new Set(flags.filter((flag) => flag.status === "open").map((flag) => flag.request?.enrollment?.student?.id || flag.id)).size, icon: TriangleAlert },
+    { label: "Classes", value: dashboard?.total_classes, icon: BookOpen, resource: "dashboard" },
+    { label: "Total students", value: dashboard?.total_students, icon: GraduationCap, resource: "dashboard" },
+    { label: "Students at risk", value: ready.flags ? new Set(flags.filter((flag) => flag.status === "open").map((flag) => flag.request?.enrollment?.student?.id || flag.id)).size : null, icon: TriangleAlert, resource: "flags" },
   ];
-  return <div className="grid gap-4 sm:grid-cols-3">{metrics.map(({ label, value, icon: Icon }) => (
+  return <div className="grid gap-4 sm:grid-cols-3">{metrics.map(({ label, value, icon: Icon, resource }) => resourceLoading[resource] && !ready[resource] ? <MetricPlaceholder key={label} /> : (
     <div key={label} className={`${panel} flex items-center justify-between rounded-md p-5`}>
-      <div><p className="text-sm text-slate-500 dark:text-slate-400">{label}</p><p className="mt-2 text-3xl font-bold text-slate-950 dark:text-white">{value ?? "—"}</p></div>
+      <div><p className="text-sm text-slate-500 dark:text-slate-400">{label}</p><p className="mt-2 text-3xl font-bold text-slate-950 dark:text-white">{errors[resource] ? "—" : value ?? "—"}</p></div>
       <Icon className="size-7 text-blue-900 dark:text-blue-300" aria-hidden="true" />
     </div>
   ))}</div>;
@@ -34,7 +36,13 @@ function RiskPreview({ flags }) {
   </section>;
 }
 
-export default function ProgramHeadOverview({ dashboard, flags, requests }) {
+export default function ProgramHeadOverview({ dashboard, flags, requests, errors = {}, resourceLoading = {}, ready = { dashboard: true, flags: true, requests: true } }) {
   const { user } = useAuth();
-  return <div className="space-y-6"><header><p className="text-sm font-medium text-blue-900 dark:text-blue-300">Program head</p><h1 className="mt-1 text-2xl font-bold">Welcome back, {user?.name || "Program Head"}</h1><p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{dashboard?.program_name || "Your program"} overview</p></header><Summary dashboard={dashboard} flags={flags} /><Activity requests={requests} /><RiskPreview flags={flags} /></div>;
+  return <div className="space-y-6">
+    {resourceLoading.dashboard && !ready.dashboard ? <ProgramHeaderPlaceholder /> : <header><p className="text-sm font-medium text-blue-900 dark:text-blue-300">Program head</p><h1 className="mt-1 text-2xl font-bold">Welcome back, {user?.name || "Program Head"}</h1><p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{dashboard?.program_name || "Your program"} overview</p></header>}
+    <Summary dashboard={dashboard} flags={flags} errors={errors} resourceLoading={resourceLoading} ready={ready} />
+    {errors.dashboard ? <ErrorState title="Could not load program summary" message={errors.dashboard} /> : null}
+    {resourceLoading.requests && !ready.requests ? <ActivityChartPlaceholder /> : errors.requests ? <ErrorState title="Could not load request activity" message={errors.requests} /> : <Activity requests={requests} />}
+    {resourceLoading.flags && !ready.flags ? <SectionPlaceholder /> : errors.flags ? <ErrorState title="Could not load students at risk" message={errors.flags} /> : <RiskPreview flags={flags} />}
+  </div>;
 }

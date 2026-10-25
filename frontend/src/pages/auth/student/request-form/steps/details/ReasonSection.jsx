@@ -2,7 +2,7 @@ import { Input } from "@/components/ui/input";
 import ErrorText from "../../components/ErrorText";
 import FieldLabel from "../../components/FieldLabel";
 import SectionBox from "../../components/SectionBox";
-import { absenceReasonOptions } from "../../constants";
+import { absenceReasonOptions, LIMITS } from "../../constants";
 import { controlClass } from "../../utils";
 
 export default function ReasonSection({
@@ -42,6 +42,7 @@ export default function ReasonSection({
         <FieldLabel>Reason</FieldLabel>
         <Input
           value={form.reason}
+          maxLength={LIMITS.reason}
           onChange={(event) => updateField("reason", event.target.value)}
           aria-invalid={Boolean(fieldErrors.reason)}
           className={controlClass(

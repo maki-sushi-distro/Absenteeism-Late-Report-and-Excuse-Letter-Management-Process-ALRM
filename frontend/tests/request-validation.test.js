@@ -19,7 +19,7 @@ test("student details reject numeric guardian names and invalid phone prefixes",
     dateSubmitted: "2026-10-13" };
   const errors = check(form, 3);
   assert.match(errors.guardianName, /must not contain numbers/);
-  assert.match(errors.contactNumber, /starting with 09 or \+639/);
+  assert.match(errors.contactNumber, /9 digits after \+639/);
   assert.deepEqual(check({ ...form, guardianName: "Alex Parent",
     contactNumber: "+639123456789" }, 3), {});
 });

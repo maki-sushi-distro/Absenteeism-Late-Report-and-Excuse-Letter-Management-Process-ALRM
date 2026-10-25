@@ -23,12 +23,13 @@ export function ProtectedRoute({
   allowedRoles,
   children,
 }) {
-  const { user, loading, sessionError } = useAuth();
+  const { user, loading, sessionError, logoutDestination } = useAuth();
   const location = useLocation();
   const pendingOtpToken = getPendingOtpToken();
   const pendingOtpUserId = getPendingOtpUserId();
   const { activeRole } = usePreviewRole(user);
 
+  if (!user && logoutDestination) return <Navigate to={logoutDestination} replace />;
   if (!user && (loading || sessionError)) return <SessionStatus />;
 
   if (!user && (pendingOtpToken || pendingOtpUserId)) {

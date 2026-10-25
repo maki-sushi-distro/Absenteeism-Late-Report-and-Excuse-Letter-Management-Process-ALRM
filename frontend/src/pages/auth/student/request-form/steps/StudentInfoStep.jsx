@@ -1,4 +1,5 @@
 import { Input } from "@/components/ui/input";
+import ContactNumberInput from "../components/ContactNumberInput";
 import ErrorText from "../components/ErrorText";
 import FieldLabel from "../components/FieldLabel";
 import FormNavigation from "../components/FormNavigation";
@@ -9,7 +10,6 @@ import SectionBox from "../components/SectionBox";
 import { programOptions } from "../constants";
 import {
   controlClass,
-  normalizePhoneInput,
   yearOptionsForProgram,
 } from "../utils";
 
@@ -37,6 +37,9 @@ export default function StudentInfoStep({
   onBack,
   onNext,
 }) {
+  const programs = form.program && !programOptions.includes(form.program)
+    ? [...programOptions, form.program]
+    : programOptions;
   return (
     <RequestShell requestType={form.requestType} step={step}>
       <HeaderIdentity requestType={form.requestType} step={step} user={user} />
@@ -49,8 +52,8 @@ export default function StudentInfoStep({
           <FieldLabel>Student Name</FieldLabel>
           <Input
             value={form.studentName}
-            onChange={(event) => updateField("studentName", event.target.value)}
-            placeholder="Add text here..."
+            aria-label="Student Name"
+            readOnly
             aria-invalid={Boolean(fieldErrors.studentName)}
             className={controlClass(fieldErrors.studentName, inputClass)}
           />
@@ -59,8 +62,8 @@ export default function StudentInfoStep({
       </SectionBox>
 
       <SectionBox invalid={Boolean(fieldErrors.program)} title="Program">
-        <div className="grid gap-2 sm:grid-cols-2">
-          {programOptions.map((program) => (
+        <fieldset disabled aria-label="Program" className="grid gap-2 sm:grid-cols-2 [&_label]:cursor-default">
+          {programs.map((program) => (
             <RadioOption
               key={program}
               name="program"
@@ -70,12 +73,12 @@ export default function StudentInfoStep({
               onChange={updateField}
             />
           ))}
-        </div>
+        </fieldset>
         <ErrorText message={fieldErrors.program} />
       </SectionBox>
 
       <SectionBox invalid={Boolean(fieldErrors.level)} title="Level">
-        <div className="grid gap-2 sm:grid-cols-4">
+        <fieldset disabled aria-label="Level" className="grid gap-2 sm:grid-cols-4 [&_label]:cursor-default">
           {yearOptionsForProgram(form.program).map((year) => (
             <RadioOption
               key={year}
@@ -86,12 +89,14 @@ export default function StudentInfoStep({
               onChange={updateField}
             />
           ))}
-        </div>
+        </fieldset>
         <ErrorText message={fieldErrors.level} />
       </SectionBox>
 
       <TextField label="Parent/Guardian's Name" error={fieldErrors.guardianName}>
         <Input
+          name="guardianName"
+          aria-label="Parent/Guardian's Name"
           value={form.guardianName}
           onChange={(event) => updateField("guardianName", event.target.value)}
           placeholder="Add text here..."
@@ -101,14 +106,10 @@ export default function StudentInfoStep({
       </TextField>
 
       <TextField label="Contact Number" error={fieldErrors.contactNumber}>
-        <Input
+        <ContactNumberInput
           value={form.contactNumber}
-          onChange={(event) =>
-            updateField("contactNumber", normalizePhoneInput(event.target.value))
-          }
-          placeholder="09XXXXXXXXX or +639XXXXXXXXX"
-          aria-invalid={Boolean(fieldErrors.contactNumber)}
-          className={controlClass(fieldErrors.contactNumber, inputClass)}
+          onChange={(value) => updateField("contactNumber", value)}
+          error={fieldErrors.contactNumber}
         />
       </TextField>
 

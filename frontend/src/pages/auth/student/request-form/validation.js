@@ -21,14 +21,14 @@ function validateStudentInfo(form) {
   } else if (form.guardianName.trim().length > LIMITS.guardianName) {
     // NEW
     errors.guardianName = `Parent or guardian's name must not exceed ${LIMITS.guardianName} characters.`;
-  } else if (/\d/.test(form.guardianName.trim())) {
+  } else if (/\p{N}/u.test(form.guardianName.trim())) {
     errors.guardianName = "Parent or guardian's name must not contain numbers.";
   }
   if (!form.contactNumber.trim()) {
     errors.contactNumber = "Enter your contact number.";
   } else if (!/^(09\d{9}|\+639\d{9})$/.test(form.contactNumber.trim())) {
     errors.contactNumber =
-      "Enter a valid phone number starting with 09 or +639.";
+      "Enter all 9 digits after +639.";
   }
   if (!form.dateSubmitted) errors.dateSubmitted = "Choose a date.";
 

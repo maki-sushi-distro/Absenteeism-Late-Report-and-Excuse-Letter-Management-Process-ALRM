@@ -76,14 +76,20 @@ export function flowSteps(requestType) {
   ];
 }
 
-export function normalizePhoneInput(value) {
-  const trimmed = String(value || "").trim();
-
-  if (trimmed.startsWith("+")) {
-    return `+${trimmed.slice(1).replace(/\D/g, "").slice(0, 12)}`;
+export function phoneDigits(value) {
+  const raw = String(value || "").trim();
+  let digits = raw.replace(/\D/g, "");
+  if (raw.startsWith("+639") || (digits.length > 9 && digits.startsWith("639"))) {
+    digits = digits.slice(3);
+  } else if (digits.length > 9 && digits.startsWith("09")) {
+    digits = digits.slice(2);
   }
+  return digits.slice(0, 9);
+}
 
-  return trimmed.replace(/\D/g, "").slice(0, 11);
+export function normalizePhoneInput(value) {
+  const digits = phoneDigits(value);
+  return digits ? `+639${digits}` : "";
 }
 
 export function yearOptionsForProgram(program) {
@@ -121,7 +127,7 @@ export function matchProgram(stored) {
   if (!target) return "";
 
   return (
-    programOptions.find((option) => normalizeProgram(option) === target) || ""
+    programOptions.find((option) => normalizeProgram(option) === target) || String(stored).trim()
   );
 }
 
@@ -142,7 +148,7 @@ export function profileDefaults(user, storedProfile) {
     program,
     level: matchYearLevel(storedProfile?.year_level, program),
     guardianName: user?.guardian_name || "",
-    contactNumber: user?.contact_number || "",
+    contactNumber: normalizePhoneInput(user?.contact_number),
   };
 }
 

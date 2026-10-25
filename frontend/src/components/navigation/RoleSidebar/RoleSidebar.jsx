@@ -4,6 +4,7 @@ import {
   SidebarMenu, SidebarMenuItem, SidebarProvider,
 } from "@/components/ui/sidebar";
 import { useAuth } from "@/context/AuthContext";
+import { logoutToSignedOut } from "@/lib/logout";
 import SidebarBrand from "./SidebarBrand";
 import SidebarLogout from "./SidebarLogout";
 import SidebarNavigation from "./SidebarNavigation";
@@ -12,9 +13,8 @@ function RoleSidebar({ children, navigation, wide = false, compact = "student" }
   const navigate = useNavigate();
   const { logout } = useAuth();
 
-  async function handleLogout() {
-    await logout();
-    navigate("/login", { replace: true });
+  function handleLogout() {
+    return logoutToSignedOut(logout, navigate);
   }
 
   return (

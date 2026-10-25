@@ -1,22 +1,20 @@
-import { absenceReasonOptions, LIMITS, programOptions, proofOptions, requestOptions } from "../constants";
-import { classLabel, normalizePhoneInput, yearOptionsForProgram } from "../utils";
+import { absenceReasonOptions, LIMITS, proofOptions, requestOptions } from "../constants";
+import { classLabel } from "../utils";
 import ReviewAttachment from "./ReviewAttachment";
 import ReviewCheckboxGroup from "./ReviewCheckboxGroup";
 import ReviewField from "./ReviewField";
-
-const choices = (values) => values.map((value) => ({ value, label: value }));
 
 export default function RequestReviewEditor({ form, user, classes, classesLoading, classesError, fieldErrors = {}, updateField, toggleListField, onFileChange, processing, disabled }) {
   const isAbsence = form.requestType === "absence";
   const fields = [
     { name: "requestType", label: "Request type", options: requestOptions },
-    { name: "studentName", label: "Student name", maxLength: LIMITS.studentName },
+    { name: "studentName", label: "Student name", readOnly: true },
     { name: "email", label: "Email address", value: user?.email || "Not available", readOnly: true },
     { name: "schoolId", label: "Student ID", value: user?.school_student_id || "Not available", readOnly: true },
-    { name: "program", label: "Program", options: choices(programOptions) },
-    { name: "level", label: "Year level", options: choices(yearOptionsForProgram(form.program)) },
+    { name: "program", label: "Program", readOnly: true },
+    { name: "level", label: "Year level", readOnly: true },
     { name: "guardianName", label: "Parent/Guardian's name", maxLength: LIMITS.guardianName },
-    { name: "contactNumber", label: "Contact number", type: "tel", onChange: (value) => updateField("contactNumber", normalizePhoneInput(value)) },
+    { name: "contactNumber", label: "Contact number", phone: true },
     { name: "dateSubmitted", label: "Date submitted", type: "date" },
     { name: "classId", label: "Subject/Class", options: classes.map((item) => ({ value: item.class_id, label: classLabel(item) })), loading: classesLoading, disabled: classesLoading, error: fieldErrors.classId || classesError },
     ...(isAbsence ? [

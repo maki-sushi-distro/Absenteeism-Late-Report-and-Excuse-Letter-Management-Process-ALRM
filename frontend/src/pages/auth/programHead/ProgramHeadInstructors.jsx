@@ -1,10 +1,12 @@
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ArrowLeft, ArrowRight, Search } from "lucide-react";
+import { ArrowRight, Search } from "lucide-react";
 import { ErrorState } from "@/components/common/ErrorState";
-import { Spinner } from "@/components/ui/spinner";
+import LoadingSkeleton from "@/components/loading/LoadingSkeleton";
+import PageBreadcrumbs from "@/components/navigation/PageBreadcrumbs";
 import { instructorRows, requestClass, requestStudent } from "./programHeadData";
 import { useProgramHeadRecords } from "./useProgramHeadRecords";
+import { TEXT_INPUT_MAX_LENGTH } from "@/lib/inputLimits";
 
 const panel = "overflow-x-auto rounded-md border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900";
 
@@ -17,9 +19,9 @@ export function ProgramHeadInstructors() {
   const [search, setSearch] = useState("");
   const rows = instructorRows(requests).filter((row) => `${row.name} ${row.classes.map((item) => item.subject_name).join(" ")}`.toLowerCase().includes(search.toLowerCase()));
   return <div className="space-y-5"><header><h1 className="text-2xl font-bold">Instructors</h1><p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Instructors associated with requests in your program</p></header>
-    <label className="relative block max-w-sm"><Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" /><span className="sr-only">Search instructors</span><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search instructor or subject" className="w-full rounded-md border border-slate-300 bg-white py-2 pl-9 pr-3 text-sm dark:border-slate-700 dark:bg-slate-900" /></label>
+    <label className="relative block max-w-sm"><Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" /><span className="sr-only">Search instructors</span><input maxLength={TEXT_INPUT_MAX_LENGTH} value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search instructor or subject" className="w-full rounded-md border border-slate-300 bg-white py-2 pl-9 pr-3 text-sm dark:border-slate-700 dark:bg-slate-900" /></label>
     {errors.requests ? <ErrorState message={errors.requests} /> : null}{errors.requests ? <button onClick={refresh} className="text-sm text-blue-800 underline dark:text-blue-300">Retry</button> : null}
-    {loading ? <div className="flex items-center gap-2"><Spinner />Loading instructors</div> : rows.length ? <InstructorTable rows={rows} /> : <p className="rounded-md border border-slate-200 p-5 text-sm text-slate-500 dark:border-slate-800 dark:text-slate-400">{search ? "No instructors match your search." : "No instructor-linked requests are available yet. The backend does not provide a full instructor roster to program heads."}</p>}
+    {loading ? <LoadingSkeleton variant="table" columns={5} label="Loading instructors" /> : rows.length ? <InstructorTable rows={rows} /> : <p className="rounded-md border border-slate-200 p-5 text-sm text-slate-500 dark:border-slate-800 dark:text-slate-400">{search ? "No instructors match your search." : "No instructor-linked requests are available yet. The backend does not provide a full instructor roster to program heads."}</p>}
     <p className="text-xs text-slate-500 dark:text-slate-400">Counts reflect submitted requests, not attendance records or the full class roster.</p>
   </div>;
 }
@@ -43,8 +45,8 @@ export function ProgramHeadInstructorDetail() {
   const [classId, setClassId] = useState("");
   const selectedClass = classId || instructor?.classes[0]?.id;
   const visible = requests.filter((request) => requestClass(request)?.instructor?.id === instructorId && requestClass(request)?.id === selectedClass);
-  return <div className="space-y-5"><Link className="inline-flex items-center gap-2 text-sm text-blue-800 hover:underline dark:text-blue-300" to="/program-head/instructors"><ArrowLeft className="size-4" /> Instructors</Link>
+  return <div className="space-y-5"><PageBreadcrumbs items={[{ label: "Instructors", to: "/program-head/instructors" }, { label: instructor?.name || "Instructor Details" }]} />
     {errors.requests ? <ErrorState message={errors.requests} /> : null}
-    {loading ? <div className="flex items-center gap-2"><Spinner />Loading instructor</div> : instructor ? <><header><h1 className="text-2xl font-bold">{instructor.name}</h1><p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Student request activity by class</p></header><label className="block text-sm font-medium">Class <select value={selectedClass} onChange={(event) => setClassId(event.target.value)} className="ml-2 max-w-full rounded-md border border-slate-300 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-900">{instructor.classes.map((item) => <option key={item.id} value={item.id}>{item.subject_name} · {item.section || "No section"}</option>)}</select></label><StudentRequestTable requests={visible} /><p className="text-xs text-slate-500 dark:text-slate-400">These are submitted requests, not complete attendance or threshold records.</p></> : <p className="text-sm text-slate-500">Instructor not found in program requests.</p>}
+    {loading ? <LoadingSkeleton variant="profile" columns={3} label="Loading instructor" /> : instructor ? <><header><h1 className="text-2xl font-bold">{instructor.name}</h1><p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Student request activity by class</p></header><label className="block text-sm font-medium">Class <select value={selectedClass} onChange={(event) => setClassId(event.target.value)} className="ml-2 max-w-full rounded-md border border-slate-300 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-900">{instructor.classes.map((item) => <option key={item.id} value={item.id}>{item.subject_name} · {item.section || "No section"}</option>)}</select></label><StudentRequestTable requests={visible} /><p className="text-xs text-slate-500 dark:text-slate-400">These are submitted requests, not complete attendance or threshold records.</p></> : <p className="text-sm text-slate-500">Instructor not found in program requests.</p>}
   </div>;
 }

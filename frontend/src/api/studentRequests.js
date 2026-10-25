@@ -78,6 +78,18 @@ export async function updateStudentRequest(requestId, payload) {
   return body?.data ?? body;
 }
 
+export async function followUpStudentRequest(requestId, { signal } = {}) {
+  const res = await apiFetch(`/api/requests/${encodeURIComponent(requestId)}/follow-up`, {
+    method: "POST",
+    signal,
+  });
+  const body = await expectJson(res);
+  if (body?.success !== true || !body?.data?.id) {
+    throw new Error(typeof body?.message === "string" ? body.message : "The server did not confirm your follow-up. Please check your request before trying again.");
+  }
+  return body;
+}
+
 // NEW: i-upload ang attachment. Ibinabalik ang { path (attachment ID), name, type }
 export async function uploadEvidence(file) {
   const formData = new FormData();

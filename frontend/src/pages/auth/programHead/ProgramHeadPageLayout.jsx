@@ -15,7 +15,7 @@ function ProgramHeadPageLayout({ children }) {
 
   return (
     <RoleSidebar navigation={navigation} compact="program">
-      <DashboardPageLayout name={user?.name || "Program Head"} role="Program Head">
+      <DashboardPageLayout name={user?.name || "Program Head"} role="Program Head" user={user}>
         {children}
       </DashboardPageLayout>
     </RoleSidebar>

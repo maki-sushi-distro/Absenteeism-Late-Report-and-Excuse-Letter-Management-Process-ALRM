@@ -2,8 +2,9 @@ import { Input } from "@/components/ui/input";
 import ErrorText from "./ErrorText";
 import { controlClass } from "../utils";
 import LoadingSkeleton from "@/components/loading/LoadingSkeleton";
+import ContactNumberInput from "./ContactNumberInput";
 
-export default function ReviewField({ name, label, value, onChange, error, options, multiline, wide, loading, ...props }) {
+export default function ReviewField({ name, label, value, onChange, error, options, multiline, wide, loading, phone, ...props }) {
   const id = `review-${name}`;
   const shared = {
     ...props, id, name, value: value ?? "",
@@ -16,7 +17,7 @@ export default function ReviewField({ name, label, value, onChange, error, optio
     {loading ? <LoadingSkeleton variant="field" label={`Loading ${label.toLowerCase()}...`} /> : options ? <select {...shared}>
       <option value="">Select {label.toLowerCase()}</option>
       {options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-    </select> : multiline ? <textarea {...shared} rows={4} /> : <Input {...shared} />}
+    </select> : phone ? <ContactNumberInput {...props} id={id} value={value} onChange={onChange} error={error} aria-describedby={shared["aria-describedby"]} /> : multiline ? <textarea {...shared} rows={4} /> : <Input {...shared} />}
     {error && <div id={`${id}-error`} role="alert"><ErrorText message={error} /></div>}
   </div>;
 }

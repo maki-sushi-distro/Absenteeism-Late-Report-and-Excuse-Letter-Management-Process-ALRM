@@ -42,6 +42,7 @@ function AddStudent() {
       sectionTitle="Student Information"
       submitLabel="Add Student"
       cancelPath="/students"
+      parentLabel="Students"
       initialValues={initialValues}
       fields={fields}
       validate={validate}

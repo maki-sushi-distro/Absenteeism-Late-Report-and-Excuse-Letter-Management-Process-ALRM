@@ -42,6 +42,7 @@ function AddInstructor() {
       sectionTitle="Instructor Information"
       submitLabel="Add Instructor"
       cancelPath="/instructors"
+      parentLabel="Instructors"
       initialValues={initialValues}
       fields={fields}
       validate={validate}

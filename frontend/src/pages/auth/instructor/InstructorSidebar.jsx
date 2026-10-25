@@ -1,7 +1,7 @@
 import { NavLink, useNavigate } from "react-router-dom";
 import {
-  ClipboardList,
-  FileText,
+  FilePen,
+  FileInput,
   LayoutDashboard,
   LogOut,
   Settings,
@@ -11,6 +11,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import LogoutConfirmation from "@/components/navigation/RoleSidebar/LogoutConfirmation";
+import { logoutToSignedOut } from "@/lib/logout";
 import {
   Sidebar as AppSidebar,
   SidebarContent,
@@ -35,12 +36,12 @@ const menuItems = [
   {
     label: "Class Records",
     path: "/instructor/class-records",
-    icon: ClipboardList,
+    icon: FilePen,
   },
   {
     label: "Class Requests",
     path: "/instructor/class-requests",
-    icon: FileText,
+    icon: FileInput,
   },
   {
     label: "Settings",
@@ -75,9 +76,8 @@ function InstructorSidebar({ children }) {
   const navigate = useNavigate();
   const { logout } = useAuth();
 
-  async function handleLogout() {
-    await logout();
-    navigate("/login", { replace: true });
+  function handleLogout() {
+    return logoutToSignedOut(logout, navigate);
   }
 
   return (
@@ -102,18 +102,23 @@ function InstructorSidebar({ children }) {
 
               return (
                 <SidebarMenuItem key={item.path}>
-                  <NavLink to={item.path} end={item.path === "/dashboard"}>
+                  <NavLink to={item.path} aria-label={item.label} end={item.path === "/dashboard"}>
                     {({ isActive }) => (
                       <SidebarMenuButton
                         isActive={isActive}
                         tooltip={item.label}
                         className={cn(
-                          "h-9 gap-3 rounded-[6px] px-4 text-[15px] font-bold text-slate-100 hover:bg-white/10 hover:text-white group-data-[collapsible=icon]:size-10! group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0!",
+                          "h-9 gap-3 rounded-[6px] px-4 text-[15px] font-bold text-slate-100 hover:bg-white/10 hover:text-white [&_svg]:size-5 [--sidebar-icon-bg:#0d1526] hover:[--sidebar-icon-bg:#252c3c] group-data-[collapsible=icon]:size-10! group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0!",
                           isActive &&
-                            "bg-[#203b82] text-white hover:bg-[#203b82]",
+                            "bg-[#203b82] text-white hover:bg-[#203b82] data-active:bg-[#203b82] data-active:text-white data-active:hover:bg-[#203b82] [--sidebar-icon-bg:#203b82] hover:[--sidebar-icon-bg:#203b82]",
                         )}
                       >
-                        <Icon className="size-5 shrink-0" strokeWidth={2.25} />
+                        <Icon
+                          aria-hidden="true"
+                          className={cn("size-5 shrink-0", Icon === Settings && "[&>circle]:fill-[var(--sidebar-icon-bg)] [&>circle]:stroke-none")}
+                          fill={Icon === Settings ? "currentColor" : "none"}
+                          strokeWidth={2}
+                        />
                         <span className="group-data-[collapsible=icon]:hidden">
                           {item.label}
                         </span>
@@ -131,15 +136,16 @@ function InstructorSidebar({ children }) {
             <SidebarMenuItem>
               <AlertDialog>
                 <AlertDialogTrigger
+                  aria-label="Logout"
                   render={
                     <SidebarMenuButton
                       type="button"
                       tooltip="Logout"
-                      className="h-9 gap-3 rounded-[6px] px-4 text-[15px] font-bold text-slate-100 hover:bg-red-500/15 hover:text-white group-data-[collapsible=icon]:size-10! group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0!"
+                      className="h-9 gap-3 rounded-[6px] px-4 text-[15px] font-bold text-slate-100 hover:bg-red-500/15 hover:text-white [&_svg]:size-5 group-data-[collapsible=icon]:size-10! group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0!"
                     />
                   }
                 >
-                  <LogOut className="size-5 shrink-0" strokeWidth={2.25} />
+                  <LogOut aria-hidden="true" className="size-5 shrink-0" strokeWidth={2} />
                   <span className="group-data-[collapsible=icon]:hidden">
                     Logout
                   </span>

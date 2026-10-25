@@ -1,14 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import {
   AlertCircle,
-  ArrowLeft,
   ChevronDown,
   Search,
   UserCircle,
 } from "lucide-react";
 import { getAdminStudent } from "@/api/adminStudents";
 import LoadingSkeleton from "@/components/loading/LoadingSkeleton";
+import PageBreadcrumbs from "@/components/navigation/PageBreadcrumbs";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -474,7 +474,6 @@ function RequestsTable({ requests }) {
 }
 
 function StudentProfile() {
-  const navigate = useNavigate();
   const { studentId } = useParams();
   const [student, setStudent] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -538,15 +537,7 @@ function StudentProfile() {
   return (
     <AdminPageLayout>
       <div className="mx-auto grid w-full max-w-[1040px] gap-6">
-        <Button
-          type="button"
-          variant="ghost"
-          onClick={() => navigate("/students")}
-          className="h-auto w-fit rounded-[5px] px-0 py-0 text-sm font-black text-[#203b82] hover:bg-transparent hover:text-[#14285f]"
-        >
-          <ArrowLeft className="size-4" />
-          Back to Students
-        </Button>
+        <PageBreadcrumbs items={[{ label: "Students", to: "/students" }, { label: "Student Profile" }]} />
 
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <h1 className="text-2xl font-black tracking-normal text-slate-950">

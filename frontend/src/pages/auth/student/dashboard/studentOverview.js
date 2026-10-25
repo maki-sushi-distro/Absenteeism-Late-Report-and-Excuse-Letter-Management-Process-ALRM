@@ -1,13 +1,6 @@
 export const ATTENDANCE_POLICY = { warning: 2, incidentReport: 3, latesPerAbsence: 3 };
 
-export function programShortName(name) {
-  const normalized = String(name || "").replace(/^Bachelor of Science\s+/i, "BS ")
-    .replace(/^Bachelor of Arts\s+/i, "BA ").replace(/^Associate in\s+/i, "A ");
-  const match = normalized.match(/^(BS|BA|A)\s+(?:in\s+)?(.+)$/i);
-  if (!match) return normalized;
-  const initials = match[2].split(/\s+/).filter((word) => !["and", "in", "of"].includes(word.toLowerCase())).map((word) => word[0]).join("");
-  return `${match[1]}${initials}`.toUpperCase();
-}
+export { programShortName } from "../../../../lib/programs.js";
 
 export function studentProfile(user, classes = []) {
   const sections = [...new Set(classes.map((item) => item.section).filter(Boolean))];

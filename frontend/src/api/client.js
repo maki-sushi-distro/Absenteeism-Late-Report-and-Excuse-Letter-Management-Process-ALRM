@@ -120,8 +120,8 @@ export async function apiDownload(path, filename = "alrm-report.xlsx") {
 }
 
 export function googleLoginUrl(options = {}) {
-  const base = /^https?:\/\//.test(API_URL) ? API_URL : window.location.origin;
-  const url = new URL("/api/auth/google/redirect", base);
+  // The OAuth cookie must be set on the same host that receives Google's callback.
+  const url = new URL("/api/auth/google/redirect", window.location.origin);
   url.searchParams.set("origin", window.location.origin);
   if (options.prompt) url.searchParams.set("prompt", options.prompt);
   return url.toString();

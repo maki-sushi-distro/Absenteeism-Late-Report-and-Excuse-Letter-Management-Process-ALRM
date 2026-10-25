@@ -10,28 +10,7 @@ import { EVIDENCE, proofOptions } from "../constants";
 import { compressImage } from "../imageCompress";
 import { validateEvidenceFile } from "../evidenceValidation";
 import UploadProgress from "@/components/loading/UploadProgress";
-
-function FileThumbnail({ file }) {
-  const imageRef = useRef(null);
-  const isImage = file.type.startsWith("image/");
-
-  useEffect(() => {
-    if (!isImage) return;
-    const url = URL.createObjectURL(file);
-    if (imageRef.current) imageRef.current.src = url;
-    return () => URL.revokeObjectURL(url);
-  }, [file, isImage]);
-
-  return (
-    <div className="flex size-16 shrink-0 items-center justify-center rounded-xl border border-[#DCE3F0] bg-white p-1.5 sm:size-20">
-      {isImage ? (
-        <img ref={imageRef} alt="Selected attachment thumbnail" className="size-full rounded-md object-cover" />
-      ) : (
-        <FileText aria-hidden="true" className="size-9 text-[#65799E]" />
-      )}
-    </div>
-  );
-}
+import AttachmentPreview from "../components/AttachmentPreview";
 
 export default function AttachmentStep({
   step,
@@ -195,18 +174,20 @@ export default function AttachmentStep({
           onDrop={handleDrop}
           className={`flex min-h-48 flex-col items-center justify-center gap-4 rounded-xl border border-dashed px-4 py-7 text-center transition-colors ${dragging ? "border-blue-600 bg-blue-50" : "border-[#B8C8E5] bg-[#F7F9FE]"}`}
         >
-          {processing ? <UploadProgress label="Checking your file..." className="flex-col" /> : <CloudUpload aria-hidden="true" className="size-12 text-[#66799E]" strokeWidth={1.7} />}
-          {!processing && <p role="status" className="text-base font-medium text-[#0B1229]">
-            {dragging ? "Drop your file here" : "Drag and drop your file here"}
-          </p>}
-          <button
+          {processing ? <UploadProgress label="Checking your file..." className="flex-col" /> : file ? <AttachmentPreview file={file} /> : <>
+            <CloudUpload aria-hidden="true" className="size-12 text-[#66799E]" strokeWidth={1.7} />
+            <p role="status" className="text-base font-medium text-[#0B1229]">
+              {dragging ? "Drop your file here" : "Drag and drop your file here"}
+            </p>
+          </>}
+          {!file && <button
             type="button"
             onClick={() => inputRef.current?.click()}
             disabled={processing}
             className="inline-flex h-11 items-center justify-center rounded-lg bg-[#1960F2] px-7 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
           >
             Choose file
-          </button>
+          </button>}
           <input
             ref={inputRef}
             type="file"
@@ -219,7 +200,6 @@ export default function AttachmentStep({
         </div>
         {file && (
           <div className="flex flex-wrap items-center gap-4 rounded-xl border border-[#D8E0EF] bg-[#FDFEFF] p-4">
-            <FileThumbnail file={file} />
             <div className="min-w-0 flex-1 basis-28">
               <button type="button" onClick={openFile} disabled={processing} title={file.name} className="block max-w-full truncate text-left text-base font-bold text-[#0B1229] hover:text-blue-600 focus-visible:outline-2 focus-visible:outline-blue-600">
                 {file.name}

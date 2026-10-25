@@ -1,3 +1,5 @@
+import { TEXT_INPUT_MAX_LENGTH } from "../../../../lib/inputLimits.js";
+
 export const requestOptions = [
   { label: "Student Late Form", value: "late" },
   { label: "Student Absence Form", value: "absence" },
@@ -58,8 +60,8 @@ export const initialForm = {
 
 export const LIMITS = {
   studentName: 100,
-  guardianName: 60,
-  reason: 300,
+  guardianName: TEXT_INPUT_MAX_LENGTH,
+  reason: 100,
   minutesLate: 3, // max na digits (hanggang 999)
 };
 

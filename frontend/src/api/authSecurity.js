@@ -1,7 +1,7 @@
 import { needsProfileSetup } from '../lib/profileSetup.js';
 
 const LAST_PAGE_PREFIX = 'alrm_last_page:';
-const AUTH_PATHS = ['/login', '/auth/callback', '/auth/otp', '/verify-otp', '/complete-profile'];
+const AUTH_PATHS = ['/login', '/signed-out', '/auth/callback', '/auth/otp', '/verify-otp', '/complete-profile'];
 
 function safePage(path) {
   if (typeof path !== 'string' || !path.startsWith('/') || path.startsWith('//')) return null;

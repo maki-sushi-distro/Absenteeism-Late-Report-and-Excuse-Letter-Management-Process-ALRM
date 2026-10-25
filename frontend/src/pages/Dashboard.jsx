@@ -17,7 +17,7 @@ export function Dashboard() {
 
   if (role === "student") return <StudentDashboard />;
   if (role === "instructor") {
-    return <InstructorPageLayout><InstructorDashboard /></InstructorPageLayout>;
+    return <InstructorPageLayout title="Dashboard"><InstructorDashboard /></InstructorPageLayout>;
   }
   if (role === "program") {
     return <ProgramHeadPageLayout><ProgramHeadDashboard /></ProgramHeadPageLayout>;

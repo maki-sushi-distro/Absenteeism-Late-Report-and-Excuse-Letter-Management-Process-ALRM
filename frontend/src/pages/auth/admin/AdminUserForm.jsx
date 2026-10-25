@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AlertCircle, CheckCircle2, IdCard, Mail, User } from "lucide-react";
 import LoadingSkeleton from "@/components/loading/LoadingSkeleton";
+import PageBreadcrumbs from "@/components/navigation/PageBreadcrumbs";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -94,6 +95,7 @@ function SelectField({ error, label, loading = false, name, onChange, value, chi
 
 function AdminUserForm({
   cancelPath,
+  parentLabel,
   createUser,
   fields,
   initialValues,
@@ -193,6 +195,7 @@ function AdminUserForm({
 
   return (
     <AdminPageLayout>
+      <PageBreadcrumbs className="mb-5" items={[{ label: parentLabel, to: cancelPath }, { label: title }]} />
       <div className="mb-6">
         <h1 className="text-2xl font-black tracking-normal text-slate-950">
           {title}

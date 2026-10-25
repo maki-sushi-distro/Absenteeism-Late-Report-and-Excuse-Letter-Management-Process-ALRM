@@ -1,9 +1,11 @@
-import LoadingSkeleton from '@/components/loading/LoadingSkeleton';
+import { useLocation } from 'react-router-dom';
+import AuthLoading from '@/components/loading/AuthLoading';
 import { useAuth } from '@/context/AuthContext';
 import HttpErrorPage from '@/pages/HttpErrorPage';
 
 export default function SessionStatus() {
   const { loading, sessionError, refreshUser } = useAuth();
+  const { pathname } = useLocation();
 
   if (!loading) {
     return (
@@ -15,9 +17,6 @@ export default function SessionStatus() {
     );
   }
 
-  return (
-    <main className="min-h-screen bg-background px-5 py-10 text-foreground">
-      <LoadingSkeleton label="Restoring your session..." className="mx-auto max-w-6xl" />
-    </main>
-  );
+  const authPath = /^\/(login|verify-otp)\/*$/.test(pathname) || pathname.startsWith('/auth/');
+  return <AuthLoading label={authPath ? 'Signing you in...' : 'Loading ALRM System...'} />;
 }

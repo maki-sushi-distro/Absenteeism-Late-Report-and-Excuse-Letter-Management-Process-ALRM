@@ -11,6 +11,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import LogoutConfirmation from "@/components/navigation/RoleSidebar/LogoutConfirmation";
+import { logoutToSignedOut } from "@/lib/logout";
 import {
   Sidebar as AppSidebar,
   SidebarContent,
@@ -75,9 +76,8 @@ function StudentSidebar({ children }) {
   const navigate = useNavigate();
   const { logout } = useAuth();
 
-  async function handleLogout() {
-    await logout();
-    navigate("/login", { replace: true });
+  function handleLogout() {
+    return logoutToSignedOut(logout, navigate);
   }
 
   return (

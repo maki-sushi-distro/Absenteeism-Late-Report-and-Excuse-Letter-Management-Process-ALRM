@@ -17,7 +17,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
-import LoadingSkeleton from "@/components/loading/LoadingSkeleton";
+import AuthLoading from "@/components/loading/AuthLoading";
 import { useAuth } from "@/context/AuthContext";
 import {
   checkTrustedDevice,
@@ -324,18 +324,7 @@ function OtpVerificationForm() {
   }
 
   if (checking) {
-    return (
-      <main className="grid min-h-screen place-items-center bg-slate-50 px-5 text-slate-950">
-        <div className="grid w-full max-w-md justify-items-center gap-4 text-center">
-          <img
-            src={lvLogo}
-            alt="La Verdad Christian College logo"
-            className="size-20 object-contain"
-          />
-          <LoadingSkeleton variant="form" rows={4} label="Signing you in..." />
-        </div>
-      </main>
-    );
+    return <AuthLoading />;
   }
 
   if (!hasPendingOtp) {

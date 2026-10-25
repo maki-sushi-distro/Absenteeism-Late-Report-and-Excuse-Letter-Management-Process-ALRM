@@ -9,6 +9,7 @@ export function AuthProvider({ children }) {
   const token = useSyncExternalStore(subscribeToTokenChanges, getToken, () => null);
   const [session, setSession] = useState({ token: null, user: null, error: '', loading: false });
   const requestVersion = useRef(0);
+  const [logoutDestination, setLogoutDestination] = useState(null);
 
   const loadUser = useCallback((nextToken) => {
     const version = ++requestVersion.current;
@@ -49,6 +50,7 @@ export function AuthProvider({ children }) {
 
   async function loginWithToken(nextToken) {
     if (!nextToken) throw new Error('Missing login token.');
+    setLogoutDestination(null);
     setToken(nextToken);
     const user = await loadUser(nextToken);
     if (!user) throw new Error('Unable to confirm your session. Please try again.');
@@ -56,7 +58,9 @@ export function AuthProvider({ children }) {
     return user;
   }
 
-  async function logout() {
+  async function logout({ redirectToSignedOut = false } = {}) {
+    // The token subscription can re-render protected routes before the sidebar navigates.
+    setLogoutDestination(redirectToSignedOut ? '/signed-out' : null);
     const request = apiFetch('/api/logout', {
       method: 'POST',
       signal: AbortSignal.timeout(10000),
@@ -78,7 +82,7 @@ export function AuthProvider({ children }) {
   const sessionError = currentSession ? session.error : '';
 
   return (
-    <AuthContext.Provider value={{ user, loading, sessionError, loginWithToken, logout, refreshUser }}>
+    <AuthContext.Provider value={{ user, loading, sessionError, logoutDestination, loginWithToken, logout, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

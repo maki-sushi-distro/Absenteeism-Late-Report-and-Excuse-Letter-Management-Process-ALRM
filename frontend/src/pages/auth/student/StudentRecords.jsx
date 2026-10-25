@@ -6,13 +6,17 @@ import { getStudentRequest, openEvidence, updateStudentRequest } from "@/api/stu
 import { useAuth } from "@/context/AuthContext";
 import StatusBadge from "@/components/dashboard/StatusBadge";
 import StudentPageLayout from "./StudentPageLayout";
-import { proofOptions } from "./request-form/constants";
+import { LIMITS, proofOptions } from "./request-form/constants";
+import { TEXT_INPUT_MAX_LENGTH } from "@/lib/inputLimits";
 import { buildRequestEditForm, buildRequestUpdatePayload, proofTypeError } from "./request-form/buildPayload";
 import { paginateRecords } from "./records/pagination";
 import { filterRecords, reasonOf, recordDate, subjectOf, typeOf } from "./records/recordData";
 import RecordsTabs from "./records/RecordsTabs";
 import RecordActions from "./records/RecordActions";
+import FollowUpNotice from "./records/FollowUpNotice";
+import useRequestFollowUp from "./records/useRequestFollowUp";
 import LoadingSkeleton from "@/components/loading/LoadingSkeleton";
+import TablePageSkeleton from "@/components/loading/TablePageSkeleton";
 
 // Keep My Records data handling, filters, and UI together in this student page.
 async function fetchRecords(signal) {
@@ -74,6 +78,11 @@ function RequestEditForm({ record, onSaved, onCancel }) {
   async function save(event) {
     event.preventDefault();
     if (loading || saving) return;
+    if (form.reason.length > LIMITS.reason) {
+      setErrors({ reason: `Reason must not exceed ${LIMITS.reason} characters.` });
+      setError("Please shorten your reason before saving.");
+      return;
+    }
     setSaving(true);
     setError("");
     setErrors({});
@@ -96,7 +105,7 @@ function RequestEditForm({ record, onSaved, onCancel }) {
       {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
       {loading ? error ? <p className="text-sm text-slate-500">Edit form could not be loaded.</p> : <LoadingSkeleton variant="form" rows={4} label="Loading request details..." /> : <>
         <label className="grid gap-2 text-sm font-semibold">{form.type === "absence" ? "Reason of absence" : "Reason"}
-          <textarea required maxLength={500} value={form.reason} onChange={(event) => change("reason", event.target.value)} aria-invalid={Boolean(errors.reason)} rows={3} className={control} />
+          <textarea required maxLength={LIMITS.reason} value={form.reason} onChange={(event) => change("reason", event.target.value)} aria-invalid={Boolean(errors.reason)} rows={3} className={control} />
           {fieldError("reason") && <span role="alert" className="font-normal text-red-600">{fieldError("reason")}</span>}
         </label>
         {form.type === "absence" ? <>
@@ -143,6 +152,7 @@ export default function StudentRecords() {
   const [attachmentError, setAttachmentError] = useState("");
   const [openingAttachment, setOpeningAttachment] = useState(false);
   const dialogRef = useRef(null);
+  const { followingUpId, notice, followUp, dismissNotice } = useRequestFollowUp();
 
   useEffect(() => {
     const controller = new AbortController();
@@ -228,12 +238,12 @@ export default function StudentRecords() {
     <StudentPageLayout contentPadding="px-5 sm:px-[50px]">
       <section aria-label="My Records" className="grid min-w-0 w-full gap-2">
         <h1 className="sr-only">My Records</h1>
-        <RecordsTabs value={recordType} onValueChange={changeRecordType}>
+        {loading ? <TablePageSkeleton layout="student-records" label="Loading your records..." /> : <RecordsTabs value={recordType} onValueChange={changeRecordType}>
         <div className="grid min-w-0 gap-2">
         <div className="flex flex-wrap items-center gap-3">
           <div className="relative w-[220px] max-w-full">
             <Search aria-hidden="true" className="pointer-events-none absolute left-2.5 top-3 size-4 text-slate-400" />
-            <input aria-label="Search records" placeholder="Search Name..." value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} className={`${inputClass} w-full pl-8 pr-3`} />
+            <input aria-label="Search records" placeholder="Search Name..." maxLength={TEXT_INPUT_MAX_LENGTH} value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} className={`${inputClass} w-full pl-8 pr-3`} />
           </div>
           <div className="relative w-[190px] max-w-full">
             <select aria-label="Filter by subject" value={subject} onChange={(event) => { setSubject(event.target.value); setPage(1); }} className={`${inputClass} w-full appearance-none pl-3 pr-8`}>
@@ -243,6 +253,7 @@ export default function StudentRecords() {
           </div>
         </div>
         {error && <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300">{error} <button type="button" onClick={refresh} className="ml-2 font-semibold underline">Try again</button></div>}
+        <FollowUpNotice notice={notice} onDismiss={dismissNotice} />
         <div aria-busy={loading} className="overflow-x-auto">
           <table className="w-full min-w-[820px] table-auto border-collapse text-left text-sm leading-5">
             <colgroup><col /><col className="w-[20%]" /><col className="w-[18%]" /><col className="w-[228px]" /></colgroup>
@@ -255,9 +266,7 @@ export default function StudentRecords() {
               </tr>
             </thead>
             <tbody>
-              {loading ? (
-                <tr><td colSpan={4} className="px-4 py-3"><LoadingSkeleton variant="table" columns={4} rows={10} label="Loading your records..." /></td></tr>
-              ) : error ? (
+              {error ? (
                 <tr><td colSpan={4} className="px-4 py-10 text-center text-slate-500">Records could not be loaded.</td></tr>
               ) : visibleRecords.length === 0 ? (
                 <tr><td colSpan={4} className="px-4 py-10 text-center text-slate-500">{typeRecords.length ? "No records match your search or subject filter." : `You have no submitted ${recordType === "absence" ? "absence" : "late"} requests yet.`}</td></tr>
@@ -266,7 +275,7 @@ export default function StudentRecords() {
                   <td className="break-words px-4 py-4">{subjectOf(record)}</td>
                   <td className="whitespace-nowrap px-4 py-4">{formatDate(recordDate(record))}</td>
                   <td className="px-4 py-4"><StatusBadge value={record.status} /></td>
-                  <td className="px-4 py-4 text-right"><RecordActions record={record} onView={viewRecord} description={`${subjectOf(record)}, ${formatDate(recordDate(record))}`} /></td>
+                  <td className="px-4 py-4 text-right"><RecordActions record={record} onView={viewRecord} description={`${subjectOf(record)}, ${formatDate(recordDate(record))}`} onFollowUp={followUp} followingUpId={followingUpId} /></td>
                 </tr>
               ))}
             </tbody>
@@ -293,7 +302,7 @@ export default function StudentRecords() {
           </div>
         )}
         </div>
-        </RecordsTabs>
+        </RecordsTabs>}
       </section>
 
       <dialog ref={dialogRef} aria-labelledby="record-dialog-title" onClose={() => {

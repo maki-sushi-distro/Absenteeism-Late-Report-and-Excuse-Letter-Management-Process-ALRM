@@ -98,7 +98,7 @@ function Login() {
               Welcome Back!
             </CardTitle>
             <CardDescription className="text-[18px] text-slate-600">
-              Sign in to your account
+              Sign in with your La Verdad Christian College account.
             </CardDescription>
           </CardHeader>
 

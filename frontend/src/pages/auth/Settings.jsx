@@ -1,16 +1,12 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import {
   AlertCircle,
-  Bell,
-  KeyRound,
-  Mail,
   Settings as SettingsIcon,
-  ShieldCheck,
   UserRound,
 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
+import NotificationPreferences from "@/components/notifications/NotificationPreferences";
 import {
   Card,
   CardContent,
@@ -21,7 +17,6 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { Switch } from "@/components/ui/switch";
 import { useAuth } from "@/context/AuthContext";
 import { getStoredProfileSetup } from "@/lib/profileSetup";
 import AdminPageLayout from "./admin/AdminPageLayout";
@@ -194,20 +189,6 @@ function SettingsCard({ icon: Icon, title, description, children }) {
   );
 }
 
-function UnsupportedActionAlert({ notice }) {
-  if (!notice) return null;
-
-  return (
-    <Alert className="mb-5 border-amber-200 bg-amber-50 text-amber-950">
-      <AlertCircle className="size-4" />
-      <AlertTitle>{notice.title}</AlertTitle>
-      <AlertDescription className="text-amber-900">
-        {notice.description}
-      </AlertDescription>
-    </Alert>
-  );
-}
-
 function ProfileCard({ user, config, role }) {
   const normalizedRole = normalizeRole(role);
   const storedSetup = getStoredProfileSetup(user);
@@ -321,125 +302,6 @@ function AdminPolicyCard() {
   );
 }
 
-function NotificationCard({ config, onUnsupported }) {
-  const channels = [
-    {
-      label: "In-app Notifications",
-      description: "Alerts inside the ALRM system.",
-    },
-    {
-      label: "School Email",
-      description: "Messages sent to the authenticated LV email account.",
-    },
-  ];
-
-  return (
-    <SettingsCard
-      icon={Bell}
-      title={config.preferencesTitle}
-      description={config.preferencesDescription}
-    >
-      <div className="grid gap-3">
-        {channels.map((channel) => (
-          <div
-            key={channel.label}
-            className="flex flex-col gap-3 rounded-[5px] border border-slate-200 p-4 sm:flex-row sm:items-center sm:justify-between"
-          >
-            <div>
-              <p className="text-sm font-black text-slate-950">
-                {channel.label}
-              </p>
-              <p className="mt-1 text-sm text-slate-600">
-                {channel.description}
-              </p>
-            </div>
-            <div className="flex items-center gap-3">
-              <span className="text-xs font-bold text-slate-500">
-                Managed by system
-              </span>
-              <Switch checked={false} disabled aria-label={channel.label} />
-            </div>
-          </div>
-        ))}
-      </div>
-      <Button
-        type="button"
-        variant="outline"
-        className="mt-4 h-9 rounded-[5px] border-slate-300 font-bold text-[#0b367f]"
-        onClick={() =>
-          onUnsupported(
-            "Notification preferences unavailable",
-            "The backend has notification records, but no preference endpoint is registered for reading or saving per-user notification channels."
-          )
-        }
-      >
-        Manage Notifications
-      </Button>
-    </SettingsCard>
-  );
-}
-
-function SecurityCard({ user, onUnsupported }) {
-  return (
-    <SettingsCard
-      icon={ShieldCheck}
-      title="Account & Security"
-      description="Security information for your authenticated ALRM session."
-    >
-      <div className="grid gap-4 md:grid-cols-2">
-        <div className="rounded-[5px] border border-slate-200 p-4">
-          <div className="flex items-center gap-2 text-slate-950">
-            <Mail className="size-4 text-[#203b82]" />
-            <p className="text-sm font-black">Google Account</p>
-          </div>
-          <p className="mt-2 text-sm text-slate-600">
-            {valueOrFallback(user?.email)} is managed through LV Google OAuth.
-          </p>
-        </div>
-
-        <div className="rounded-[5px] border border-slate-200 p-4">
-          <div className="flex items-center gap-2 text-slate-950">
-            <KeyRound className="size-4 text-[#203b82]" />
-            <p className="text-sm font-black">Password</p>
-          </div>
-          <p className="mt-2 text-sm text-slate-600">
-            Password changes are handled by the LV Google account provider.
-          </p>
-        </div>
-      </div>
-
-      <div className="mt-4 flex flex-wrap gap-2">
-        <Button
-          type="button"
-          variant="outline"
-          className="h-9 rounded-[5px] border-slate-300 font-bold text-[#0b367f]"
-          onClick={() =>
-            onUnsupported(
-              "Password change unavailable",
-              "No change-password API route exists in the current backend. This login flow uses Google OAuth."
-            )
-          }
-        >
-          Change Password
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          className="h-9 rounded-[5px] border-slate-300 font-bold text-[#0b367f]"
-          onClick={() =>
-            onUnsupported(
-              "Security settings unavailable",
-              "No account-security settings endpoint is registered for the frontend to update."
-            )
-          }
-        >
-          Account Security
-        </Button>
-      </div>
-    </SettingsCard>
-  );
-}
-
 function SettingsLayout({ children, role }) {
   if (normalizeRole(role) === "program_head") {
     return <ProgramHeadPageLayout>{children}</ProgramHeadPageLayout>;
@@ -478,14 +340,9 @@ function UnknownRoleState({ role }) {
 
 function Settings() {
   const { user, loading } = useAuth();
-  const [notice, setNotice] = useState(null);
 
   const normalizedRole = useMemo(() => normalizeRole(user?.role), [user?.role]);
   const config = normalizedRole ? ROLE_CONFIG[normalizedRole] : null;
-
-  function showUnsupported(title, description) {
-    setNotice({ title, description });
-  }
 
   if (loading) {
     return (
@@ -515,8 +372,6 @@ function Settings() {
           </p>
         </div>
 
-        <UnsupportedActionAlert notice={notice} />
-
         <div className="grid gap-5">
           <ProfileCard
             user={user}
@@ -526,12 +381,7 @@ function Settings() {
 
           {normalizedRole === "administrator" && <AdminPolicyCard />}
 
-          <NotificationCard
-            config={config}
-            onUnsupported={showUnsupported}
-          />
-
-          <SecurityCard user={user} onUnsupported={showUnsupported} />
+          <NotificationPreferences key={user?.id} userId={user?.id} role={normalizedRole} />
         </div>
       </div>
     </SettingsLayout>

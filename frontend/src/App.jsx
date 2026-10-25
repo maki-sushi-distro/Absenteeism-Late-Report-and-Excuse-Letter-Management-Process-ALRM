@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
 import { ProtectedRoute } from "./routes/ProtectedRoute";
 import Login from "./pages/login";
+import SignedOut from "./pages/auth/SignedOut";
 import { AuthCallback } from "./pages/AuthCallback";
 import { Dashboard } from "./pages/Dashboard";
 import OtpVerification from "./pages/OtpVerification";
@@ -14,8 +15,9 @@ import { AdminDashboard as AdminWorkspace } from "./pages/auth/admin/AdminDashbo
 import StudentProfile from "./pages/auth/admin/StudentProfile";
 import Students from "./pages/auth/admin/Students";
 import Settings from "./pages/auth/Settings";
-import InstructorPageLayout from "./pages/auth/instructor/InstructorPageLayout";
-import { InstructorDashboard as InstructorWorkspace } from "./pages/auth/instructor/InstructorDashboard";
+import Notifications from "./pages/auth/Notifications";
+import InstructorClassRecords from "./pages/auth/instructor/InstructorClassRecords";
+import InstructorRequests from "./pages/auth/instructor/InstructorRequests";
 import { ProgramHeadDashboard as ProgramHeadWorkspace } from "./pages/auth/programHead/ProgramHeadDashboard";
 import { ProgramHeadInstructors, ProgramHeadInstructorDetail } from "./pages/auth/programHead/ProgramHeadInstructors";
 import { ProgramHeadReports } from "./pages/auth/programHead/ProgramHeadReports";
@@ -34,6 +36,7 @@ function App() {
           <AppErrorBoundary>
             <Routes>
           <Route path="/login" element={<Login />} />
+          <Route path="/signed-out" element={<SignedOut />} />
           <Route path="/auth/callback" element={<AuthCallback />} />
           <Route path="/verify-otp" element={<OtpVerification />} />
           <Route path="/auth/otp" element={<OtpVerification />} />
@@ -114,15 +117,16 @@ function App() {
             path="/instructor/class-records"
             element={
               <ProtectedRoute allowedRoles={["instructor"]}>
-                <InstructorPageLayout><InstructorWorkspace view="dashboard" /></InstructorPageLayout>
+                <InstructorClassRecords />
               </ProtectedRoute>
             }
           />
+          <Route path="/instructor/class-records/:classId" element={<ProtectedRoute allowedRoles={["instructor"]}><InstructorClassRecords /></ProtectedRoute>} />
           <Route
             path="/instructor/class-requests"
             element={
               <ProtectedRoute allowedRoles={["instructor"]}>
-                <InstructorPageLayout><InstructorWorkspace view="requests" /></InstructorPageLayout>
+                <InstructorRequests />
               </ProtectedRoute>
             }
           />
@@ -135,6 +139,7 @@ function App() {
             }
           />
           <Route path="/student/notifications" element={<ProtectedRoute allowedRoles={["student"]}><StudentNotificationsPage /></ProtectedRoute>} />
+          <Route path="/notifications" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
           <Route
             path="/student/request"
             element={

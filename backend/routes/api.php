@@ -15,6 +15,7 @@ use App\Http\Controllers\Instructor\InstructorRequestController;
 use App\Http\Controllers\Instructor\InstructorRequestExportController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\ProgramHead\ProgramHeadDashboardController;
+use App\Http\Controllers\ProgramHead\ProgramHeadReportController;
 use App\Http\Controllers\Student\AttendanceController;
 use App\Http\Controllers\Student\ClassController;
 use App\Http\Controllers\Student\EvidenceController;
@@ -111,6 +112,7 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     |----------------------------------------------------------------
     */
     Route::prefix('program-head')->middleware('role:program_head')->group(function () {
+        Route::get('/reports/export', [ProgramHeadReportController::class, 'export'])->middleware('throttle:exports');
         Route::get('/audit-logs', [AuditLogController::class, 'index']);
         Route::get('/dashboard', [ProgramHeadDashboardController::class, 'index']);
         Route::get('/students', [ProgramHeadDashboardController::class, 'students']);

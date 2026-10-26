@@ -15,6 +15,41 @@ use Tests\SecurityTestCase;
 
 class ProgramHeadAttendanceAlertsTest extends SecurityTestCase
 {
+    protected function setUp(): void
+    {
+        parent::setUp();
+        config(['mail.program_head_test_recipient' => null, 'mail.test_recipient' => null]);
+    }
+
+    public function test_program_head_alerts_only_email_the_configured_tester_without_changing_in_app_owners(): void
+    {
+        $request = $this->requestFor($this->user('student'));
+        $programId = $request->enrollment->class->program_id;
+        $first = $this->user('program_head', ['program_id' => $programId]);
+        $second = $this->user('program_head', ['program_id' => $programId]);
+        config([
+            'mail.program_head_test_recipient' => 'marwin.mandocdoc@student.laverdad.edu.ph',
+            'mail.test_recipient' => 'global-tester@example.com',
+        ]);
+        $tracker = AttendanceTracker::create([
+            'enrollment_id' => $request->enrollment_id, 'total_absences' => 3,
+            'total_lates' => 0, 'converted_absences' => 3, 'status' => 'warning',
+        ]);
+        app(AttendanceThresholdNotifier::class)->notify($tracker);
+        $tracker->update(['status' => 'IR', 'total_absences' => 4, 'converted_absences' => 4]);
+        app(AttendanceThresholdNotifier::class)->notify($tracker);
+
+        Mail::assertQueued(ProgramHeadAttendanceAlertMail::class, 2);
+        foreach (['warning', 'IR'] as $status) {
+            Mail::assertQueued(ProgramHeadAttendanceAlertMail::class, fn ($mail) => $mail->alertStatus === $status && $mail->hasTo('marwin.mandocdoc@student.laverdad.edu.ph')
+                && ! $mail->hasTo($first->email) && ! $mail->hasTo($second->email)
+                && ! $mail->hasTo('global-tester@example.com')
+            );
+        }
+        $this->assertSame(2, UserNotification::where('user_id', $first->id)->count());
+        $this->assertSame(2, UserNotification::where('user_id', $second->id)->count());
+    }
+
     public function test_decisions_send_both_stages_to_all_program_heads_once_without_automation_duplicates(): void
     {
         $student = $this->user('student');

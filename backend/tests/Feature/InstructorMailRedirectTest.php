@@ -10,7 +10,9 @@ use App\Models\User;
 use App\Models\UserNotification;
 use App\Notifications\SendOtpCode;
 use App\Observers\ExcuseRequestObserver;
+use App\Providers\AppServiceProvider;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Mail\MailManager;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Schema;
@@ -47,13 +49,12 @@ class InstructorMailRedirectTest extends TestCase
     {
         (new ExcuseRequestObserver)->created($this->request());
 
-        Mail::assertQueued(InstructorExcuseRequestMail::class, fn ($mail) =>
-            $mail->hasTo('tester@example.com') && ! $mail->hasTo('teacher@example.com')
+        Mail::assertQueued(InstructorExcuseRequestMail::class, fn ($mail) => $mail->hasTo('tester@example.com') && ! $mail->hasTo('teacher@example.com')
         );
         $this->assertSame('teacher-id', UserNotification::sole()->user_id);
 
         config(['mail.default' => 'array']);
-        Mail::swap(new \Illuminate\Mail\MailManager($this->app));
+        Mail::swap(new MailManager($this->app));
         $user = new User(['name' => 'OTP User', 'email' => 'otp-user@example.com']);
         $user->notify(new SendOtpCode('123456'));
 
@@ -69,6 +70,26 @@ class InstructorMailRedirectTest extends TestCase
         (new ExcuseRequestObserver)->created($this->request());
 
         Mail::assertQueued(InstructorExcuseRequestMail::class, fn ($mail) => $mail->hasTo('teacher@example.com'));
+    }
+
+    public function test_otp_reaches_students_and_instructors_even_when_test_redirects_are_configured(): void
+    {
+        config([
+            'mail.default' => 'array',
+            'mail.test_recipient' => 'global-tester@example.com',
+            'mail.program_head_test_recipient' => 'marwin.mandocdoc@student.laverdad.edu.ph',
+        ]);
+        Mail::swap(new MailManager($this->app));
+        (new AppServiceProvider($this->app))->boot();
+
+        foreach (['student', 'instructor'] as $role) {
+            $user = new User(['name' => 'OTP User', 'role' => $role, 'email' => $role.'@example.com']);
+            $user->notify(new SendOtpCode('123456'));
+        }
+        $messages = Mail::mailer()->getSymfonyTransport()->messages();
+        $this->assertCount(2, $messages);
+        $addresses = $messages->map(fn ($message) => $message->getOriginalMessage()->getTo()[0]->getAddress())->all();
+        $this->assertEqualsCanonicalizing(['student@example.com', 'instructor@example.com'], $addresses);
     }
 
     private function request(): ExcuseRequest

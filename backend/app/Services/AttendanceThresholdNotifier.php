@@ -44,6 +44,12 @@ class AttendanceThresholdNotifier
                 ? "{$student->name} is near the absence limit in {$class->subject_name} ({$used} of {$limit} units). One more absence will trigger an IR."
                 : "{$student->name} exceeded the allowable absences in {$class->subject_name} ({$used} of {$limit} units) and needs follow-up.";
 
+            $testRecipient = trim((string) config('mail.program_head_test_recipient', ''));
+            if ($testRecipient === '') {
+                $testRecipient = trim((string) config('mail.test_recipient', ''));
+            }
+            $emailTargets = [];
+
             foreach ($recipients as $recipient) {
                 UserNotification::create([
                     'user_id' => $recipient->id,
@@ -55,10 +61,13 @@ class AttendanceThresholdNotifier
                     'is_read' => false,
                 ]);
 
-                if (filled($recipient->email)) {
-                    Mail::to($recipient->email, $recipient->name)->queue(
+                $email = $testRecipient !== '' ? $testRecipient : $recipient->email;
+                if (filled($email) && ! isset($emailTargets[strtolower($email)])) {
+                    $emailTargets[strtolower($email)] = true;
+                    Mail::to($email, $testRecipient !== '' ? null : $recipient->name)->queue(
                         (new ProgramHeadAttendanceAlertMail(
-                            $recipient->name, $student->name, $class->subject_name,
+                            $testRecipient !== '' ? 'Program Head' : $recipient->name,
+                            $student->name, $class->subject_name,
                             $program->program_name, $tracker->status, $message, $used, $limit,
                         ))->afterCommit(),
                     );

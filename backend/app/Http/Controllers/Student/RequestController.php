@@ -49,7 +49,8 @@ class RequestController extends Controller
             'type' => ['required', 'in:absence,late'],
             'subjects_missed' => ['required', 'string', 'max:255'],
             'minutes_late' => ['required_if:type,late', 'nullable', 'integer', 'min:1', 'max:999'],
-            'start_date_of_absence' => ['required_if:type,absence', 'nullable', 'date'],
+            // This existing field stores the occurrence date for both absence and late requests.
+            'start_date_of_absence' => ['required', 'date'],
             'end_date_of_absence' => ['nullable', 'date', 'after_or_equal:start_date_of_absence'],
             'reason' => ['required', 'string', 'max:600'],
             'evidence_file_url' => [
@@ -93,8 +94,10 @@ class RequestController extends Controller
                 ->where('reason', $validated['reason'])
                 ->where('subjects_missed', $validated['subjects_missed'])
                 ->where('minutes_late', $validated['minutes_late'] ?? null)
-                ->where('start_date_of_absence', $validated['start_date_of_absence'] ?? null)
-                ->where('end_date_of_absence', $validated['end_date_of_absence'] ?? null)
+                ->whereDate('start_date_of_absence', $validated['start_date_of_absence'])
+                ->when($validated['end_date_of_absence'] ?? null,
+                    fn ($query, $date) => $query->whereDate('end_date_of_absence', $date),
+                    fn ($query) => $query->whereNull('end_date_of_absence'))
                 ->where('created_at', '>', now()->subMinutes(5))
                 ->exists();
             abort_if($duplicate, 409, 'This request was already submitted. Please check your records.');
@@ -190,7 +193,7 @@ class RequestController extends Controller
             'type' => ['required', 'in:absence,late'],
             'subjects_missed' => ['required', 'string', 'max:255'],
             'minutes_late' => ['required_if:type,late', 'nullable', 'integer', 'min:1', 'max:999'],
-            'start_date_of_absence' => ['required_if:type,absence', 'nullable', 'date'],
+            'start_date_of_absence' => ['required', 'date'],
             'end_date_of_absence' => ['nullable', 'date', 'after_or_equal:start_date_of_absence'],
             'reason' => ['required', 'string', 'max:500'],
             'evidence_file_url' => ['nullable', 'uuid'],
@@ -203,7 +206,7 @@ class RequestController extends Controller
             $request = ExcuseRequest::whereKey($request->id)->lockForUpdate()->firstOrFail();
             $this->authorize('update', $request);
             abort_if($request->status !== 'pending', 409, 'This request has already been reviewed.');
-            
+
             if (array_key_exists('evidence_file_url', $validated)) {
                 abort_if($validated['evidence_file_url'] !== $request->evidence_file_url,
                     422, 'Evidence cannot be replaced through this endpoint.');

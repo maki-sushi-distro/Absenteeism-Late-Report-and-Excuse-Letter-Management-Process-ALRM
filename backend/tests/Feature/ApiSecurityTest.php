@@ -128,6 +128,7 @@ class ApiSecurityTest extends SecurityTestCase
         $existing = $this->requestFor($owner);
         $payload = ['class_id' => $existing->enrollment->class_id, 'type' => 'late',
             'subjects_missed' => 'Security', 'minutes_late' => 10, 'reason' => 'Bus delay',
+            'start_date_of_absence' => '2026-10-21',
             'guardian_name' => 'Guardian', 'contact_number' => '09123456789'];
         $this->bearer($owner)->postJson('/api/requests', $payload)->assertCreated();
         $this->bearer($owner)->postJson('/api/requests', $payload)->assertConflict();
@@ -259,6 +260,7 @@ class ApiSecurityTest extends SecurityTestCase
         $this->bearer($owner)->patchJson('/api/requests/'.$request->id, [
             'type' => 'late', 'subjects_missed' => 'Security', 'minutes_late' => 10,
             'reason' => 'Updated reason', 'status' => 'approved', 'reviewed_by' => $owner->id,
+            'start_date_of_absence' => '2026-10-21',
         ])->assertOk()->assertJsonPath('data.status', 'pending');
         $this->assertNull($request->fresh()->reviewed_by);
         $this->bearer($owner)->postJson('/api/complete-profile', [
@@ -274,6 +276,7 @@ class ApiSecurityTest extends SecurityTestCase
         $this->bearer($owner)->patchJson('/api/requests/'.$request->id, [
             'type' => 'late', 'subjects_missed' => 'Security', 'minutes_late' => 10,
             'reason' => 'Updated reason', 'evidence_file_url' => (string) Str::uuid(),
+            'start_date_of_absence' => '2026-10-21',
         ])->assertUnprocessable();
         $this->assertNull($request->fresh()->evidence_file_url);
     }

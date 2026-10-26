@@ -31,6 +31,9 @@ class MailDeliveryService
             'student' => trim((string) config('mail.student_test_recipient', '')),
             default => '',
         };
+        if ($testRecipient === '') {
+            $testRecipient = trim((string) config('mail.test_recipient', ''));
+        }
 
         try {
             Mail::to($testRecipient !== '' ? $testRecipient : $user->email, $testRecipient !== '' ? null : $user->name)

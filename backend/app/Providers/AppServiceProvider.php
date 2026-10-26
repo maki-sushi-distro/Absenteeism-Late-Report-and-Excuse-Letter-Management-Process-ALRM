@@ -85,9 +85,7 @@ class AppServiceProvider extends ServiceProvider
             );
         });
 
-        // Testing safeguard: lahat ng email ay ire-redirect sa isang address lang.
-        if ($to = config('mail.test_recipient')) {
-            Mail::alwaysTo($to);
-        }
+        // Request-mail redirects are handled by the delivery services.
+        // Do not apply a global alwaysTo override: OTP must reach the login account.
     }
 }

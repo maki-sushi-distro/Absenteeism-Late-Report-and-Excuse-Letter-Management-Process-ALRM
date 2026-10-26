@@ -98,6 +98,7 @@ class RequestProofTypesTest extends SecurityTestCase
             'type' => 'late',
             'subjects_missed' => 'Networking',
             'minutes_late' => 23,
+            'start_date_of_absence' => '2026-10-21',
             'reason' => 'may sakit po e',
         ];
     }

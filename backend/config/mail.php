@@ -127,5 +127,6 @@ return [
     'instructor_test_recipient' => env('MAIL_INSTRUCTOR_TEST_RECIPIENT'),
     'test_recipient' => env('MAIL_TEST_RECIPIENT'),
     'student_test_recipient' => env('MAIL_STUDENT_TEST_RECIPIENT'),
+    'program_head_test_recipient' => env('MAIL_PROGRAM_HEAD_TEST_RECIPIENT'),
 
 ];

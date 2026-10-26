@@ -4,7 +4,6 @@ namespace App\Policies;
 
 use App\Models\ExcuseRequest;
 use App\Models\User;
-use Illuminate\Auth\Access\Response;
 
 class ExcuseRequestPolicy
 {
@@ -40,10 +39,9 @@ class ExcuseRequestPolicy
 
         // Program Head — primary role OR an instructor who also heads this
         // program (same override as RoleMiddleware §9.1a).
-        $headedProgram = $user->headedProgram;
-
-        return $headedProgram && $excuseRequest->enrollment->class->program_id === $headedProgram->id;
+        return $user->headsProgram($excuseRequest->enrollment->class->program_id);
     }
+
     /**
      * Determine whether the user can approve/note/invalidate the request.
      * Only the instructor of the class this request was filed under.

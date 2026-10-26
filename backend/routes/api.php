@@ -5,10 +5,10 @@ use App\Http\Controllers\Admin\ClassManagementController;
 use App\Http\Controllers\Admin\ProgramController;
 use App\Http\Controllers\Admin\ReportController;
 use App\Http\Controllers\Admin\UserApprovalController;
+use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Auth\OtpController;
 use App\Http\Controllers\Auth\ProfileController;
-use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\Instructor\FollowupController as InstructorFollowupController;
 use App\Http\Controllers\Instructor\InstructorDashboardController;
 use App\Http\Controllers\Instructor\InstructorRequestController;
@@ -111,6 +111,8 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     Route::prefix('program-head')->middleware('role:program_head')->group(function () {
         Route::get('/audit-logs', [AuditLogController::class, 'index']);
         Route::get('/dashboard', [ProgramHeadDashboardController::class, 'index']);
+        Route::get('/students', [ProgramHeadDashboardController::class, 'students']);
+        Route::get('/instructors', [ProgramHeadDashboardController::class, 'instructors']);
         Route::get('/students/flagged', [ProgramHeadDashboardController::class, 'flaggedStudents']);
         Route::get('/requests', [ProgramHeadDashboardController::class, 'requests']);
     });

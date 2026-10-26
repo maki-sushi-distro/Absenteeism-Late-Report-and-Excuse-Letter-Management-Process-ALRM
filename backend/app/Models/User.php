@@ -86,6 +86,23 @@ class User extends Authenticatable
         return $this->hasOne(Program::class, 'program_head_id');
     }
 
+    /** Explicit co-head assignments, separate from teaching membership. */
+    public function additionalHeadedPrograms(): BelongsToMany
+    {
+        return $this->belongsToMany(Program::class, 'program_head_assignments')->withTimestamps();
+    }
+
+    public function headedProgramIds(): array
+    {
+        return Program::where('program_head_id', $this->id)->pluck('id')
+            ->merge($this->additionalHeadedPrograms()->pluck('programs.id'))->unique()->values()->all();
+    }
+
+    public function headsProgram(?string $programId): bool
+    {
+        return $programId !== null && in_array($programId, $this->headedProgramIds(), true);
+    }
+
     /**
      * Classes this user teaches (if they are an instructor).
      */

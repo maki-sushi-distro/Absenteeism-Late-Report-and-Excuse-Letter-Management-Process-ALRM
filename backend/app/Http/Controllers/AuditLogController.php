@@ -9,6 +9,7 @@ use App\Support\BoundedCollection;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Validation\Rule;
 
 class AuditLogController extends Controller
@@ -28,10 +29,10 @@ class AuditLogController extends Controller
             'to' => ['sometimes', 'date_format:Y-m-d', 'after_or_equal:from'],
         ]);
 
-        $programId = null;
+        $programIds = null;
         if ($user->role === 'program_head') {
-            $programId = $user->headedProgram?->id;
-            abort_unless($programId, 403, 'No program is assigned to this account.');
+            $programIds = $user->headedProgramIds();
+            abort_unless($programIds, 403, 'No program is assigned to this account.');
         }
 
         /** @var Builder<AuditLog> $query */
@@ -40,10 +41,10 @@ class AuditLogController extends Controller
             ->whereHas('user', function ($query) use ($filters) {
                 $query->whereIn('role', isset($filters['role']) ? [$filters['role']] : ['student', 'instructor']);
             })
-            ->where(function ($query) use ($programId, $filters) {
-                $scope = function ($query) use ($programId, $filters) {
-                    if ($programId) {
-                        $query->whereHas('enrollment.class', fn ($query) => $query->where('program_id', $programId));
+            ->where(function ($query) use ($programIds, $filters) {
+                $scope = function ($query) use ($programIds, $filters) {
+                    if ($programIds) {
+                        $query->whereHas('enrollment.class', fn ($query) => $query->whereIn('program_id', $programIds));
                     }
                     if (isset($filters['request_id'])) {
                         $query->whereKey($filters['request_id']);
@@ -73,7 +74,7 @@ class AuditLogController extends Controller
             $query->where('timestamp', '>=', $filters['from'].' 00:00:00');
         }
         if (isset($filters['to'])) {
-            $query->where('timestamp', '<', \Illuminate\Support\Carbon::parse($filters['to'])->addDay()->startOfDay());
+            $query->where('timestamp', '<', Carbon::parse($filters['to'])->addDay()->startOfDay());
         }
 
         $query->orderByDesc('timestamp')->orderByDesc('id');

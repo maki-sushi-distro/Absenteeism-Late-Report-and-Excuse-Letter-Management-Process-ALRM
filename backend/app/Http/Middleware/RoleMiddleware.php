@@ -2,7 +2,6 @@
 
 namespace App\Http\Middleware;
 
-use App\Models\Program;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -17,7 +16,7 @@ class RoleMiddleware
             return response()->json([
                 'success' => false,
                 'message' => 'Unauthenticated.',
-                'data'    => null,
+                'data' => null,
             ], 401);
         }
 
@@ -25,7 +24,7 @@ class RoleMiddleware
             return response()->json([
                 'success' => false,
                 'message' => 'Your account is not active. Please contact an administrator.',
-                'data'    => null,
+                'data' => null,
             ], 403);
         }
 
@@ -33,13 +32,13 @@ class RoleMiddleware
 
         $hasProgramHeadOverride = ! $hasDirectRole
             && in_array('program_head', $roles, true)
-            && Program::where('program_head_id', $user->id)->exists();
+            && count($user->headedProgramIds()) > 0;
 
         if (! $hasDirectRole && ! $hasProgramHeadOverride) {
             return response()->json([
                 'success' => false,
                 'message' => 'You are not authorized to access this resource.',
-                'data'    => null,
+                'data' => null,
             ], 403);
         }
 

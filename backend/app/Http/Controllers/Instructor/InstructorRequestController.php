@@ -8,6 +8,7 @@ use App\Models\Enrollment;
 use App\Models\ExcuseRequest;
 use App\Models\FollowupFlag;
 use App\Models\UserNotification;
+use App\Services\AttendanceThresholdNotifier;
 use App\Services\AuditLoggerService;
 use App\Support\BoundedCollection;
 use Illuminate\Http\Request as HttpRequest;
@@ -102,10 +103,8 @@ class InstructorRequestController extends Controller
 
     /**
      * Increment the enrollment's attendance tracker and recompute status.
-     * Per stakeholder interviews: alerts fire at BOTH the warning stage (2)
-     * and IR stage (3), and go to both the Instructor and Program Head —
-     * not just on IR, not just to the Program Head. FollowupFlag (escalation
-     * record) is created only on the IR crossing.
+     * Warning and IR alerts are delivered to the program heads through the
+     * shared notifier. A follow-up flag is created on the IR crossing.
      */
     private function applyToTracker(ExcuseRequest $request): void
     {
@@ -142,60 +141,23 @@ class InstructorRequestController extends Controller
         });
 
         if ($tracker->status === $previousStatus) {
-            return; // walang bagong threshold na naabot
-        }
-
-        $student = $request->enrollment->student;
-        $instructor = $request->enrollment->class->instructor;
-        $programHead = $student->program?->programHead;
-
-        $recipients = array_filter([$instructor, $programHead]);
-
-        $subject = $request->enrollment->class->subject_name;
-        $used = $tracker->unitsUsed();
-        $limit = $tracker->allowedUnits();
-
-        if ($tracker->status === 'warning') {
-            $this->notifyAll(
-                $recipients,
-                $request,
-                'threshold_warning',
-                "{$student->name} is near the absence limit in {$subject} ({$used} of {$limit} units). One more absence will trigger an IR."
-            );
+            return;
         }
 
         if ($tracker->status === 'IR') {
-            FollowupFlag::create([
-                'request_id' => $request->id,
-                'flagged_date' => now(),
-                'escalated_to' => $programHead?->id,
-                'status' => 'open',
-            ]);
+            $program = $request->enrollment->class->program;
+            $heads = $program?->notificationHeads();
+            $programHead = $heads?->firstWhere('id', $program->program_head_id) ?? $heads?->first();
 
-            $this->notifyAll(
-                $recipients,
-                $request,
-                'ir_escalation',
-                "{$student->name} exceeded the allowable absences in {$subject} ({$used} of {$limit} units) and needs follow-up."
-            );
+            if ($programHead) {
+                FollowupFlag::firstOrCreate(['request_id' => $request->id], [
+                    'flagged_date' => now(),
+                    'escalated_to' => $programHead->id,
+                    'status' => 'open',
+                ]);
+            }
         }
-    }
 
-    /**
-     * Fan out the same notification to a set of recipients (instructor, program head).
-     */
-    private function notifyAll(array $recipients, ExcuseRequest $request, string $type, string $message): void
-    {
-        foreach ($recipients as $recipient) {
-            UserNotification::create([
-                'user_id' => $recipient->id,
-                'request_id' => $request->id,
-                'type' => $type,
-                'message' => $message,
-                'channel' => 'in_app',
-                'date_sent' => now(),
-                'is_read' => false,
-            ]);
-        }
+        app(AttendanceThresholdNotifier::class)->notify($tracker, $request);
     }
 }

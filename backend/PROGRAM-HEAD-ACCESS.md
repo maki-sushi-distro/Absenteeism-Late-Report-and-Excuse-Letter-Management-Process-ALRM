@@ -19,4 +19,8 @@ Program head dashboards, request monitoring, audit logs, and read policies recog
 
 The account lists are available at `GET /api/program-head/students` and `GET /api/program-head/instructors`, with `page` and `per_page` support. Students are selected by program affiliation; instructors by teaching membership or assigned classes. The dashboard includes `total_students` and `total_instructors`.
 
+Absence-limit warning and IR alerts now go to the class program's active heads: the primary head, explicit co-heads, and accounts with `role = program_head` and that current `program_id`. Each recipient gets one in-app alert plus a queued English email using `mail/program-head-attendance-alert.blade.php`, styled like the existing instructor emails. These two alert types are routed to heads rather than ordinary instructors.
+
+Request decisions and scheduled automation share `AttendanceThresholdNotifier` and lock the tracker while checking `warning_notified_at` / `ir_notified_at`. This prevents duplicate delivery by the two paths. Email jobs dispatch after commit and retry up to three times through the existing queue worker. No-recipient stages remain available for the next automation run. Previously notified stages and historical duplicates are not replayed or deleted. Existing overdue-request follow-up behavior is unchanged.
+
 Validation: `ProgramHeadAssignmentsTest`, `AuditLogTest`, and `ApiSecurityTest`. These tests use an isolated in-memory database.

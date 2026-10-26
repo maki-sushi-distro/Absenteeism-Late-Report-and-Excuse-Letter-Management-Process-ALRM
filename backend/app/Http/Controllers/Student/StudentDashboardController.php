@@ -25,12 +25,12 @@ class StudentDashboardController extends Controller
 
         /** @var Collection<int, AttendanceTracker> $trackers */
         $trackers = AttendanceTracker::query()
-            ->whereHas('enrollment', fn($q) => $q->where('student_id', $student->id))
+            ->whereHas('enrollment', fn ($q) => $q->where('student_id', $student->id))
             ->with('enrollment.class')
             ->get();
 
-        $ownRequests = fn() => ExcuseRequest::query()
-            ->whereHas('enrollment', fn($q) => $q->where('student_id', $student->id));
+        $ownRequests = fn () => ExcuseRequest::query()
+            ->whereHas('enrollment', fn ($q) => $q->where('student_id', $student->id));
 
         $pendingRequests = $ownRequests()->where('status', 'pending')->count();
 
@@ -40,33 +40,33 @@ class StudentDashboardController extends Controller
             ->count();
 
         $thresholdStatus = match (true) {
-            $trackers->contains('status', 'IR')      => 'IR',
+            $trackers->contains('status', 'IR') => 'IR',
             $trackers->contains('status', 'warning') => 'warning',
-            default                                  => 'safe',
+            default => 'safe',
         };
 
         /** @var AttendanceTracker|null $closest */
         $closest = $trackers->sortByDesc(fn (AttendanceTracker $tracker): float => $tracker->usageRatio())->first();
 
-        $notifications = UserNotification::query()
+        $notifications = UserNotification::inApp()
             ->where('user_id', $student->id);
 
         return response()->json([
             'success' => true,
             'message' => null,
-            'data'    => new StudentDashboardResource([
+            'data' => new StudentDashboardResource([
                 'total_classes' => $student->enrollments()
-                    ->whereHas('class', fn($q) => $q
+                    ->whereHas('class', fn ($q) => $q
                         ->where('semester', AcademicPeriod::semester())
                         ->where('school_year', AcademicPeriod::schoolYear()))
                     ->count(),
-                'unexcused_absences'   => (int) $trackers->sum('total_absences'),
-                'excused_absences'     => $excusedAbsences,
-                'lates_recorded'       => (int) $trackers->sum('total_lates'),
-                'pending_requests'     => $pendingRequests,
-                'threshold'            => [
-                    'used'   => $closest?->unitsUsed() ?? 0,
-                    'limit'  => $closest?->allowedUnits() ?? 0,
+                'unexcused_absences' => (int) $trackers->sum('total_absences'),
+                'excused_absences' => $excusedAbsences,
+                'lates_recorded' => (int) $trackers->sum('total_lates'),
+                'pending_requests' => $pendingRequests,
+                'threshold' => [
+                    'used' => $closest?->unitsUsed() ?? 0,
+                    'limit' => $closest?->allowedUnits() ?? 0,
                     'status' => $thresholdStatus,
                 ],
                 'unread_notifications' => (clone $notifications)->where('is_read', false)->count(),

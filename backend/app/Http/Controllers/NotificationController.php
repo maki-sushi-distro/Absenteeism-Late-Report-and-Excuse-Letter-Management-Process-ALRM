@@ -22,7 +22,7 @@ class NotificationController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $query = UserNotification::query()
+        $query = UserNotification::inApp()
             ->where('user_id', Auth::id());
 
         if ($request->boolean('unread')) {
@@ -42,7 +42,7 @@ class NotificationController extends Controller
      */
     public function unreadCount(): JsonResponse
     {
-        $count = UserNotification::query()
+        $count = UserNotification::inApp()
             ->where('user_id', Auth::id())
             ->where('is_read', false)
             ->count();
@@ -85,7 +85,7 @@ class NotificationController extends Controller
      */
     public function markAllAsRead(): JsonResponse
     {
-        $updated = UserNotification::query()
+        $updated = UserNotification::inApp()
             ->where('user_id', Auth::id())
             ->where('is_read', false)
             ->update(['is_read' => true]);

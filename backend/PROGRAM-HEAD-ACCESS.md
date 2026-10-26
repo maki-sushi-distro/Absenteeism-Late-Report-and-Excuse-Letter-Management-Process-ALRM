@@ -1,6 +1,8 @@
 # Shared program head access
 
-The primary head remains in `programs.program_head_id`. Additional heads are explicitly assigned in `program_head_assignments`. Teaching membership (`program_user`) and student affiliation (`users.program_id`) do not grant head access.
+Changing an account's role to `program_head` automatically grants head access to its current `users.program_id`. This works for admin role changes and direct database role edits used in SQA testing. Ordinary student/instructor affiliation and teaching memberships (`program_user`) do not grant head access. When there is no current program or explicit head assignment, the admin response warns that a program still needs to be assigned; teaching memberships are not guessed.
+
+The primary head remains in `programs.program_head_id`. Additional explicit assignments in `program_head_assignments` are also supported. Automatic access follows the current program and role on subsequent requests, without creating a permanent assignment. Changing the role away from `program_head` removes this automatic access; existing explicit head assignments remain independent.
 
 Deploy the backend changes and run migrations before serving the updated code. For the connected database, the new migration and the two BSIS assignments were applied on October 26, 2026. Mac Robert Savandal and Marwin Mandocdoc now both have `role = program_head`; the existing primary BSIS head was preserved.
 
@@ -17,4 +19,4 @@ Program head dashboards, request monitoring, audit logs, and read policies recog
 
 The account lists are available at `GET /api/program-head/students` and `GET /api/program-head/instructors`, with `page` and `per_page` support. Students are selected by program affiliation; instructors by teaching membership or assigned classes. The dashboard includes `total_students` and `total_instructors`.
 
-Validation: `ProgramHeadAssignmentsTest`, `AuditLogTest`, and `ApiSecurityTest` (37 tests, 337 assertions). These tests use an isolated in-memory database.
+Validation: `ProgramHeadAssignmentsTest`, `AuditLogTest`, and `ApiSecurityTest`. These tests use an isolated in-memory database.

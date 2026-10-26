@@ -95,7 +95,11 @@ class User extends Authenticatable
     public function headedProgramIds(): array
     {
         return Program::where('program_head_id', $this->id)->pluck('id')
-            ->merge($this->additionalHeadedPrograms()->pluck('programs.id'))->unique()->values()->all();
+            ->merge($this->additionalHeadedPrograms()->pluck('programs.id'))
+            // A role change grants head access to the account's current program,
+            // including changes made directly in the database for SQA testing.
+            ->merge($this->role === 'program_head' && $this->program_id !== null ? [$this->program_id] : [])
+            ->unique()->values()->all();
     }
 
     public function headsProgram(?string $programId): bool

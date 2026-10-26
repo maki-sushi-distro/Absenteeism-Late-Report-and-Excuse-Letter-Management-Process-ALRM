@@ -17,9 +17,8 @@ class UserApprovalController extends Controller
 {
     /**
      * Roles an Administrator can hand-pick when RE-assigning an existing
-     * staff member's role (PATCH .../role). Deliberately excludes
-     * 'student' — a student's role is locked in at first Google login
-     * and is never something an Admin flips through this endpoint.
+     * account's role (PATCH .../role). Student accounts may be promoted
+     * to program head for SQA; assigning the student role is not supported.
      */
     private const ASSIGNABLE_ROLES = ['instructor', 'program_head', 'administrator'];
 
@@ -264,10 +263,10 @@ class UserApprovalController extends Controller
             'role' => ['required', 'string', Rule::in(self::ASSIGNABLE_ROLES)],
         ]);
 
-        if ($user->role === 'student' || $user->role === null) {
+        if ($user->role === null || ($user->role === 'student' && $validated['role'] !== 'program_head')) {
             return response()->json([
                 'success' => false,
-                'message' => 'This endpoint only reassigns existing staff roles (instructor, program_head, administrator).',
+                'message' => 'This endpoint reassigns staff roles or promotes an existing student to program head.',
                 'data' => null,
             ], 409);
         }
@@ -299,11 +298,9 @@ class UserApprovalController extends Controller
             $user->id
         );
 
-        $user->loadExists('headedProgram');
-
         return response()->json([
             'success' => true,
-            'message' => $validated['role'] === 'program_head' && ! $user->headed_program_exists
+            'message' => $validated['role'] === 'program_head' && ! $user->headedProgramIds()
                 ? 'Role updated. Paalala: wala pang program na naka-assign sa user na ito. Itakda ito sa Programs.'
                 : 'Role updated.',
             'data' => new UserResource($user),

@@ -12,6 +12,7 @@ use App\Http\Controllers\Auth\ProfileController;
 use App\Http\Controllers\Instructor\FollowupController as InstructorFollowupController;
 use App\Http\Controllers\Instructor\InstructorDashboardController;
 use App\Http\Controllers\Instructor\InstructorRequestController;
+use App\Http\Controllers\Instructor\InstructorRequestExportController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\ProgramHead\ProgramHeadDashboardController;
 use App\Http\Controllers\Student\AttendanceController;
@@ -94,6 +95,7 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     |----------------------------------------------------------------
     */
     Route::prefix('instructor')->middleware('role:instructor')->group(function () {
+        Route::get('/requests/export', [InstructorRequestExportController::class, 'export'])->middleware('throttle:exports');
         Route::get('/requests', [InstructorRequestController::class, 'index']);
         Route::patch('/requests/{request}/decision', [InstructorRequestController::class, 'decide']);
         Route::get('/dashboard', [InstructorDashboardController::class, 'index']);

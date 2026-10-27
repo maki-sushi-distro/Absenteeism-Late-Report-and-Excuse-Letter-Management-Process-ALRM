@@ -1,4 +1,4 @@
-import { ChevronDown, UserCircle } from "lucide-react";
+import { UserCircle } from "lucide-react";
 import NotificationBell from "@/components/notifications/NotificationBell";
 import { useAuth } from "@/context/AuthContext";
 import { SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
@@ -25,7 +25,6 @@ function AdminPageLayout({ children }) {
                   {user?.role || "Administrator"}
                 </p>
               </div>
-              <ChevronDown className="size-4" />
             </div>
           </div>
         </header>

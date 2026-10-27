@@ -1,0 +1,59 @@
+import assert from "node:assert/strict";
+import { afterEach, mock, test } from "node:test";
+import { getCollection } from "../src/api/collections.js";
+import { flagActivity, requestActivity, filterActivity, programOverviewRows } from "../src/pages/auth/admin/overviewData.js";
+
+const storage = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
+afterEach(() => { mock.restoreAll(); if (storage) Object.defineProperty(globalThis, "localStorage", storage); else delete globalThis.localStorage; });
+function transport(handler) {
+  Object.defineProperty(globalThis, "localStorage", { configurable: true, value: { getItem: () => null } });
+  mock.method(globalThis, "fetch", handler);
+}
+test("collections load every bounded API page while preserving filters", async () => {
+  const seen = [];
+  transport(async url => {
+    const parsed = new URL(url, "https://local.test"); seen.push(parsed.searchParams.get("page"));
+    assert.equal(parsed.searchParams.get("status"), "pending");
+    assert.equal(parsed.searchParams.get("per_page"), "100");
+    const page = Number(parsed.searchParams.get("page"));
+    return Response.json({ success: true, data: [{ id: String(page) }], meta: { page, last_page: 2 } });
+  });
+  assert.deepEqual(await getCollection("/admin/users?status=pending"), [{ id: "1" }, { id: "2" }]);
+  assert.deepEqual(seen, ["1", "2"]);
+});
+test("collections reject repeated pagination and surface backend failures", async () => {
+  transport(async () => Response.json({ success: true, data: [], meta: { page: 1, last_page: 2 } }));
+  await assert.rejects(getCollection("/admin/users"), /pagination/i);
+  mock.restoreAll();
+  transport(async () => Response.json({ message: "Not permitted" }, { status: 403 }));
+  await assert.rejects(getCollection("/admin/users"), /Not permitted/);
+});
+test("request activity uses real event dates and never invents an unrecorded decision", () => {
+  const request = { id: "r1", type: "absence", status: "approved", date_submitted: "2026-10-01T10:00:00Z", date_reviewed: "2026-10-02T12:00:00Z", enrollment: { student: { name: "Student A" }, class: { id: "c1", subject_name: "Math", instructor: { name: "Instructor A" } } } };
+  const events = requestActivity([request, { ...request, id: "r2", date_reviewed: null }]);
+  assert.equal(events.length, 3);
+  assert.equal(events.filter(row => row.action === "Approved").length, 1);
+  assert.equal(events[0].date, request.date_reviewed);
+  assert.equal(filterActivity(events, { action: "Approved", subject: "c1", date: "2026-10-02" }).length, 1);
+});
+test("historical decisions retain the recorded reviewer after a class is reassigned", () => {
+  const [decision] = requestActivity([{ id: "r1", type: "absence", status: "approved", date_submitted: "2026-10-01", date_reviewed: "2026-10-02", reviewer: { name: "Original Reviewer" }, enrollment: { class: { instructor: { name: "New Instructor" } } } }]);
+  assert.equal(decision.instructor, "Original Reviewer");
+});
+test("flags use the actual class instructor as the supplier of the flagged-by field", () => {
+  const [event] = flagActivity([{ id: "f1", flagged_date: "2026-10-01", request: { type: "late", enrollment: { student: { name: "Student A" }, class: { id: "c1", subject_name: "Math", instructor_id: "i1" } } } }], [{ id: "c1", instructor: { name: "Instructor A" } }]);
+  assert.equal(event.action, "Flagged");
+  assert.equal(event.instructor, "Instructor A");
+  assert.equal(event.flaggedBy, "Instructor A");
+});
+test("program overview uses real per-program counts and leaves absent risk and request totals unknown", () => {
+  const rows = programOverviewRows({ programs_summary: [{ id: "p1", program_name: "BSIS", student_count: 12 }] }, [{ id: "c1", program_id: "p1", instructor_id: "i1" }, { id: "c2", program_id: "p1", instructor_id: "i1" }]);
+  assert.equal(rows[0].students, 12);
+  assert.equal(rows[0].instructors, 1);
+  assert.equal(rows[0].atRisk, null);
+  assert.equal(rows[0].pending, null);
+});
+test("a flag with no assigned instructor remains unavailable", () => {
+  const [row] = flagActivity([{ id: "f1", flagged_date: "2026-10-01", request: { id: "r1" } }]);
+  assert.equal(row.flaggedBy, "Unavailable");
+});

@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
 import { ProtectedRoute } from "./routes/ProtectedRoute";
 import Login from "./pages/login";
+import Home from "./pages/Home";
 import SignedOut from "./pages/auth/SignedOut";
 import { AuthCallback } from "./pages/AuthCallback";
 import { Dashboard } from "./pages/Dashboard";
@@ -12,6 +13,10 @@ import AddStudent from "./pages/auth/admin/AddStudent";
 import Instructors from "./pages/auth/admin/Instructors";
 import AdminPageLayout from "./pages/auth/admin/AdminPageLayout";
 import { AdminDashboard as AdminWorkspace } from "./pages/auth/admin/AdminDashboard";
+import AdminUserManagement from "./pages/auth/admin/AdminUserManagement";
+import AdminProgramOverview from "./pages/auth/admin/AdminProgramOverview";
+import AdminActivityLog from "./pages/auth/admin/AdminActivityLog";
+import AdminManage from "./pages/auth/admin/AdminManage";
 import StudentProfile from "./pages/auth/admin/StudentProfile";
 import Students from "./pages/auth/admin/Students";
 import Settings from "./pages/auth/Settings";
@@ -22,6 +27,7 @@ import { ProgramHeadDashboard as ProgramHeadWorkspace } from "./pages/auth/progr
 import { ProgramHeadInstructors, ProgramHeadInstructorDetail } from "./pages/auth/programHead/ProgramHeadInstructors";
 import { ProgramHeadReports } from "./pages/auth/programHead/ProgramHeadReports";
 import ProgramHeadPageLayout from "./pages/auth/programHead/ProgramHeadPageLayout";
+import ProgramHeadActivityLog from "./pages/auth/programHead/ProgramHeadActivityLog";
 import StudentRecords from "./pages/auth/student/StudentRecords";
 import StudentNotificationsPage from "./pages/auth/student/StudentNotificationsPage";
 import StudentRequestForm from "./pages/auth/student/StudentRequestForm";
@@ -48,14 +54,7 @@ function App() {
               </ProtectedRoute>
             }
           />
-          <Route
-            path="/"
-            element={
-              <ProtectedRoute>
-                <Dashboard />
-              </ProtectedRoute>
-            }
-          />
+          <Route path="/" element={<Home />} />
           <Route
             path="/dashboard"
             element={
@@ -72,7 +71,10 @@ function App() {
               </ProtectedRoute>
             }
           />
-          <Route path="/user-management" element={<ProtectedRoute allowedRoles={["admin"]}><AdminPageLayout><AdminWorkspace view="users" /></AdminPageLayout></ProtectedRoute>} />
+          <Route path="/user-management" element={<ProtectedRoute allowedRoles={["admin"]}><AdminPageLayout><AdminUserManagement /></AdminPageLayout></ProtectedRoute>} />
+          <Route path="/program-overview" element={<ProtectedRoute allowedRoles={["admin"]}><AdminPageLayout><AdminProgramOverview /></AdminPageLayout></ProtectedRoute>} />
+          <Route path="/activity-log" element={<ProtectedRoute allowedRoles={["admin"]}><AdminPageLayout><AdminActivityLog /></AdminPageLayout></ProtectedRoute>} />
+          <Route path="/manage" element={<ProtectedRoute allowedRoles={["admin"]}><AdminPageLayout><AdminManage /></AdminPageLayout></ProtectedRoute>} />
           <Route path="/programs" element={<ProtectedRoute allowedRoles={["admin"]}><AdminPageLayout><AdminWorkspace view="programs" /></AdminPageLayout></ProtectedRoute>} />
           <Route path="/classes" element={<ProtectedRoute allowedRoles={["admin"]}><AdminPageLayout><AdminWorkspace view="classes" /></AdminPageLayout></ProtectedRoute>} />
           <Route path="/reports" element={<ProtectedRoute allowedRoles={["admin"]}><AdminPageLayout><AdminWorkspace view="reports" /></AdminPageLayout></ProtectedRoute>} />
@@ -81,6 +83,7 @@ function App() {
           <Route path="/program-head/instructors" element={<ProtectedRoute allowedRoles={["program"]}><ProgramHeadPageLayout><ProgramHeadInstructors /></ProgramHeadPageLayout></ProtectedRoute>} />
           <Route path="/program-head/instructors/:instructorId" element={<ProtectedRoute allowedRoles={["program"]}><ProgramHeadPageLayout><ProgramHeadInstructorDetail /></ProgramHeadPageLayout></ProtectedRoute>} />
           <Route path="/program-head/reports" element={<ProtectedRoute allowedRoles={["program"]}><ProgramHeadPageLayout><ProgramHeadReports /></ProgramHeadPageLayout></ProtectedRoute>} />
+          <Route path="/program-head/activity-log" element={<ProtectedRoute allowedRoles={["program"]}><ProgramHeadPageLayout><ProgramHeadActivityLog /></ProgramHeadPageLayout></ProtectedRoute>} />
           <Route
             path="/instructors/add"
             element={

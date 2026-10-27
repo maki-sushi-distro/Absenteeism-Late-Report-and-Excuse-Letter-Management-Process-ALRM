@@ -1,4 +1,4 @@
-import { NavLink, useNavigate } from "react-router-dom";
+import { NavLink, matchPath, useLocation, useNavigate } from "react-router-dom";
 import {
   GraduationCap,
   LayoutDashboard,
@@ -7,12 +7,17 @@ import {
   UserCog,
   Users,
   UsersRound,
+  FileInput,
+  FileSearchCorner,
+  RotateCcwClock,
+  UserRoundArrowLeft,
 } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import LogoutConfirmation from "@/components/navigation/RoleSidebar/LogoutConfirmation";
+import SidebarBrand from "@/components/navigation/RoleSidebar/SidebarBrand";
 import { logoutToSignedOut } from "@/lib/logout";
 import {
   Sidebar as AppSidebar,
@@ -23,16 +28,14 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarProvider,
-  useSidebar,
 } from "@/components/ui/sidebar";
 import { useAuth } from "@/context/AuthContext";
 import { cn } from "@/lib/utils";
-import lvLogo from "@/assets/LV_Logo.png";
 
 const menuItems = [
   {
     label: "Dashboard",
-    path: "/",
+    path: "/dashboard",
     icon: LayoutDashboard,
   },
   {
@@ -56,36 +59,35 @@ const menuItems = [
     icon: UserCog,
   },
   {
+    label: "Program Overview",
+    path: "/program-overview",
+    icon: FileSearchCorner,
+  },
+  {
+    label: "Activity Log",
+    path: "/activity-log",
+    icon: RotateCcwClock,
+  },
+  {
+    label: "Manage",
+    path: "/manage",
+    icon: UserRoundArrowLeft,
+  },
+  {
+    label: "Report",
+    path: "/reports",
+    icon: FileInput,
+  },
+  {
     label: "Settings",
     path: "/settings",
     icon: Settings,
   },
 ];
 
-function SidebarBrand() {
-  const { toggleSidebar } = useSidebar();
-
-  return (
-    <button
-      type="button"
-      aria-label="Toggle sidebar"
-      onClick={toggleSidebar}
-      className="flex h-[89px] w-full items-center justify-start gap-3 rounded-none px-5 text-white hover:bg-white/5 hover:text-white group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0"
-    >
-      <img
-        src={lvLogo}
-        alt="ALRM System logo"
-        className="size-11 shrink-0 object-contain"
-      />
-      <span className="whitespace-nowrap text-2xl font-black tracking-normal group-data-[collapsible=icon]:hidden">
-        ALRM SYSTEM
-      </span>
-    </button>
-  );
-}
-
 function Sidebar({ children }) {
   const navigate = useNavigate();
+  const { pathname } = useLocation();
   const { logout } = useAuth();
 
   function handleLogout() {
@@ -95,7 +97,7 @@ function Sidebar({ children }) {
   return (
     <SidebarProvider
       style={{
-        "--sidebar-width": "264px",
+        "--sidebar-width": "280px",
         "--sidebar-width-icon": "80px",
       }}
     >
@@ -104,37 +106,35 @@ function Sidebar({ children }) {
         className="border-0 bg-[#0d1526] text-white"
       >
         <SidebarHeader className="bg-[#0d1526] p-0">
-          <SidebarBrand />
+          <SidebarBrand wide />
         </SidebarHeader>
 
         <SidebarContent className="bg-[#0d1526] px-4 py-12 group-data-[collapsible=icon]:px-4">
           <SidebarMenu className="gap-2">
             {menuItems.map((item) => {
               const Icon = item.icon;
+              const isActive = Boolean(matchPath({ path: item.path, end: item.path === "/" }, pathname));
 
               return (
                 <SidebarMenuItem key={item.path}>
-                  <NavLink to={item.path} end={item.path === "/"}>
-                    {({ isActive }) => (
-                      <SidebarMenuButton
-                        isActive={isActive}
-                        tooltip={item.label}
-                        className={cn(
-                          "h-11 gap-4 rounded-[7px] px-5 text-[18px] font-semibold text-slate-100 hover:bg-white/10 hover:text-white group-data-[collapsible=icon]:size-11! group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0!",
-                          isActive &&
-                            "bg-[#203b82] text-white hover:bg-[#203b82]",
-                        )}
-                      >
-                        <Icon
-                          className="size-[30px] shrink-0"
-                          strokeWidth={2.25}
-                        />
-                        <span className="group-data-[collapsible=icon]:hidden">
-                          {item.label}
-                        </span>
-                      </SidebarMenuButton>
+                  <SidebarMenuButton
+                    render={<NavLink to={item.path} aria-label={item.label} end={item.path === "/"} />}
+                    isActive={isActive}
+                    tooltip={item.label}
+                    className={cn(
+                      "h-11 gap-4 rounded-[7px] px-5 text-[18px] font-semibold text-slate-100 hover:bg-white/10 hover:text-white group-data-[collapsible=icon]:size-11! group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0!",
+                      isActive &&
+                        "bg-[#203b82] text-white hover:bg-[#203b82]",
                     )}
-                  </NavLink>
+                  >
+                    <Icon
+                      className="size-[30px] shrink-0"
+                      strokeWidth={2.25}
+                    />
+                    <span className="group-data-[collapsible=icon]:hidden">
+                      {item.label}
+                    </span>
+                  </SidebarMenuButton>
                 </SidebarMenuItem>
               );
             })}
@@ -145,7 +145,7 @@ function Sidebar({ children }) {
           <SidebarMenu>
             <SidebarMenuItem>
               <AlertDialog>
-                <AlertDialogTrigger
+                <AlertDialogTrigger aria-label="Logout"
                   render={
                     <SidebarMenuButton
                       type="button"

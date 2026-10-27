@@ -1,4 +1,4 @@
-import { ChevronDown, UserCircle } from "lucide-react";
+import { UserCircle } from "lucide-react";
 import { Link } from "react-router-dom";
 import { SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import { useAuth } from "@/context/AuthContext";
@@ -26,7 +26,6 @@ function StudentPageLayout({ children, contentPadding = "px-5 sm:px-8 lg:px-10" 
                   Student
                 </p>
               </div>
-              <ChevronDown className="size-4" />
             </Link>
           </div>
         </header>

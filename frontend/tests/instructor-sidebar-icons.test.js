@@ -25,7 +25,7 @@ async function renderSidebar(path = "/instructor/class-requests") {
 function menuLink(html, path) {
   const match = html.match(new RegExp(`<a\\b[^>]*href="${path}"[^>]*>([\\s\\S]*?)</a>`));
   assert.ok(match, `${path} must remain a navigation link`);
-  return match[1];
+  return match[0];
 }
 
 test("instructor navigation uses the wireframe's dashboard, file-pencil and file-arrow icons", async () => {

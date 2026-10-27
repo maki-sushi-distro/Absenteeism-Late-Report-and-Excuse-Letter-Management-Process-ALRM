@@ -18,9 +18,9 @@ function RoleSidebar({ children, navigation, wide = false, compact = "student" }
   }
 
   return (
-    <SidebarProvider style={{ "--sidebar-width": wide ? "264px" : "214px", "--sidebar-width-icon": wide ? "80px" : "72px" }}>
+    <SidebarProvider style={{ "--sidebar-width": "280px", "--sidebar-width-icon": wide ? "80px" : "72px" }}>
       <AppSidebar collapsible="icon" className="border-0 bg-[#0d1526] text-white">
-        <SidebarHeader className="bg-[#0d1526] p-0"><SidebarBrand wide={wide} compact={compact} /></SidebarHeader>
+        <SidebarHeader className="bg-[#0d1526] p-0"><SidebarBrand wide={wide} /></SidebarHeader>
         <SidebarContent className={`bg-[#0d1526] ${wide ? "px-4 py-12 group-data-[collapsible=icon]:px-4" : compact === "instructor" ? "px-3 py-7 group-data-[collapsible=icon]:px-3" : "px-3 py-8 group-data-[collapsible=icon]:px-3"}`}>
           <SidebarNavigation items={navigation} wide={wide} compact={compact} />
         </SidebarContent>

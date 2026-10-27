@@ -153,6 +153,8 @@ test("settings remove Account & Security and use the working shared preference c
   assert.match(html, /Attendance threshold alerts/);
   assert.match(html, /Email notifications/);
   assert.match(html, /managed by your school/);
+  assert.match(html, /School-managed/);
+  assert.doesNotMatch(html, /id="notification-preference-email"/);
 });
 
 test("a student preview cannot load or display its student inbox inside the instructor bell", async () => {

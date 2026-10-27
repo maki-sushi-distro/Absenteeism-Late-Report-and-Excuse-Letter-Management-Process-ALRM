@@ -1,4 +1,4 @@
-import { ChevronDown, UserCircle } from "lucide-react";
+import { UserCircle } from "lucide-react";
 import NotificationBell from "@/components/notifications/NotificationBell";
 import { SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import { useAuth } from "@/context/AuthContext";
@@ -26,7 +26,6 @@ function InstructorPageLayout({ children, title }) {
                   Instructor
                 </p>
               </div>
-              <ChevronDown className="size-4" />
             </div>
           </div>
         </header>

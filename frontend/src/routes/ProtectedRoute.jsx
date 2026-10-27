@@ -9,6 +9,7 @@ import { needsProfileSetup } from '../lib/profileSetup';
 import { roleMatches } from '../lib/roles';
 import { usePreviewRole } from '../hooks/usePreviewRole';
 import HttpErrorPage from '../pages/HttpErrorPage';
+import ProgramHeadAccess from './ProgramHeadAccess';
 
 function AuthenticatedPage({ user, children }) {
   const { pathname, search, hash } = useLocation();
@@ -41,6 +42,9 @@ export function ProtectedRoute({
     return <Navigate to="/complete-profile" replace />;
   }
   if (allowedRoles?.length && !roleMatches(activeRole, allowedRoles)) {
+    if (roleMatches(user.role, ['instructor']) && roleMatches('program', allowedRoles)) {
+      return <ProgramHeadAccess><AuthenticatedPage user={user}>{children}</AuthenticatedPage></ProgramHeadAccess>;
+    }
     return <HttpErrorPage status={403} />;
   }
 

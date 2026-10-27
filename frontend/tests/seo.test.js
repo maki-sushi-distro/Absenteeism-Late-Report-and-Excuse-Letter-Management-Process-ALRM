@@ -9,8 +9,8 @@ test("public metadata identifies ALRM and La Verdad without losing Search Consol
   const html = await read("index.html");
   assert.match(html, /<title>ALRM System \| La Verdad Christian College<\/title>/);
   assert.match(html, /name="description"\s+content="[^"]*La Verdad Christian College[^"]*absence[^"]*late[^"]*excuse/i);
-  assert.ok(html.includes(`href="${origin}/login"`));
-  assert.ok(html.includes(`content="${origin}/login"`));
+  assert.ok(html.includes(`href="${origin}/"`));
+  assert.ok(html.includes(`content="${origin}/"`));
   assert.match(html, /content="l5W2w8vUhhFO7Ix3C2he42RYNwvtDK4AoPxOtRFvNis"/);
   assert.equal((html.match(/rel="canonical"/g) || []).length, 1);
   assert.doesNotMatch(html, /name="robots"[^>]*noindex/);
@@ -26,17 +26,17 @@ test("structured data describes the real educational app without invented rating
   assert.equal(app["@context"], "https://schema.org");
   assert.equal(app["@type"], "WebApplication");
   assert.equal(app.name, "ALRM System");
-  assert.equal(app.url, `${origin}/login`);
+  assert.equal(app.url, `${origin}/`);
   assert.equal(app.applicationCategory, "EducationalApplication");
   assert.equal(app.image, `${origin}/LV_Logo.png`);
   assert.equal(app.aggregateRating, undefined);
   assert.equal(app.potentialAction, undefined);
 });
 
-test("the sitemap contains only the canonical public sign-in page and robots permits its crawl", async () => {
+test("the sitemap promotes the canonical public landing page and robots permits its crawl", async () => {
   const sitemap = await read("public/sitemap.xml");
   assert.match(sitemap, /xmlns="http:\/\/www.sitemaps.org\/schemas\/sitemap\/0.9"/);
-  assert.deepEqual([...sitemap.matchAll(/<loc>(.*?)<\/loc>/g)].map(match => match[1]), [`${origin}/login`]);
+  assert.deepEqual([...sitemap.matchAll(/<loc>(.*?)<\/loc>/g)].map(match => match[1]), [`${origin}/`]);
   const robots = await read("public/robots.txt");
   assert.match(robots, /User-agent: \*/);
   assert.match(robots, /Allow: \/\s/);
@@ -50,10 +50,10 @@ test("Vercel excludes private and unknown pages from search without blocking pub
   const exclusions = (config.headers || []).filter(rule => rule.headers.some(header =>
     header.key.toLowerCase() === "x-robots-tag" && header.value.includes("noindex")));
   const excluded = path => exclusions.some(rule => new RegExp(`^${rule.source}$`).test(path));
-  for (const path of ["/", "/dashboard", "/student/records", "/student/request", "/settings", "/signed-out", "/instructors", "/students/1", "/classes", "/programs", "/reports", "/program-head/requests", "/instructor/class-requests", "/verify-otp", "/auth/callback", "/api/auth/google/callback", "/404", "/unknown-page", "/login/private"]) {
+  for (const path of ["/dashboard", "/student/records", "/student/request", "/settings", "/signed-out", "/instructors", "/students/1", "/classes", "/programs", "/reports", "/program-head/requests", "/instructor/class-requests", "/verify-otp", "/auth/callback", "/api/auth/google/callback", "/404", "/unknown-page", "/login/private"]) {
     assert.equal(excluded(path), true, path);
   }
-  for (const path of ["/login", "/login/", "/assets/index.js", "/assets/index.css", "/LV_Logo.png", "/sitemap.xml", "/robots.txt"]) {
+  for (const path of ["/", "/login", "/login/", "/assets/index.js", "/assets/index.css", "/LV_Logo.png", "/sitemap.xml", "/robots.txt"]) {
     assert.equal(excluded(path), false, path);
   }
   assert.deepEqual(config.rewrites, [

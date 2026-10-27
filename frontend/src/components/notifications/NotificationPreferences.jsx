@@ -18,8 +18,8 @@ export default function NotificationPreferences({ userId, role = "student" }) {
     </div>
     <div className="mt-5 grid gap-5 sm:pl-6">
       {options.map(option => <div key={option.key} className="flex items-center justify-between gap-5">
-        <div className="min-w-0"><label htmlFor={`${prefix}-preference-${option.key}`} className="cursor-pointer text-sm font-semibold">{option.label}</label><p id={`${prefix}-preference-${option.key}-description`} className="mt-1 text-sm leading-relaxed text-slate-600">{option.description}</p></div>
-        <Switch id={`${prefix}-preference-${option.key}`} checked={preferences[option.key] ?? false} disabled={option.disabled || !userId} onCheckedChange={checked => updatePreference(option.key, checked)} aria-describedby={`${prefix}-preference-${option.key}-description`} className="data-checked:bg-[#173568]" />
+        <div className="min-w-0">{option.disabled ? <p className="text-sm font-semibold">{option.label}</p> : <label htmlFor={`${prefix}-preference-${option.key}`} className="cursor-pointer text-sm font-semibold">{option.label}</label>}<p id={`${prefix}-preference-${option.key}-description`} className="mt-1 text-sm leading-relaxed text-slate-600">{option.description}</p></div>
+        {option.disabled ? <span className="shrink-0 rounded-md bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-600">School-managed</span> : <Switch id={`${prefix}-preference-${option.key}`} checked={preferences[option.key] ?? false} disabled={!userId} onCheckedChange={checked => updatePreference(option.key, checked)} aria-describedby={`${prefix}-preference-${option.key}-description`} className="data-checked:bg-[#173568]" />}
       </div>)}
       <p className="text-sm leading-relaxed text-slate-600">On-screen preferences are saved automatically for your account on this browser.</p>
       {error && <p role="alert" className="text-sm text-red-600">{error}</p>}

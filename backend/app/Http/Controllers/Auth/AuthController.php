@@ -210,7 +210,8 @@ class AuthController extends Controller
             $user->role = $isStudent ? 'student' : self::DEFAULT_STAFF_ROLE;
             $user->status = $isStudent ? 'approved' : 'pending';
             $user->password = null;
-        } elseif ($isFirstLogin && $user->status === 'pending') {
+        } elseif ($user->status === 'pending'
+            && ($isFirstLogin || ($isStudent && $user->role === 'student'))) {
             $user->name = mb_substr($googleUser->getName() ?: $email, 0, 255);
             $user->status = 'approved';
             $user->password = null;

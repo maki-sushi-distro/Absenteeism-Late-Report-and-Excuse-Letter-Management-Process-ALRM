@@ -74,6 +74,19 @@ class UserStatusAccessTest extends SecurityTestCase
         $this->withToken($token)->getJson('/api/me')->assertOk();
     }
 
+    public function test_pending_student_is_reported_as_pending_without_revoking_the_token(): void
+    {
+        $user = $this->makeUser('pending');
+        $token = $user->createToken('alrm-spa')->plainTextToken;
+
+        $this->withToken($token)->getJson('/api/classes')
+            ->assertForbidden()
+            ->assertJsonPath('message', 'Your account is pending approval. Please contact an administrator.');
+
+        $this->assertSame('pending', $user->fresh()->status);
+        $this->assertSame(1, $user->tokens()->count());
+    }
+
     public function test_can_login_fails_closed_for_null_status_in_memory(): void
     {
         $user = new User;

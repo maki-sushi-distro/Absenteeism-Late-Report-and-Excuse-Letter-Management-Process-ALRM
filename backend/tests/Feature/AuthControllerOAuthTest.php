@@ -98,9 +98,45 @@ class AuthControllerOAuthTest extends SecurityTestCase
         $this->assertSame('different-subject', $user->fresh()->google_id);
     }
 
+    public function test_returning_pending_student_is_auto_approved_after_verified_google_sign_in(): void
+    {
+        $user = $this->user('student', [
+            'email' => 'student1@student.edu.ph', 'google_id' => 'google-123', 'status' => 'pending',
+        ]);
+        $this->provider();
+        $nonce = Str::random(64);
+
+        $this->withUnencryptedCookies(['alrm_oauth' => $nonce])
+            ->get('/api/auth/google/callback?state='.urlencode($this->state($nonce)))
+            ->assertRedirectContains('/auth/otp?user_id=');
+
+        $this->assertSame('approved', $user->fresh()->status);
+        $this->assertSame('student', $user->role);
+        $this->assertSame(0, $user->tokens()->count()); // OTP is still required.
+        $this->assertSame(1, OtpCode::where('user_id', $user->id)->count());
+    }
+
+    public function test_returning_pending_instructor_is_not_auto_approved_by_student_domain(): void
+    {
+        $user = $this->user('instructor', [
+            'email' => 'student1@student.edu.ph', 'google_id' => 'google-123', 'status' => 'pending',
+        ]);
+        $this->provider();
+        $nonce = Str::random(64);
+
+        $this->withUnencryptedCookies(['alrm_oauth' => $nonce])
+            ->get('/api/auth/google/callback?state='.urlencode($this->state($nonce)))
+            ->assertRedirectContains('/auth/otp?user_id=');
+
+        $this->assertSame('pending', $user->fresh()->status);
+        $this->assertSame('instructor', $user->role);
+    }
+
     public function test_disabled_account_does_not_receive_otp_or_token(): void
     {
-        $user = $this->user('student', ['email' => 'student1@student.edu.ph', 'status' => 'deactivated']);
+        $user = $this->user('student', [
+            'email' => 'student1@student.edu.ph', 'google_id' => 'google-123', 'status' => 'deactivated',
+        ]);
         $this->provider();
         $nonce = Str::random(64);
         $this->withUnencryptedCookies(['alrm_oauth' => $nonce])

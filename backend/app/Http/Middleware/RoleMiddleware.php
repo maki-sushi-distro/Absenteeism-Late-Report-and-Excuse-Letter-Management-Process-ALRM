@@ -23,7 +23,9 @@ class RoleMiddleware
         if ($user->status !== 'approved') {
             return response()->json([
                 'success' => false,
-                'message' => 'Your account is not active. Please contact an administrator.',
+                'message' => $user->status === 'pending'
+                    ? 'Your account is pending approval. Please contact an administrator.'
+                    : 'Your account is not active. Please contact an administrator.',
                 'data' => null,
             ], 403);
         }

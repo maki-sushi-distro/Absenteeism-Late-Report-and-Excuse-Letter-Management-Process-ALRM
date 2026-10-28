@@ -29,6 +29,7 @@ export async function saveEmailNotificationPreference(enabled) {
   const data = await request("/api/me/notification-preferences", {
     method: "PATCH",
     body: JSON.stringify({ email_notifications_enabled: enabled }),
+    signal: AbortSignal.timeout(15000),
   });
   if (typeof data?.email_notifications_enabled !== "boolean") {
     throw new Error("The server did not confirm the email notification preference.");

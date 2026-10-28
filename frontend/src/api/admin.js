@@ -55,8 +55,10 @@ export function updateClass(classId, data) {
   });
 }
 
-export function deleteClass(classId) {
-  return apiRequest(`/admin/classes/${classId}`, { method: "DELETE" });
+export async function deleteClass(classId) {
+  const result = await apiRequest(`/admin/classes/${encodeURIComponent(classId)}`, { method: "DELETE" });
+  if (result?.success === false) throw new Error(result.message || "The class could not be removed.");
+  return result;
 }
 
 export function downloadReport(filters = {}) {

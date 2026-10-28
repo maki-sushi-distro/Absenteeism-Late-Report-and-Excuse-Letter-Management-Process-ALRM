@@ -1,3 +1,4 @@
+import { mockApiFetch } from "./helpers/mockApiFetch.js";
 import assert from "node:assert/strict";
 import { after, afterEach, before, mock, test } from "node:test";
 import React from "react";
@@ -82,10 +83,10 @@ test("dashboard loading uses only the existing instructor APIs and rejects malfo
   Object.defineProperty(globalThis, "localStorage", { configurable: true, value: { getItem: () => "isolated-dashboard-token" } });
   try {
     const calls = [];
-    const fetch = mock.method(globalThis, "fetch", async (url, options) => {
+    const fetch = mockApiFetch(async (url, options) => {
       const path = new URL(url, "http://localhost").pathname;
       calls.push(path);
-      assert.equal(options.headers.get("Authorization"), "Bearer isolated-dashboard-token");
+      assert.equal(options.headers.get("Authorization"), null);
       assert.ok(!options.method || options.method === "GET");
       return Response.json({ success: true, data: path.endsWith("/dashboard") ? dashboard : [report("one")] });
     });

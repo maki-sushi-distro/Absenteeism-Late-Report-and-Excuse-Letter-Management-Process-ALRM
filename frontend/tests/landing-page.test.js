@@ -5,7 +5,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter } from "react-router-dom";
 import { createServer } from "vite";
 
-let server, Home, Preview, AuthContext, setPendingOtpToken, setPendingOtpUserId;
+let server, Home, Preview, AuthContext, setPendingLogin, setPendingOtpSession, clearPendingOtp;
 before(async () => {
   server = await createServer({
     server: { middlewareMode: true, ws: false }, appType: "custom",
@@ -16,7 +16,7 @@ before(async () => {
   ({ TestAuthContext: AuthContext } = await server.ssrLoadModule("/src/context/AuthContext.jsx"));
   ({ default: Home } = await server.ssrLoadModule("/src/pages/Home.jsx"));
   ({ default: Preview } = await server.ssrLoadModule("/src/pages/landing/StudentDashboardPreview.jsx"));
-  ({ setPendingOtpToken, setPendingOtpUserId } = await server.ssrLoadModule("/src/api/otp.js"));
+  ({ setPendingLogin, setPendingOtpSession, clearPendingOtp } = await server.ssrLoadModule("/src/api/otp.js"));
 });
 after(async () => { await server?.close(); });
 
@@ -55,13 +55,11 @@ test("session restoration does not flash the public landing page", () => {
   assert.match(html, /Loading ALRM System/);
 });
 
-for (const key of ["token", "user id"]) {
-  test(`a pending OTP ${key} keeps the existing verification flow at the root`, () => {
-    const setPending = key === "token" ? setPendingOtpToken : setPendingOtpUserId;
-    setPending("pending-test-otp");
+test("an unexpired pending OTP keeps the existing verification flow at the root", () => {
+    setPendingLogin("pending-test-otp");
+    setPendingOtpSession({ userId: "student-one", email: "student@example.test" });
     try {
       const html = render(Home);
       assert.doesNotMatch(html, /handled online|Key features|Anonymous preview/);
-    } finally { setPending(null); }
+    } finally { clearPendingOtp(); }
   });
-}

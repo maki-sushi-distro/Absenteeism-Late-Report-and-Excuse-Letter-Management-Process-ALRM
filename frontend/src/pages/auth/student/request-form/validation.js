@@ -112,6 +112,12 @@ export function validateStep({ step, form, classes, classesError }) {
 
   if (step === 4) return validateDetails(form, classes, classesError);
 
+  if (step === 5) {
+    return form.evidenceFile
+      ? {}
+      : { evidenceFile: "Upload a supporting document before continuing." };
+  }
+
   if (step === 6) {
     return form.declaration
       ? {}

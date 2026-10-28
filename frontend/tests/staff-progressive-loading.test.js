@@ -82,10 +82,11 @@ function mount(render) {
 
 function network() {
   const calls = [];
-  globalThis.fetch = (input, options = {}) => new Promise(resolve => {
+  globalThis.fetch = (input, options = {}) => {
     const path = new URL(input, "http://localhost").pathname;
-    calls.push({ path, options, resolve });
-  });
+    if (path === "/api/auth/csrf") return Promise.resolve(Response.json({ success: true, data: { csrf_token: "test-csrf-proof" } }));
+    return new Promise(resolve => calls.push({ path, options, resolve }));
+  };
   return {
     calls,
     reply(path, data, status = 200) {
@@ -199,7 +200,7 @@ test("program refresh rejects superseded responses and non-dashboard views ignor
   } finally { page.unmount(); }
 });
 
-test("admin widgets reveal independently and create actions wait for their option resources", async () => {
+test("admin metrics and pending approval widgets reveal independently", async () => {
   const { AdminDashboard } = await server.ssrLoadModule(adminPath);
   const api = network();
   const page = mount(() => AdminDashboard({}));
@@ -216,19 +217,15 @@ test("admin widgets reveal independently and create actions wait for their optio
     api.reply("admin/classes", classes);
     api.reply("admin/programs", programs);
     await page.flush();
-    assert.match(page.html(), /Test Subject/);
-    assert.match(page.html(), /Test Program/);
-    assert.equal(button(page, "Create").props.disabled, true);
-    assert.equal(button(page, "Create class").props.disabled, true);
-    const createForm = elements(page.value, node => node.type === "form" && elements(node, child => child.props.children === "Create").length)[0];
-    await createForm.props.onSubmit({ preventDefault() {} });
+    assert.match(page.html(), /Absences and Tardiness by Department/);
+    assert.match(page.html(), /approval-placeholder/);
+    assert.doesNotMatch(page.html(), /Create class|Staff role assignment/);
     assert.equal(api.calls.filter(call => call.options.method === "POST").length, 0);
-    api.reply("admin/users", users);
+    api.reply("admin/users", [{ ...users[0], status: "pending" }]);
     await page.flush();
     assert.match(page.html(), /Test Instructor/);
-    assert.equal(button(page, "Create").props.disabled, false);
-    assert.equal(button(page, "Create class").props.disabled, false);
-    assert.doesNotMatch(page.html(), /role="status"/);
+    assert.match(page.html(), /href="\/user-management\?tab=waiting/);
+    assert.doesNotMatch(page.html(), /Loading administrator data/);
   } finally { page.unmount(); }
 });
 
@@ -246,16 +243,13 @@ test("admin local failures do not fabricate metric zeros or empty lists and retr
     const html = page.html();
     assert.match(html, /Metrics offline/);
     assert.match(html, /Users offline/);
-    assert.match(html, /Test Program/);
+    assert.match(html, /Quick Access/);
     assert.doesNotMatch(html, /No staff accounts|>0<|No classes found/);
-    assert.equal(button(page, "Create").props.disabled, true);
-    assert.equal(button(page, "Create class").props.disabled, true);
-    const retry = elements(page.value, node => node.props.children === "Retry loading")[0];
-    retry.props.onClick();
+    page.value.props.onRetry();
     await page.flush();
-    assert.match(page.html(), /Test Program/);
+    assert.match(page.html(), /Quick Access/);
     api.reply("admin/dashboard", adminData);
-    api.reply("admin/users", users);
+    api.reply("admin/users", [{ ...users[0], status: "pending" }]);
     await page.flush();
     assert.match(page.html(), />123</);
     assert.match(page.html(), /Test Instructor/);
@@ -276,6 +270,7 @@ test("admin users view and role mutation reload do not wait to publish unrelated
     select.props.onChange({ target: { value: "program_head" } });
     await page.flush();
     button(page, "Assign role").props.onClick();
+    await page.flush();
     api.reply("admin/users/instructor-one/role", { ...users[0], role: "program_head" });
     await page.flush();
     assert.equal(api.calls.filter(call => call.path === "/api/admin/users").length, 2);
@@ -316,7 +311,7 @@ test("admin superseded responses cannot overwrite a newer reload", async () => {
     await page.flush();
     api.reply("admin/users", "Users offline", 503);
     await page.flush();
-    button(page, "Retry loading").props.onClick();
+    page.value.props.onRetry();
     await page.flush();
     api.reply("admin/dashboard", { total_students: 999 });
     await page.flush();
@@ -351,16 +346,18 @@ test("admin program failure leaves classes visible and report options recover wi
     await report.flush();
     reportApi.reply("admin/programs", programs);
     await report.flush();
-    assert.match(report.html(), /Export requests report/);
+    assert.match(report.html(), /Generate requests report/);
     assert.doesNotMatch(report.html(), /role="status"/);
-    assert.equal(button(report, "Download").props.disabled, false);
+    assert.match(report.html(), />Generate<\/button>/);
+    assert.doesNotMatch(report.html(), />Download<\/button>/);
   } finally { report.unmount(); }
 });
 
 test("administrator create and delete mutations retain their payloads and await all reload resources", async () => {
   const { AdminDashboard } = await server.ssrLoadModule(adminPath);
+  for (const view of ["programs", "classes"]) {
   const api = network();
-  const page = mount(() => AdminDashboard({}));
+  const page = mount(() => AdminDashboard({ view }));
   const settle = async () => {
     api.reply("admin/dashboard", adminData);
     api.reply("admin/users", users);
@@ -375,48 +372,90 @@ test("administrator create and delete mutations retain their payloads and await 
   try {
     await page.flush();
     await settle();
-    fill("program_name", "New Program");
-    fill("program_head_id", "instructor-one");
+    const payload = view === "programs" ? { program_name: "New Program", program_head_id: "instructor-one" }
+      : { subject_name: "New Subject", section: "A", schedule: "Monday", instructor_id: "instructor-one", program_id: "program-one", semester: "1st", school_year: "2026-2027" };
+    for (const [name, value] of Object.entries(payload)) fill(name, value);
     await page.flush();
     const form = elements(page.value, node => node.type === "form")[0];
     const action = form.props.onSubmit({ preventDefault() {} });
-    const create = api.calls.find(call => call.options.method === "POST");
-    assert.deepEqual(JSON.parse(create.options.body), { program_name: "New Program", program_head_id: "instructor-one" });
-    api.reply("admin/programs", programs[0]);
     await page.flush();
-    assert.equal(button(page, "Create").props.disabled, true);
+    const create = api.calls.find(call => call.options.method === "POST");
+    assert.deepEqual(JSON.parse(create.options.body), payload);
+    api.reply(`admin/${view}`, view === "programs" ? programs[0] : classes[0]);
+    await page.flush();
+    const actionLabel = view === "programs" ? "Create" : "Create class";
+    assert.equal(button(page, actionLabel).props.disabled, true);
     api.reply("admin/users", users);
     await page.flush();
     // Working state survives partial reload completion.
-    assert.equal(button(page, "Create").props.disabled, true);
+    assert.equal(button(page, actionLabel).props.disabled, true);
     api.reply("admin/dashboard", adminData);
     api.reply("admin/programs", programs);
     api.reply("admin/classes", classes);
     await action;
     await page.flush();
-    assert.equal(elements(page.value, node => node.props.name === "program_name")[0].props.value, "");
+    assert.equal(elements(page.value, node => node.props.name === (view === "programs" ? "program_name" : "subject_name"))[0].props.value, "");
+    if (view === "classes") {
+      const html = page.html();
+      assert.match(html, /aria-labelledby="create-class-title"/);
+      assert.match(html, /aria-labelledby="existing-classes-title"/);
+      assert.match(html, /lg:grid-cols-2/);
+      assert.match(button(page, actionLabel).props.className, /justify-self-center/);
+      assert.match(button(page, actionLabel).props.className, /md:w-\[calc\(50%-0\.75rem\)\]/);
+    }
 
-    for (const [name, value] of Object.entries({ subject_name: "New Subject", section: "A", schedule: "Monday", instructor_id: "instructor-one", program_id: "program-one", school_year: "2026-2027" })) fill(name, value);
-    await page.flush();
-    const classAction = elements(page.value, node => node.type === "form")[1].props.onSubmit({ preventDefault() {} });
-    const createClass = api.calls.find(call => call.path === "/api/admin/classes" && call.options.method === "POST");
-    assert.deepEqual(JSON.parse(createClass.options.body), { subject_name: "New Subject", section: "A", schedule: "Monday", instructor_id: "instructor-one", program_id: "program-one", semester: "1st", school_year: "2026-2027" });
-    api.reply("admin/classes", classes[0]);
-    await page.flush();
-    await settle();
-    await classAction;
-    await page.flush();
-    assert.equal(elements(page.value, node => node.props.name === "subject_name")[0].props.value, "");
-
-    for (const path of ["admin/programs/program-one", "admin/classes/class-one"]) {
+    for (const path of [view === "programs" ? "admin/programs/program-one" : "admin/classes/class-one"]) {
       const buttons = elements(page.value, node => node.props.children === "Delete");
-      buttons[path.includes("/programs/") ? 0 : 1].props.onClick();
+      buttons[0].props.onClick();
+      await page.flush();
       const deletion = api.calls.find(call => call.path === `/api/${path}`);
       assert.equal(deletion.options.method, "DELETE");
       api.reply(path, {});
       await page.flush();
       await settle();
     }
-    assert.match(page.html(), /Class deleted/);
+    assert.match(page.html(), view === "programs" ? /Program deleted/ : /Class deleted/);
+  } finally { page.unmount(); }
+  }
+});
+
+test("Manage confirms class deletion, preserves rejected rows, blocks duplicates and reloads after success", async () => {
+  const { default: AdminManage } = await server.ssrLoadModule("/src/pages/auth/admin/AdminManage.jsx");
+  const api = network();
+  const page = mount(() => AdminManage());
+  const settle = async records => {
+    api.reply("admin/classes", records);
+    api.reply("admin/programs", programs);
+    api.reply("admin/users", users);
+    await page.flush();
+  };
+  try {
+    await page.flush(); await settle(classes);
+    assert.equal(button(page, "Remove").props.disabled, false);
+    button(page, "Remove").props.onClick(); await page.flush();
+    assert.equal(api.calls.filter(call => call.options.method === "DELETE").length, 0);
+    const confirmation = () => elements(page.value, node => node.props.open === true && node.props.onOpenChange)[0];
+    confirmation().props.onOpenChange(false); await page.flush();
+    assert.equal(confirmation(), undefined);
+    button(page, "Remove").props.onClick(); await page.flush();
+    const confirm = button(page, "Remove class");
+    const rejected = confirm.props.onClick();
+    confirm.props.onClick();
+    await page.flush();
+    assert.equal(api.calls.filter(call => call.options.method === "DELETE").length, 1);
+    assert.equal(button(page, "Remove").props.disabled, true);
+    confirmation().props.onOpenChange(false); await page.flush();
+    assert.ok(confirmation(), "cannot dismiss while removing");
+    api.reply("admin/classes/class-one", "Cannot delete a class that still has enrollments.", 409);
+    await rejected; await page.flush();
+    assert.match(page.html(), /Test Subject/);
+    assert.ok(elements(page.value, node => node.props.role === "alert").some(node => String(node.props.children).includes("still has enrollments")));
+    const success = button(page, "Remove class").props.onClick();
+    await page.flush();
+    api.reply("admin/classes/class-one", {});
+    await page.flush(); await settle([]); await success; await page.flush();
+    assert.match(page.html(), /Class removed\./);
+    assert.doesNotMatch(page.html(), /Test Subject/);
+    assert.equal(confirmation(), undefined);
   } finally { page.unmount(); }
 });

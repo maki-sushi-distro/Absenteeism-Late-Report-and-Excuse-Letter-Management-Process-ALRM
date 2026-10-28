@@ -5,7 +5,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { getPostLoginPath } from "@/api/authSecurity";
 import SessionStatus from "@/components/SessionStatus";
-import { googleLoginUrl } from "@/api/client";
+import { clearCallbackCredentials, googleLoginUrl } from "@/api/client";
 import {
   Card,
   CardContent,
@@ -24,11 +24,9 @@ import {
   clearPendingOtp,
   exchangeOtpCode,
   getExchangeCodeFromResponse,
-  getOtpTokenFromResponse,
   getOtpWaitSeconds,
   getPendingLogin,
   getPendingOtpEmail,
-  getPendingOtpToken,
   getPendingOtpUserId,
   sendOtp,
   setPendingLogin,
@@ -58,7 +56,7 @@ function OtpVerification() {
 function OtpVerificationForm() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { loginWithToken, logout } = useAuth();
+  const { completeCookieLogin, logout } = useAuth();
   const [code, setCode] = useState("");
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
@@ -88,32 +86,25 @@ function OtpVerificationForm() {
   const checkedRef = useRef(false);
 
   const pendingSession = useMemo(() => {
-    const urlToken =
-      searchParams.get("token") ||
-      searchParams.get("otp_token") ||
-      searchParams.get("verification_token");
     const urlEmail = searchParams.get("email");
     const urlUserId = searchParams.get("user_id");
 
-    if (urlToken || urlUserId) {
+    if (urlUserId) {
       setPendingOtpSession({
-        token: urlToken,
         email: urlEmail,
         userId: urlUserId,
       });
-      return { token: urlToken, email: urlEmail, userId: urlUserId };
+      return { email: urlEmail, userId: urlUserId };
     }
 
     return {
-      token: getPendingOtpToken(),
       email: getPendingOtpEmail(),
       userId: getPendingOtpUserId(),
     };
   }, [searchParams]);
-  const pendingToken = pendingSession.token;
   const pendingEmail = pendingSession.email;
   const pendingUserId = pendingSession.userId;
-  const hasPendingOtp = Boolean(pendingToken || pendingUserId || pendingEmail);
+  const hasPendingOtp = Boolean(pendingLogin && (pendingUserId || pendingEmail));
   const canSubmit = code.length === 6 && !verifying;
   const initialResendWaitSeconds = useMemo(
     () =>
@@ -130,10 +121,10 @@ function OtpVerificationForm() {
     [searchParams],
   );
   const resendStorageKey = useMemo(() => {
-    const keySource = pendingUserId || pendingEmail || pendingToken || "otp";
+    const keySource = pendingUserId || pendingEmail || "otp";
 
     return `otp_resend_ready_at:${keySource}`;
-  }, [pendingEmail, pendingToken, pendingUserId]);
+  }, [pendingEmail, pendingUserId]);
 
   function startResendCountdown(seconds) {
     const nextSeconds = Math.max(0, Math.ceil(Number(seconds) || 0));
@@ -150,6 +141,8 @@ function OtpVerificationForm() {
     );
     setResendSeconds(nextSeconds);
   }
+
+  useEffect(() => { clearCallbackCredentials(); }, []);
 
   useEffect(() => {
     if (!needsTrustedCheck || checkedRef.current) return;
@@ -169,14 +162,10 @@ function OtpVerificationForm() {
 
         if (exchangeCode) {
           const exchangeRes = await exchangeOtpCode(exchangeCode);
-          const token = getOtpTokenFromResponse(exchangeRes);
-
-          if (token) {
-            const verifiedUser = await loginWithToken(token);
-            clearPendingOtp();
-            navigate(getPostLoginPath(verifiedUser), { replace: true });
-            return;
-          }
+          const verifiedUser = await completeCookieLogin(exchangeRes);
+          clearPendingOtp();
+          navigate(getPostLoginPath(verifiedUser), { replace: true });
+          return;
         }
       } catch (checkError) {
         setError(checkError?.message || "Unable to verify this device.");
@@ -235,7 +224,6 @@ function OtpVerificationForm() {
 
     try {
       const response = await sendOtp({
-        token: pendingToken,
         userId: pendingUserId,
         email: pendingEmail,
         pending: pendingLogin,
@@ -279,30 +267,15 @@ function OtpVerificationForm() {
 
     try {
       const response = await verifyOtp({
-        token: pendingToken,
         userId: pendingUserId,
         email: pendingEmail,
         code,
         pending: pendingLogin,
       });
-      let verifiedToken = getOtpTokenFromResponse(response);
-
-      if (!verifiedToken) {
-        const exchangeCode = getExchangeCodeFromResponse(response);
-
-        if (exchangeCode) {
-          const exchangeResponse = await exchangeOtpCode(exchangeCode);
-          verifiedToken = getOtpTokenFromResponse(exchangeResponse);
-        }
-      }
-
-      if (!verifiedToken) {
-        throw new Error(
-          "Verification succeeded, but the login token exchange failed.",
-        );
-      }
-
-      const verifiedUser = await loginWithToken(verifiedToken);
+      const exchangeCode = getExchangeCodeFromResponse(response);
+      if (!exchangeCode) throw new Error("Verification succeeded, but the one-time sign-in code is missing.");
+      const exchangeResponse = await exchangeOtpCode(exchangeCode);
+      const verifiedUser = await completeCookieLogin(exchangeResponse);
       clearPendingOtp();
       navigate(getPostLoginPath(verifiedUser), {
         replace: true,

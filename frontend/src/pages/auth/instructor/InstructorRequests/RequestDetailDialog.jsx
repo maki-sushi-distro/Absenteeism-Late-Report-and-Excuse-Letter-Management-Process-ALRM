@@ -4,11 +4,12 @@ import StatusBadge from "@/components/dashboard/StatusBadge";
 import RequestFacts from "./RequestFacts";
 import useRequestReview from "./useRequestReview";
 
-const decisions = [{ status: "approved", label: "Approve", Icon: Check }, { status: "noted", label: "Note", Icon: FileCheck }, { status: "invalid", label: "Mark Invalid", Icon: X }];
+const decisions = [{ status: "approved", label: "Approve", Icon: Check }, { status: "noted", label: "Note", Icon: FileCheck }, { status: "invalid", label: "Invalid", Icon: X }];
 
 export default function RequestDetailDialog({ request, onClose, onReload }) {
   const dialog = useRef(null);
   const review = useRequestReview(request, onReload);
+  const canReview = review.record.status === "pending";
   useEffect(() => {
     const element = dialog.current;
     if (!element.open) element.showModal();
@@ -25,8 +26,11 @@ export default function RequestDetailDialog({ request, onClose, onReload }) {
     </div>
     {review.error && <p role="alert" className="mt-4 text-sm text-red-700">{review.error}</p>}
     {review.message && <p role="status" className="mt-4 text-sm text-green-800">{review.message}</p>}
-    {review.record.status === "pending" && <div aria-busy={review.sending} className="mt-5 flex flex-wrap gap-2 border-t border-slate-200 pt-4">
-      {decisions.map(({ status, label, Icon }) => <button key={status} type="button" disabled={review.sending} onClick={() => review.submit(status)} className={`flex min-h-9 items-center gap-2 rounded border px-3 text-sm font-semibold disabled:opacity-50 ${status === "invalid" ? "border-red-200 text-red-700" : "border-[#A9B9D9] text-[#203B82]"}`}>{review.sending ? <LoaderCircle aria-hidden="true" className="size-4 animate-spin" /> : <Icon aria-hidden="true" className="size-4" />}{label}</button>)}
-    </div>}
+    <footer aria-label="Request actions" aria-busy={review.sending} className="mt-5 border-t border-slate-200 pt-4">
+      <div className="flex flex-wrap gap-2">
+        {decisions.map(({ status, label, Icon }) => <button key={status} type="button" disabled={review.sending || !canReview} onClick={() => review.submit(status)} className={`flex min-h-9 items-center gap-2 rounded border px-3 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50 ${status === "invalid" ? "border-red-200 text-red-700" : "border-[#A9B9D9] text-[#203B82]"}`}>{review.sending ? <LoaderCircle aria-hidden="true" className="size-4 animate-spin" /> : <Icon aria-hidden="true" className="size-4" />}{label}</button>)}
+      </div>
+      {!canReview && <p className="mt-3 text-xs text-slate-500">This request has already been reviewed.</p>}
+    </footer>
   </dialog>;
 }

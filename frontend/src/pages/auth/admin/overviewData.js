@@ -2,7 +2,8 @@ function eventDate(value) { return value && Number.isFinite(Date.parse(value)) ?
 function newest(rows) { return rows.filter(row => eventDate(row.date)).sort((a, b) => Date.parse(b.date) - Date.parse(a.date)); }
 function requestInfo(request) {
   const course = request.enrollment?.class;
-  return { student: request.enrollment?.student?.name || "Unavailable", subject: course?.subject_name || request.subjects_missed || "Unavailable", classId: course?.id || "", type: request.type === "absence" ? "Absent" : request.type === "late" ? "Late" : "Unavailable", instructor: course?.instructor?.name || "Unavailable" };
+  const student = request.enrollment?.student;
+  return { student: student?.name || "Unavailable", studentId: student?.school_student_id || "", email: student?.email || "", subject: course?.subject_name || request.subjects_missed || "Unavailable", classId: course?.id || "", type: request.type === "absence" ? "Absent" : request.type === "late" ? "Late" : "Unavailable", instructor: course?.instructor?.name || "Unavailable" };
 }
 export function requestActivity(requests = []) {
   return newest(requests.flatMap(request => {
@@ -26,8 +27,9 @@ export function flagActivity(flags = [], classes = []) {
     return { ...info, id: flag.id, date: flag.flagged_date || flag.created_at, action: "Flagged", instructor, flaggedBy: instructor };
   }));
 }
-export function filterActivity(rows, { action = "", subject = "", date = "" } = {}) {
-  return rows.filter(row => (!action || row.action === action) && (!subject || row.classId === subject) && (!date || (() => {
+export function filterActivity(rows, { search = "", action = "", subject = "", date = "" } = {}) {
+  const query = search.trim().toLowerCase();
+  return rows.filter(row => (!query || [row.student, row.studentId, row.email, row.subject, row.instructor, row.type, row.action].some(value => String(value || "").toLowerCase().includes(query))) && (!action || row.action === action) && (!subject || row.classId === subject) && (!date || (() => {
     const time = new Date(row.date);
     const day = `${time.getFullYear()}-${String(time.getMonth() + 1).padStart(2, "0")}-${String(time.getDate()).padStart(2, "0")}`;
     return day === date;

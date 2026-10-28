@@ -1,7 +1,8 @@
+import { mockApiFetch } from "./helpers/mockApiFetch.js";
 import assert from "node:assert/strict";
 import { afterEach, beforeEach, mock, test } from "node:test";
 import { changeManagedUser, getUserManagementPrograms, getUserManagementUsers } from "../src/api/adminUserManagement.js";
-import { filterUsers, paginateUsers, studentYearLabel, userDepartment, userDisplayId, userErrorMessage, userPermissions } from "../src/pages/auth/admin/userManagementData.js";
+import { filterUsers, paginateUsers, studentYearSection, userDepartment, userDisplayId, userErrorMessage, userPermissions } from "../src/pages/auth/admin/userManagementData.js";
 
 const accounts = [
   { id: "s1", name: "Zoe Student", role: "student", status: "approved", school_student_id: "2026-001", program_id: "p1", year_level: "1st" },
@@ -28,6 +29,19 @@ test("role, program, and trimmed case-insensitive search combine", () => {
   assert.deepEqual(filterUsers(accounts, { role: "student", program: "p1", search: "  2026-001  " }, programs).map((user) => user.id), ["s1"]);
   assert.equal(filterUsers(accounts, { role: "student", program: "p1", search: "BSSW" }, programs).length, 0);
   assert.equal(filterUsers(accounts, { tab: "waiting", program: "p1", search: "ADA@LAVERDAD" }, programs).length, 1);
+});
+
+test("student year filtering combines with role, program and search without affecting staff views", () => {
+  const users = [...accounts,
+    { ...accounts[0], id: "third-year", name: "Alex Third", year_level: "3rd Year" },
+    { ...accounts[0], id: "numeric-year", name: "Alex Numeric", year_level: 3 },
+    { ...accounts[0], id: "unassigned-year", name: "Alex Unassigned", year_level: null },
+  ];
+  assert.deepEqual(filterUsers(users, { role: "student", year: "3", program: "p1", search: "Alex" }, programs).map(user => user.id), ["numeric-year", "third-year"]);
+  assert.deepEqual(filterUsers(users, { role: "student", year: "unassigned" }, programs).map(user => user.id), ["unassigned-year"]);
+  assert.equal(filterUsers(users, { role: "student", year: "4" }, programs).length, 0);
+  assert.equal(filterUsers(users, { role: "instructor", tab: "waiting", year: "3" }, programs)[0].id, "staff1");
+  assert.equal(filterUsers(users, { role: "student", year: "", program: "p1" }, programs).length, 4);
 });
 
 test("Program Head filter includes instructor accounts identified by either resource flag", () => {
@@ -65,7 +79,7 @@ test("program-head presentation does not change native role mutation permissions
   const head = { id: "head", name: "Head", role: "instructor", status: "approved", heads_program: true };
   assert.deepEqual(userPermissions(head, "admin"), { changeRole: true, changeStatus: true });
   assert.deepEqual(userPermissions(head, "head"), { changeRole: false, changeStatus: false });
-  const fetchMock = mock.method(globalThis, "fetch", async (url, options) => {
+  const fetchMock = mockApiFetch(async (url, options) => {
     assert.ok(String(url).endsWith("/admin/users/head/role"));
     assert.deepEqual(JSON.parse(options.body), { role: "administrator" });
     return Response.json({ success: true, data: { ...head, role: "administrator" } });
@@ -75,20 +89,23 @@ test("program-head presentation does not change native role mutation permissions
   assert.equal((await changeManagedUser(head, "admin", "role", "administrator")).role, "administrator");
 });
 
-test("approved students group by actual year before alphabetical name", () => {
-  assert.deepEqual(filterUsers(accounts, { role: "student" }).map((user) => user.id), ["s1", "s2"]);
-  assert.equal(studentYearLabel({ year_level: "3rd Year" }), "3rd Year");
-  assert.equal(studentYearLabel({}), "Year unavailable");
+test("filtered students list alphabetically across years and preserve supplied year and section", () => {
+  assert.deepEqual(filterUsers(accounts, { role: "student" }).map((user) => user.id), ["s2", "s1"]);
+  assert.equal(studentYearSection({ year_level: "3rd" }), "3rd");
+  assert.equal(studentYearSection({ year_level: "3rd", section: "BSIS 3A" }), "3rd / BSIS 3A");
+  assert.equal(studentYearSection({ section: " A " }), "A");
+  assert.equal(studentYearSection({}), "Unassigned");
 });
 
 test("missing faculty and student IDs remain unavailable rather than showing database UUIDs", () => {
   assert.equal(userDisplayId(accounts[2]), "Unavailable");
-  assert.equal(userDisplayId(accounts[1]), "Unavailable");
+  assert.equal(userDisplayId(accounts[1]), "Unassigned");
   assert.equal(userDisplayId(accounts[0]), "2026-001");
   assert.equal(userDisplayId({ role: "instructor", faculty_id: "FAC-100" }), "FAC-100");
   assert.equal(userDepartment(accounts[0], programs), "BSIS");
   assert.equal(userDepartment(accounts[2]), "BSIS");
   assert.equal(userDepartment({ program_id: "unknown" }, programs), "Unavailable");
+  assert.equal(userDepartment({ role: "student", program_id: "unknown" }, programs), "Unassigned");
 });
 
 test("pagination displays ten accounts, clamps after filtering, and handles empty lists", () => {
@@ -110,7 +127,7 @@ test("self accounts, unknown sessions, and students cannot receive inappropriate
 
 test("user listing follows bounded collection metadata before local search or pagination", async () => {
   const pages = [];
-  mock.method(globalThis, "fetch", async (url) => {
+  mockApiFetch(async (url) => {
     const parsed = new URL(url, "https://example.test");
     pages.push(parsed);
     const page = Number(parsed.searchParams.get("page"));
@@ -124,7 +141,7 @@ test("user listing follows bounded collection metadata before local search or pa
 });
 
 test("failure on a later collection page does not publish a truncated list", async () => {
-  mock.method(globalThis, "fetch", async (url) => {
+  mockApiFetch(async (url) => {
     const page = new URL(url, "https://example.test").searchParams.get("page");
     return page === "1"
       ? Response.json({ success: true, data: Array.from({ length: 100 }, (_, id) => ({ id })), meta: { page: 1, per_page: 100, total: 101, last_page: 2 } })
@@ -135,7 +152,7 @@ test("failure on a later collection page does not publish a truncated list", asy
 
 test("program list uses the same complete collection reader", async () => {
   let requested;
-  mock.method(globalThis, "fetch", async (url) => {
+  mockApiFetch(async (url) => {
     requested = String(url);
     return Response.json({ success: true, data: programs, meta: { page: 1, per_page: 100, total: 2, last_page: 1 } });
   });
@@ -145,7 +162,7 @@ test("program list uses the same complete collection reader", async () => {
 
 test("pending approval remains offered without google_id and surfaces the server's 409", async () => {
   const message = "This account has not logged in yet (still pending).";
-  mock.method(globalThis, "fetch", async (url, options) => {
+  mockApiFetch(async (url, options) => {
     assert.ok(String(url).endsWith("/admin/users/staff1/status"));
     assert.equal(options.method, "PATCH");
     assert.deepEqual(JSON.parse(options.body), { status: "approved" });
@@ -155,13 +172,13 @@ test("pending approval remains offered without google_id and surfaces the server
 });
 
 test("status actions require a confirmed resource and never fabricate success from empty HTTP 200", async () => {
-  mock.method(globalThis, "fetch", async () => Response.json({ success: true, data: null }));
+  mockApiFetch(async () => Response.json({ success: true, data: null }));
   await assert.rejects(changeManagedUser(accounts[2], "admin", "status", "approved"), /did not confirm/);
 });
 
 test("role assignment preserves account status and uses the existing staff endpoint", async () => {
   const updated = { ...accounts[2], role: "program_head" };
-  mock.method(globalThis, "fetch", async (url, options) => {
+  mockApiFetch(async (url, options) => {
     assert.ok(String(url).endsWith("/admin/users/staff1/role"));
     assert.equal(options.method, "PATCH");
     assert.deepEqual(JSON.parse(options.body), { role: "program_head" });
@@ -171,7 +188,7 @@ test("role assignment preserves account status and uses the existing staff endpo
 });
 
 test("self changes, student role changes, and pending deactivation issue no requests", async () => {
-  const fetchMock = mock.method(globalThis, "fetch", async () => { throw new Error("Unexpected mutation"); });
+  const fetchMock = mockApiFetch(async () => { throw new Error("Unexpected mutation"); });
   await assert.rejects(changeManagedUser(accounts[2], "staff1", "role", "administrator"), /not available/);
   await assert.rejects(changeManagedUser(accounts[2], "staff1", "status", "approved"), /not available/);
   await assert.rejects(changeManagedUser(accounts[0], "admin", "role", "instructor"), /not available/);
@@ -181,13 +198,13 @@ test("self changes, student role changes, and pending deactivation issue no requ
 });
 
 test("deactivation and reactivation require matching server status and resource identity", async () => {
-  mock.method(globalThis, "fetch", async (url, options) => {
+  mockApiFetch(async (url, options) => {
     const account = String(url).includes("staff2") ? accounts[3] : accounts[0];
     return Response.json({ success: true, data: { ...account, status: JSON.parse(options.body).status } });
   });
   assert.equal((await changeManagedUser(accounts[0], "admin", "status", "deactivated")).status, "deactivated");
   assert.equal((await changeManagedUser(accounts[3], "admin", "status", "approved")).status, "approved");
-  mock.method(globalThis, "fetch", async () => Response.json({ success: true, data: { ...accounts[0], status: "approved" } }));
+  mockApiFetch(async () => Response.json({ success: true, data: { ...accounts[0], status: "approved" } }));
   await assert.rejects(changeManagedUser(accounts[3], "admin", "status", "approved"), /did not confirm/);
 });
 

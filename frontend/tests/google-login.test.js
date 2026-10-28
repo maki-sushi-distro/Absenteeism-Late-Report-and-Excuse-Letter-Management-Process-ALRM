@@ -22,7 +22,7 @@ for (const origin of ["http://localhost:5173", "https://absenteeism-late-report-
     assert.equal(url.origin, origin);
     assert.equal(url.pathname, "/api/auth/google/redirect");
     assert.equal(url.searchParams.get("origin"), origin);
-    assert.equal(API_URL, backend, "regular API calls must keep their configured backend");
+    assert.equal(API_URL, "", "API calls always use the same-origin gateway");
   });
 }
 

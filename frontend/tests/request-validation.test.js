@@ -4,6 +4,7 @@ import { initialForm } from "../src/pages/auth/student/request-form/constants.js
 import { firstInvalidRequestStep, validateReview, validateStep } from "../src/pages/auth/student/request-form/validation.js";
 
 const enrolledClass = { class_id: "class-one", subject_name: "Information Management" };
+const evidenceFile = new File(["%PDF-1.7"], "proof.pdf", { type: "application/pdf" });
 const check = (form, step, classes = [], classesError = "") =>
   validateStep({ form, step, classes, classesError });
 
@@ -40,6 +41,29 @@ test("declaration is required at final review", () => {
   assert.deepEqual(check({ ...initialForm, declaration: true }, 6), {});
 });
 
+test("both request types require a document before advancing from the attachment step", () => {
+  for (const requestType of ["absence", "late"]) {
+    const form = { ...initialForm, requestType };
+    assert.match(check(form, 5).evidenceFile, /upload.*supporting document/i);
+    assert.deepEqual(check({ ...form, evidenceFile }, 5), {});
+  }
+});
+
+test("removing a required document during review blocks saving edits and submission", () => {
+  for (const requestType of ["absence", "late"]) {
+    const form = { ...initialForm, requestType, consent: "agree", studentName: "Alex Student",
+      program: "BS in Information Systems", level: "1st year", guardianName: "Alex Parent",
+      contactNumber: "09123456789", dateSubmitted: "2026-10-20", classId: "class-one",
+      startDateOfAbsence: "2026-10-19", endDateOfAbsence: "2026-10-20",
+      absenceReasons: ["Personal Reason"], minutesLate: "15", reason: "Traffic delay",
+      evidenceFile, declaration: true };
+    assert.equal(firstInvalidRequestStep(form, [enrolledClass]), null);
+    const removed = { ...form, evidenceFile: null };
+    assert.match(validateReview(removed, [enrolledClass]).evidenceFile, /supporting document/i);
+    assert.equal(firstInvalidRequestStep(removed, [enrolledClass]).step, 5);
+  }
+});
+
 test("inline review reports errors across student and request fields without requiring declaration to save", () => {
   const form = { ...initialForm, requestType: "late", consent: "agree",
     studentName: "Alex Student", program: "BS in Information Systems", level: "1st year",
@@ -49,7 +73,7 @@ test("inline review reports errors across student and request fields without req
   for (const name of ["guardianName", "contactNumber", "minutesLate", "classId", "reason"]) assert.ok(errors[name], name);
   assert.equal(errors.declaration, undefined);
   assert.deepEqual(validateReview({ ...form, guardianName: "Alex Parent", contactNumber: "09123456789",
-    minutesLate: "15", classId: "class-one", reason: "Traffic delay" }, [enrolledClass]), {});
+    minutesLate: "15", classId: "class-one", reason: "Traffic delay", evidenceFile }, [enrolledClass]), {});
 });
 
 test("inline absence review validates dates and reason selection on the final page", () => {
@@ -60,14 +84,14 @@ test("inline absence review validates dates and reason selection on the final pa
   const errors = validateReview(form, [enrolledClass]);
   assert.ok(errors.endDateOfAbsence);
   assert.ok(errors.absenceReasons);
-  assert.deepEqual(validateReview({ ...form, endDateOfAbsence: "2026-10-21", absenceReasons: ["Personal Reason"] }, [enrolledClass]), {});
+  assert.deepEqual(validateReview({ ...form, endDateOfAbsence: "2026-10-21", absenceReasons: ["Personal Reason"], evidenceFile }, [enrolledClass]), {});
 });
 
 test("submission validation identifies a missing guardian name", () => {
   const form = { ...initialForm, requestType: "late", consent: "agree",
     studentName: "Alex Student", program: "BS in Information Systems", level: "1st year",
     guardianName: "Alex Parent", contactNumber: "09123456789", dateSubmitted: "2026-10-13",
-    minutesLate: "15", classId: "class-one", reason: "Traffic", declaration: true };
+    minutesLate: "15", classId: "class-one", reason: "Traffic", declaration: true, evidenceFile };
   assert.equal(firstInvalidRequestStep(form, [enrolledClass]), null);
   assert.deepEqual(firstInvalidRequestStep({ ...form, guardianName: "" }, [enrolledClass]), {
     step: 3, errors: { guardianName: "Enter a valid parent or guardian's name." },

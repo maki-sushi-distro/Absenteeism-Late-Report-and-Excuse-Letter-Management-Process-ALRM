@@ -1,3 +1,4 @@
+import { mockApiFetch } from "./helpers/mockApiFetch.js";
 import assert from "node:assert/strict";
 import { after, afterEach, before, beforeEach, mock, test } from "node:test";
 import React from "react";
@@ -30,10 +31,10 @@ afterEach(() => {
 test("student follow-up sends an authenticated POST to the registered endpoint without a payload", async () => {
   assert.equal(typeof requests.followUpStudentRequest, "function");
   const controller = new AbortController();
-  const fetch = mock.method(globalThis, "fetch", async (url, options) => {
+  const fetch = mockApiFetch(async (url, options) => {
     assert.ok(String(url).endsWith("/api/requests/request%2Fone/follow-up"));
     assert.equal(options.method, "POST");
-    assert.equal(options.headers.get("Authorization"), "Bearer student-session");
+    assert.equal(options.headers.get("Authorization"), null);
     assert.equal(options.body, undefined);
     assert.equal(options.signal, controller.signal);
     return Response.json(success, { status: 201 });
@@ -45,7 +46,7 @@ test("student follow-up sends an authenticated POST to the registered endpoint w
 test("follow-up preserves backend ownership, pending-only and cooldown errors", async () => {
   assert.equal(typeof requests.followUpStudentRequest, "function");
   for (const [status, message] of [[403, "Unauthorized."], [422, "Only pending requests can be followed up."], [429, "You already followed up. You can follow up again in 24 hours."]]) {
-    const fetch = mock.method(globalThis, "fetch", async () => Response.json({ success: false, message, data: null }, { status }));
+    const fetch = mockApiFetch(async () => Response.json({ success: false, message, data: null }, { status }));
     await assert.rejects(requests.followUpStudentRequest(record.id), error => error.status === status && error.message === message);
     fetch.mock.restore();
   }
@@ -54,7 +55,7 @@ test("follow-up preserves backend ownership, pending-only and cooldown errors", 
 test("follow-up never treats an unsuccessful or malformed 2xx response as a sent reminder", async () => {
   assert.equal(typeof requests.followUpStudentRequest, "function");
   for (const response of [Response.json({ success: false, message: "Unable to create the follow-up." }), Response.json({ success: true, data: null }), new Response("<!doctype html><title>Login</title>", { headers: { "Content-Type": "text/html" } })]) {
-    const fetch = mock.method(globalThis, "fetch", async () => response);
+    const fetch = mockApiFetch(async () => response);
     await assert.rejects(requests.followUpStudentRequest(record.id));
     fetch.mock.restore();
   }
@@ -62,7 +63,7 @@ test("follow-up never treats an unsuccessful or malformed 2xx response as a sent
 
 test("follow-up does not retry network failures and passes cancellation to the existing API client", async () => {
   assert.equal(typeof requests.followUpStudentRequest, "function");
-  const fetch = mock.method(globalThis, "fetch", async () => { throw new TypeError("Failed to fetch"); });
+  const fetch = mockApiFetch(async () => { throw new TypeError("Failed to fetch"); });
   await assert.rejects(requests.followUpStudentRequest(record.id), /Failed to fetch/);
   assert.equal(fetch.mock.callCount(), 1);
 });

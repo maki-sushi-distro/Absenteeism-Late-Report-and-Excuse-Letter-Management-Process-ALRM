@@ -21,7 +21,7 @@ function AdminPageLayout({ children }) {
               <UserCircle className="size-7 text-slate-400 dark:text-slate-500" strokeWidth={1.75} />
               <div className="hidden leading-tight sm:block">
                 <p className="text-sm font-bold">{user?.name || "Admin"}</p>
-                <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                <p className="text-[11px] font-medium capitalize text-slate-500 dark:text-slate-400">
                   {user?.role || "Administrator"}
                 </p>
               </div>

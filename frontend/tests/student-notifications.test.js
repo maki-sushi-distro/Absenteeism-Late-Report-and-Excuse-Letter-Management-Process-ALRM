@@ -1,3 +1,4 @@
+import { mockApiFetch } from "./helpers/mockApiFetch.js";
 import assert from "node:assert/strict";
 import { after, afterEach, before, beforeEach, mock, test } from "node:test";
 import React from "react";
@@ -22,10 +23,10 @@ async function loadActivity() {
 
 test("bell activity uses authenticated student requests and refreshes backend decisions", async () => {
   const record = { id: "request-1", type: "absence", subjects_missed: "Math", status: "pending", date_submitted: "2026-10-18T09:00:00Z" };
-  mock.method(globalThis, "fetch", async (url, options) => {
+  mockApiFetch(async (url, options) => {
     assert.ok(String(url).endsWith("/api/requests"));
     assert.equal(options.method || "GET", "GET");
-    assert.equal(options.headers.get("Authorization"), "Bearer test-token");
+    assert.equal(options.headers.get("Authorization"), null);
     return Response.json({ success: true, data: [record] });
   });
   assert.deepEqual((await loadActivity()).map((event) => event.id), ["request-1-submitted"]);
@@ -37,11 +38,11 @@ test("bell activity uses authenticated student requests and refreshes backend de
 });
 
 test("bell activity distinguishes no updates from backend failures and malformed data", async () => {
-  mock.method(globalThis, "fetch", async () => Response.json({ success: true, data: [] }));
+  mockApiFetch(async () => Response.json({ success: true, data: [] }));
   assert.deepEqual(await loadActivity(), []);
-  mock.method(globalThis, "fetch", async () => Response.json({ message: "Service unavailable" }, { status: 503 }));
+  mockApiFetch(async () => Response.json({ message: "Service unavailable" }, { status: 503 }));
   await assert.rejects(loadActivity(), /Service unavailable/);
-  mock.method(globalThis, "fetch", async () => Response.json({ success: true, data: {} }));
+  mockApiFetch(async () => Response.json({ success: true, data: {} }));
   await assert.rejects(loadActivity(), /unexpected/i);
 });
 
@@ -129,7 +130,7 @@ test("notification page loads activity beyond the dropdown preview", async () =>
   const records = Array.from({ length: 9 }, (_, index) => ({
     id: `r${index}`, type: "late", status: "pending", subjects_missed: "Math", date_submitted: `2026-10-${String(index + 1).padStart(2, "0")}`,
   }));
-  mock.method(globalThis, "fetch", async () => Response.json({ success: true, data: records }));
+  mockApiFetch(async () => Response.json({ success: true, data: records }));
   const activity = await loadActivity();
   assert.equal(activity.length, 9);
   assert.equal(activity[0].requestId, "r8");

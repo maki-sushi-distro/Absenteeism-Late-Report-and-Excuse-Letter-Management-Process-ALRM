@@ -1,5 +1,6 @@
-import { Fragment, useEffect, useMemo, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight, Search, X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
+import { ChevronLeft, ChevronRight, Search } from "lucide-react";
 import { changeManagedUser, getUserManagementPrograms, getUserManagementUsers } from "@/api/adminUserManagement";
 import { useAuth } from "@/context/AuthContext";
 import { EmptyState } from "@/components/common/EmptyState";
@@ -8,19 +9,20 @@ import LoadingSkeleton from "@/components/loading/LoadingSkeleton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { filterUsers, paginateUsers, ROLE_LABELS, STAFF_ROLES, studentYearLabel, userDepartment, userDisplayId, userErrorMessage, userPermissions, userStatus } from "./userManagementData.js";
+import UserManagementFilters from "./UserManagementFilters";
+import ManagedAccountDialog from "./ManagedAccountDialog";
+import { filterUsers, paginateUsers, studentYearSection, userDepartment, userDisplayId, userErrorMessage, userStatus } from "./userManagementData.js";
 
-const initialFilters = { tab: "approved", status: "approved", role: "", program: "", search: "" };
-const selectClass = "h-10 min-w-44 rounded-[8px] border border-[#172f6b]/60 bg-white px-4 pr-9 text-sm text-slate-950 outline-none focus-visible:ring-2 focus-visible:ring-[#172f6b]/40 disabled:opacity-50";
+const initialFilters = { tab: "approved", status: "approved", role: "", program: "", year: "", search: "" };
 
 export default function AdminUserManagement() {
   const { user: currentUser } = useAuth();
-  const [filters, setFilters] = useState(initialFilters);
+  const [params] = useSearchParams();
+  const [filters, setFilters] = useState(() => ({ ...initialFilters, tab: params.get("tab") === "waiting" ? "waiting" : "approved" }));
   const [page, setPage] = useState(1);
   const [data, setData] = useState({ users: [], programs: [], loading: true, error: "", programError: "" });
   const [reload, setReload] = useState(0);
-  const [selectedId, setSelectedId] = useState(null);
-  const [selectedRole, setSelectedRole] = useState("");
+  const [selectedId, setSelectedId] = useState(() => params.get("user") || null);
   const [working, setWorking] = useState(false);
   const [actionError, setActionError] = useState("");
   const [notice, setNotice] = useState("");
@@ -52,11 +54,14 @@ export default function AdminUserManagement() {
 
   const filtered = useMemo(() => filterUsers(data.users, filters, data.programs), [data.users, data.programs, filters]);
   const pagination = paginateUsers(filtered, page);
-  const selected = data.users.find((item) => item.id === selectedId);
-  const permissions = selected ? userPermissions(selected, currentUser?.id) : {};
+  const studentView = filters.role === "student";
+  const columns = studentView
+    ? [["Name", "w-[24%]"], ["ID", "w-[18%]"], ["Program", "w-[28%]"], ["Year/Section", "w-[18%]"], ["Action", "w-[12%]"]]
+    : [["Name", "w-[22%]"], ["ID", "w-[14%]"], ["Department", "w-[24%]"], ["Email", "w-[28%]"], ["Action", "w-[12%]"]];
+  const selected = data.users.find((item) => String(item.id) === String(selectedId));
 
   function changeFilter(name, value) {
-    setFilters((current) => ({ ...current, [name]: value }));
+    setFilters((current) => ({ ...current, [name]: value, ...(name === "role" && value !== "student" ? { year: "" } : {}) }));
     setPage(1);
     setSelectedId(null);
     setActionError("");
@@ -70,6 +75,10 @@ export default function AdminUserManagement() {
     setReload((current) => current + 1);
   }
 
+  function closeAccount() {
+    if (!actionLock.current) setSelectedId(null);
+  }
+
   async function changeAccount(field, value) {
     if (!selected || actionLock.current || data.loading) return;
     actionLock.current = true;
@@ -80,11 +89,8 @@ export default function AdminUserManagement() {
       const updated = await changeManagedUser(selected, currentUser?.id, field, value);
       if (!mounted.current) return;
       setData((current) => ({ ...current, users: current.users.map((item) => item.id === updated.id ? { ...item, ...updated } : item) }));
-      const result = field === "role" ? `role updated to ${ROLE_LABELS[value]}` : value === "deactivated" ? "account deactivated" : userStatus(selected) === "pending" ? "account approved" : "account reactivated";
-      const programReminder = field === "role" && value === "program_head" && updated.headed_program_exists === false
-        ? " Assign this program head to a program in Programs."
-        : "";
-      setNotice(`${updated.name || selected.name || "User"}: ${result}.${programReminder}`);
+      const result = value === "deactivated" ? "account deactivated" : userStatus(selected) === "pending" ? "account approved" : "account reactivated";
+      setNotice(`${updated.name || selected.name || "User"}: ${result}.`);
       setSelectedId(null);
     } catch (error) {
       if (mounted.current) setActionError(userErrorMessage(error));
@@ -95,7 +101,7 @@ export default function AdminUserManagement() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-[1050px] space-y-5 text-slate-950">
+    <div className="min-w-0 w-full space-y-5 text-slate-950">
       <h1 className="sr-only">User Management</h1>
       <nav aria-label="User approval views" className="flex flex-wrap gap-3">
         {[["approved", "Approved Users"], ["waiting", "Waiting for Approval"]].map(([value, label]) => (
@@ -105,71 +111,43 @@ export default function AdminUserManagement() {
         ))}
       </nav>
 
-      <div className="flex flex-wrap items-center gap-2">
-        <select aria-label="Filter role" value={filters.role} disabled={working} onChange={(event) => changeFilter("role", event.target.value)} className={selectClass}>
-          <option value="">Filter Role</option>
-          {Object.entries(ROLE_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-        </select>
-        <select aria-label="Filter program" value={filters.program} disabled={data.loading || Boolean(data.programError) || working} onChange={(event) => changeFilter("program", event.target.value)} className={selectClass}>
-          <option value="">{data.programError ? "Programs unavailable" : "Filter Program"}</option>
-          {data.programs.map((program) => <option key={program.id} value={program.id}>{program.program_name || program.name || "Unnamed program"}</option>)}
-        </select>
-        {filters.tab === "approved" && <select aria-label="Filter account status" value={filters.status} disabled={working} onChange={(event) => changeFilter("status", event.target.value)} className={selectClass}>
-          <option value="approved">Approved accounts</option>
-          <option value="deactivated">Deactivated accounts</option>
-        </select>}
-        <div className="relative min-w-48 flex-1">
-          <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 z-10 size-4 -translate-y-1/2 text-slate-500" />
-          <Input type="search" aria-label="Search users" placeholder="Search Name, ID, Email..." value={filters.search} disabled={working} onChange={(event) => changeFilter("search", event.target.value)} className="h-10 rounded-[8px] border-[#172f6b]/60 pl-9! shadow-none" />
+      <div className="grid gap-3">
+        <div className="flex flex-wrap items-center gap-2">
+        <div className="relative min-w-0 max-w-[400px] flex-1 basis-48">
+          <Input type="search" aria-label="Search users" placeholder="Search Name, ID, Email..." value={filters.search} disabled={working} onChange={(event) => changeFilter("search", event.target.value)} className="h-10 rounded-[8px] border-slate-300 pr-9! shadow-sm" />
+          <Search aria-hidden="true" className="pointer-events-none absolute right-3 top-1/2 z-10 size-4 -translate-y-1/2 text-slate-400" />
         </div>
         <Button variant="ghost" disabled={working || data.loading} onClick={refresh}>Refresh</Button>
+        </div>
+        <UserManagementFilters filters={filters} programs={data.programs} loading={data.loading} programError={data.programError} disabled={working} onChange={changeFilter} />
       </div>
 
       {data.programError && <div role="alert"><ErrorState title="Programs could not be loaded" message={data.programError} /></div>}
       {notice && <p role="status" className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">{notice}</p>}
       {data.error ? <div role="alert" className="space-y-3"><ErrorState title="Unable to load users" message={data.error} /><Button variant="outline" onClick={refresh}>Try again</Button></div> : data.loading ? (
-        <LoadingSkeleton variant="table" rows={10} columns={4} label="Loading users" />
+        <LoadingSkeleton variant="table" rows={10} columns={columns.length} label="Loading users" />
       ) : filtered.length === 0 ? (
         <EmptyState title={filters.tab === "waiting" ? "No users waiting for approval" : "No users found"} message="No accounts match this view. Try changing the filters or search." />
       ) : (
         <>
-          <p className="sr-only">Select a user's name to manage their account.</p>
-          <Table className="min-w-[720px] table-fixed">
+          <p className="sr-only">Use View to review and manage an account.</p>
+          <Table className="min-w-[900px] table-fixed">
             <TableHeader><TableRow className="border-[#172f6b]/40 hover:bg-transparent">
-              {["Name", "ID", "Department", "Email"].map((heading) => <TableHead key={heading} scope="col" className="h-12 w-1/4 px-3 font-bold text-[#172f6b]">{heading}</TableHead>)}
+              {columns.map(([heading, width]) => <TableHead key={heading} scope="col" className={`h-12 px-3 font-bold text-[#172f6b] ${width}`}>{heading}</TableHead>)}
             </TableRow></TableHeader>
             <TableBody>
               {pagination.rows.map((user, index) => (
-                <Fragment key={user.id}>
-                  {filters.tab === "approved" && filters.role === "student" && (index === 0 || studentYearLabel(user) !== studentYearLabel(pagination.rows[index - 1])) && (
-                    <TableRow className="border-[#172f6b]/40 bg-slate-50 hover:bg-slate-50"><TableCell colSpan={4} className="px-3 py-3 font-semibold text-[#172f6b]">{studentYearLabel(user)}</TableCell></TableRow>
-                  )}
-                  <TableRow className="border-[#172f6b]/40">
+                  <TableRow key={user.id} className="border-[#172f6b]/40">
                     <TableCell className="px-3 py-5 whitespace-normal">
-                      <button type="button" aria-expanded={selectedId === user.id} aria-controls={selectedId === user.id ? "managed-account" : undefined} disabled={working} className="cursor-pointer text-left font-medium underline-offset-4 hover:underline focus-visible:rounded focus-visible:outline-2 focus-visible:outline-[#172f6b]" onClick={() => { setSelectedId(selectedId === user.id ? null : user.id); setSelectedRole(user.role); setActionError(""); setNotice(""); }}>
+                      <span className="font-medium">
                         {pagination.start + index + 1}. {user.name || "Unnamed user"}
-                      </button>
+                      </span>
                     </TableCell>
                     <TableCell className="px-3 py-5 whitespace-normal">{userDisplayId(user)}</TableCell>
-                    <TableCell className="px-3 py-5 whitespace-normal">{userDepartment(user, data.programs)}</TableCell>
-                    <TableCell className="break-words px-3 py-5 whitespace-normal">{user.email || "Unavailable"}</TableCell>
+                    <TableCell className="break-words px-3 py-5 whitespace-normal">{userDepartment(user, data.programs)}</TableCell>
+                    <TableCell className="break-words px-3 py-5 whitespace-normal">{studentView ? studentYearSection(user) : user.email || "Unavailable"}</TableCell>
+                    <TableCell className="px-3 py-5"><Button type="button" aria-label={`View and manage account for ${user.name || "unnamed user"}`} aria-haspopup="dialog" aria-expanded={selected?.id === user.id} aria-controls={selected?.id === user.id ? "managed-account" : undefined} disabled={working} onClick={() => { setSelectedId(user.id); setActionError(""); setNotice(""); }} className="h-9 min-w-20 bg-[#172f6b] px-4 text-white hover:bg-[#203f8a]">View</Button></TableCell>
                   </TableRow>
-                  {selectedId === user.id && <TableRow className="border-[#172f6b]/40 bg-slate-50 hover:bg-slate-50"><TableCell colSpan={4} className="p-4 whitespace-normal">
-                    <section id="managed-account" aria-label={`Manage ${user.name || "user"}`} className="space-y-4">
-                      <div className="flex items-center justify-between gap-3"><h2 className="font-semibold">{user.name || "User"} · {ROLE_LABELS[user.role] || "Role unavailable"} · {userStatus(user) || "Status unavailable"}</h2><Button variant="ghost" size="icon-sm" aria-label="Close account actions" disabled={working} onClick={() => setSelectedId(null)}><X /></Button></div>
-                      {String(user.id) === String(currentUser?.id) && <p className="text-sm text-slate-600">You cannot change your own role or account status.</p>}
-                      {userStatus(user) === "pending" && <p className="text-sm text-slate-600">Pre-registered accounts activate on their first Google sign-in. The server checks whether this account can be approved. Assigning a staff role does not approve the account.</p>}
-                      {actionError && <div role="alert"><ErrorState title="Account change failed" message={actionError} /></div>}
-                      <div className="flex flex-wrap items-center gap-3">
-                        {permissions.changeRole && <><select aria-label={`Assign role for ${user.name || "user"}`} className={selectClass} value={selectedRole} disabled={working} onChange={(event) => setSelectedRole(event.target.value)}>{STAFF_ROLES.map((role) => <option key={role} value={role}>{ROLE_LABELS[role]}</option>)}</select><Button disabled={working || selectedRole === user.role} onClick={() => changeAccount("role", selectedRole)}>Assign role</Button></>}
-                        {permissions.changeStatus && <Button variant={userStatus(user) === "approved" ? "destructive" : "outline"} disabled={working} onClick={() => changeAccount("status", userStatus(user) === "approved" ? "deactivated" : "approved")}>
-                          {userStatus(user) === "pending" ? "Approve account" : userStatus(user) === "approved" ? "Deactivate account" : "Reactivate account"}
-                        </Button>}
-                        {working && <span role="status" className="text-sm text-slate-600">Saving account change…</span>}
-                      </div>
-                    </section>
-                  </TableCell></TableRow>}
-                </Fragment>
               ))}
             </TableBody>
           </Table>
@@ -182,6 +160,11 @@ export default function AdminUserManagement() {
             </nav>
           </div>
         </>
+      )}
+      {!data.loading && !data.error && selected && (
+        <ManagedAccountDialog key={selected.id} user={selected} currentUserId={currentUser?.id} programs={data.programs}
+          working={working} actionError={actionError}
+          onChange={changeAccount} onClose={closeAccount} />
       )}
     </div>
   );

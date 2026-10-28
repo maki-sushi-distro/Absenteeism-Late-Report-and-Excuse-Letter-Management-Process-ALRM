@@ -1,28 +1,29 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   createClass,
   createProgram,
   deleteClass,
   deleteProgram,
-  downloadReport,
   getAdminDashboard,
   getClasses,
-  getAdminUsers,
   getPrograms,
   updateStaffRole,
 } from "@/api/admin";
+import { getUserManagementUsers } from "@/api/adminUserManagement";
+import AdminOverview from "./dashboard/AdminOverview";
+import AdminReports from "./reports/AdminReports";
+import PageBreadcrumbs from "@/components/navigation/PageBreadcrumbs";
 import { EmptyState } from "@/components/common/EmptyState";
 import { ErrorState } from "@/components/common/ErrorState";
 import { StatusBadge } from "@/components/common/StatusBadge";
-import { MetricPlaceholder, SectionPlaceholder } from "@/components/loading/DashboardSkeleton/StaffDashboardPlaceholder";
+import { SectionPlaceholder } from "@/components/loading/DashboardSkeleton/StaffDashboardPlaceholder";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 const emptyProgramForm = { program_name: "", program_head_id: "" };
 const emptyClassForm = { subject_name: "", section: "", instructor_id: "", schedule: "", program_id: "", semester: "1st", school_year: "" };
-const emptyReportFilters = { program_id: "", status: "", date_from: "", date_to: "" };
-const endpoints = { dashboard: getAdminDashboard, users: getAdminUsers, programs: getPrograms, classes: getClasses };
+const endpoints = { dashboard: getAdminDashboard, users: getUserManagementUsers, programs: getPrograms, classes: getClasses };
 const pendingResources = { dashboard: true, users: true, programs: true, classes: true };
 const viewResources = { dashboard: Object.keys(endpoints), users: ["users"], programs: ["programs", "users"], classes: ["classes", "users", "programs"], reports: ["programs"] };
 
@@ -31,30 +32,15 @@ export function AdminDashboard({ view = "dashboard" }) {
     dashboard: null, users: [], programs: [], classes: [],
     loading: pendingResources, errors: {}, ready: {},
   });
-  const { dashboard, users, programs, classes, loading: resourceLoading, errors, ready } = resources;
+  const { users, programs, classes, loading: resourceLoading, errors, ready } = resources;
   const generation = useRef(0);
   const mounted = useRef(false);
   const [programForm, setProgramForm] = useState(emptyProgramForm);
   const [classForm, setClassForm] = useState(emptyClassForm);
-  const [reportFilters, setReportFilters] = useState(emptyReportFilters);
   const [roleSelections, setRoleSelections] = useState({});
   const [working, setWorking] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
-
-  const metrics = useMemo(
-    () => [
-      ["Programs", dashboard?.total_programs ?? "—"],
-      ["Classes", dashboard?.total_classes ?? "—"],
-      ["Students", dashboard?.total_students ?? "—"],
-      ["Instructors", dashboard?.total_instructors ?? "—"],
-      ["Program heads", dashboard?.total_program_heads ?? "—"],
-      ["Pending requests", dashboard?.pending_requests ?? "—"],
-      ["Warnings", dashboard?.warning_count ?? "—"],
-      ["IR cases", dashboard?.ir_count ?? "—"],
-    ],
-    [dashboard],
-  );
 
   const loadData = useCallback(async () => {
     if (!mounted.current) return;
@@ -101,11 +87,6 @@ export function AdminDashboard({ view = "dashboard" }) {
     setClassForm((current) => ({ ...current, [name]: value }));
   }
 
-  function updateReportFilters(event) {
-    const { name, value } = event.target;
-    setReportFilters((current) => ({ ...current, [name]: value }));
-  }
-
   async function runAction(action, successMessage) {
     setError("");
     setNotice("");
@@ -146,22 +127,6 @@ export function AdminDashboard({ view = "dashboard" }) {
     if (created) setClassForm(emptyClassForm);
   }
 
-  async function handleDownloadReport(event) {
-    event.preventDefault();
-    setWorking("report");
-    setError("");
-    setNotice("");
-
-    try {
-      await downloadReport(reportFilters);
-      if (mounted.current) setNotice("Report download started.");
-    } catch (requestError) {
-      if (mounted.current) setError(requestError.message);
-    } finally {
-      if (mounted.current) setWorking("");
-    }
-  }
-
   const loading = (viewResources[view] || []).some((key) => resourceLoading[key]);
   const waiting = (key) => resourceLoading[key] && !ready[key];
   const programOptionsReady = ready.users && !resourceLoading.users && !errors.users;
@@ -169,29 +134,23 @@ export function AdminDashboard({ view = "dashboard" }) {
   function resourceError(key) {
     return <div className="space-y-2"><ErrorState title={`Could not load ${key}`} message={errors[key]} /><button type="button" onClick={() => { void loadData(); }} className="text-sm font-medium text-blue-800 underline dark:text-blue-300">Retry loading</button></div>;
   }
-  const showMetrics = view === "dashboard";
-  const showUsers = view === "dashboard" || view === "users";
-  const showPrograms = view === "dashboard" || view === "programs";
-  const showClasses = view === "dashboard" || view === "classes";
-  const showReports = view === "dashboard" || view === "reports";
+  const showUsers = view === "users";
+  const showPrograms = view === "programs";
+  const showClasses = view === "classes";
+  const showReports = view === "reports";
   const staffUsers = users.filter((user) => ["instructor", "program_head", "administrator"].includes(user.role));
   const instructors = users.filter((user) => user.role === "instructor");
   const programHeads = users.filter((user) => ["instructor", "program_head"].includes(user.role));
 
+  if (view === "dashboard") return <AdminOverview resources={resources} onRetry={loadData} />;
+
   return (
     <div className="space-y-6" data-slot={view === "dashboard" && loading ? "dashboard-skeleton" : undefined} data-variant={view === "dashboard" ? "admin" : undefined}>
+      {showClasses && <PageBreadcrumbs items={[{ label: "Manage", to: "/manage" }, { label: "Manage Classes" }]} />}
+      {showPrograms && <PageBreadcrumbs items={[{ label: "Program Overview", to: "/program-overview" }, { label: "Manage Programs" }]} />}
       {loading ? <span role="status" aria-busy="true" className="sr-only">Loading administrator data</span> : null}
       {error ? <ErrorState message={error} /> : null}
       {notice ? <p className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">{notice}</p> : null}
-
-      {showMetrics ? errors.dashboard ? resourceError("dashboard") : <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {metrics.map(([label, value]) => waiting("dashboard") ? <MetricPlaceholder key={label} /> : (
-          <article key={label} className="rounded-lg border border-slate-200 bg-white p-5">
-            <p className="text-sm text-slate-500">{label}</p>
-            <p className="mt-2 text-3xl font-bold">{value}</p>
-          </article>
-        ))}
-      </section> : null}
 
       {showUsers ? waiting("users") ? <SectionPlaceholder rows={5} /> : errors.users ? resourceError("users") : <section className="rounded-lg border border-slate-200 bg-white p-5">
         <h2 className="mb-4 text-lg font-semibold">Staff role assignment</h2>
@@ -222,50 +181,46 @@ export function AdminDashboard({ view = "dashboard" }) {
         )}
       </section> : null}
 
-      {(showPrograms || showClasses) ? <section className="grid gap-6 xl:grid-cols-2">
-        {showPrograms ? waiting("programs") ? <SectionPlaceholder form /> : errors.programs ? resourceError("programs") : <div className="rounded-lg border border-slate-200 bg-white p-5">
+      {(showPrograms || showClasses) ? <section className="grid min-w-0 gap-6">
+        {showPrograms ? waiting("programs") ? <SectionPlaceholder form /> : errors.programs ? resourceError("programs") : <div className="rounded-lg border border-slate-200 bg-white p-5 text-[#0D1526]">
           <h2 className="mb-4 text-lg font-semibold">Programs</h2>
           {!showUsers && errors.users ? resourceError("users") : null}
-          <form className="mb-5 grid gap-3 md:grid-cols-[1fr_12rem_auto]" onSubmit={handleCreateProgram}>
-            <div className="space-y-2"><Label htmlFor="program_name">Program name</Label><Input id="program_name" name="program_name" value={programForm.program_name} onChange={updateProgramForm} required /></div>
-            <div className="space-y-2"><Label htmlFor="program_head_id">Program head</Label><select id="program_head_id" name="program_head_id" disabled={!programOptionsReady} value={programForm.program_head_id} onChange={updateProgramForm} className="h-9 w-full rounded-md border border-slate-300 bg-white px-2 text-sm dark:border-slate-700 dark:bg-slate-900"><option value="">Unassigned</option>{programHeads.map((user) => <option key={user.id} value={user.id}>{user.name}</option>)}</select></div>
-            <div className="flex items-end"><Button type="submit" disabled={!programOptionsReady || working === "create-program"}>Create</Button></div>
+          <form className="mb-6 grid items-end gap-4 md:grid-cols-2 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_140px]" onSubmit={handleCreateProgram}>
+            <div className="min-w-0 space-y-2"><Label htmlFor="program_name">Program name</Label><Input id="program_name" name="program_name" value={programForm.program_name} onChange={updateProgramForm} className="h-11 rounded-lg text-[#0D1526]" required /></div>
+            <div className="min-w-0 space-y-2"><Label htmlFor="program_head_id">Program head</Label><select id="program_head_id" name="program_head_id" disabled={!programOptionsReady} value={programForm.program_head_id} onChange={updateProgramForm} className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-[#0D1526]"><option value="">Unassigned</option>{programHeads.map((user) => <option key={user.id} value={user.id}>{user.name}</option>)}</select></div>
+            <div className="flex items-end md:col-span-2 xl:col-span-1"><Button type="submit" disabled={!programOptionsReady || working === "create-program"} className="h-11 w-full rounded-lg bg-[#172f6b] px-6 text-white hover:bg-[#203f8a] sm:w-[140px] xl:w-full">Create</Button></div>
           </form>
           {programs.length === 0 ? <EmptyState title="No programs found" /> : (
-            <div className="space-y-3">{programs.map((program) => <article key={program.id} className="rounded-lg border border-slate-200 p-3"><div className="flex flex-wrap items-center justify-between gap-3"><span className="font-medium">{program.program_name}</span><Button size="sm" variant="destructive" onClick={() => { setWorking(`delete-program-${program.id}`); runAction(() => deleteProgram(program.id), "Program deleted."); }}>Delete</Button></div><p className="mt-2 text-xs text-slate-500">ID {program.id} · {program.classes_count || 0} classes</p></article>)}</div>
+            <div className="grid gap-4 lg:grid-cols-2">{programs.map((program) => <article key={program.id} className="min-w-0 rounded-lg border border-slate-200 p-4"><div className="flex items-start justify-between gap-3"><span className="min-w-0 break-words font-medium">{program.program_name}</span><Button size="sm" variant="destructive" className="shrink-0" onClick={() => { setWorking(`delete-program-${program.id}`); runAction(() => deleteProgram(program.id), "Program deleted."); }}>Delete</Button></div><p className="mt-2 break-words text-xs text-slate-500">ID {program.id} · {program.classes_count || 0} classes</p></article>)}</div>
           )}
         </div> : null}
 
-        {showClasses ? waiting("classes") ? <SectionPlaceholder form /> : errors.classes ? resourceError("classes") : <div className="rounded-lg border border-slate-200 bg-white p-5">
-          <h2 className="mb-4 text-lg font-semibold">Classes</h2>
+        {showClasses ? waiting("classes") ? <div className="grid gap-6"><SectionPlaceholder form rows={0} /><SectionPlaceholder rows={3} /></div> : errors.classes ? resourceError("classes") : <div className="grid min-w-0 gap-6">
+          <section aria-labelledby="create-class-title" className="min-w-0 rounded-lg border border-slate-200 bg-white p-5">
+          <h2 id="create-class-title" className="mb-4 text-lg font-semibold">Create Class</h2>
           {!showUsers && errors.users ? resourceError("users") : null}
           {!showPrograms && errors.programs ? resourceError("programs") : null}
-          <form className="mb-5 grid gap-3 md:grid-cols-2" onSubmit={handleCreateClass}>
-            <Input name="subject_name" value={classForm.subject_name} onChange={updateClassForm} placeholder="Subject" aria-label="Subject" required />
-            <Input name="section" value={classForm.section} onChange={updateClassForm} placeholder="Section" aria-label="Section" required />
-            <Input name="schedule" value={classForm.schedule} onChange={updateClassForm} placeholder="Schedule" aria-label="Schedule" required />
-            <select name="instructor_id" aria-label="Instructor" disabled={!programOptionsReady} value={classForm.instructor_id} onChange={updateClassForm} required className="h-9 rounded-md border border-slate-300 bg-white px-2 text-sm dark:border-slate-700 dark:bg-slate-900"><option value="">Select instructor</option>{instructors.map((user) => <option key={user.id} value={user.id}>{user.name}</option>)}</select>
-            <select name="program_id" aria-label="Program" disabled={resourceLoading.programs || Boolean(errors.programs)} value={classForm.program_id} onChange={updateClassForm} required className="h-9 rounded-md border border-slate-300 bg-white px-2 text-sm dark:border-slate-700 dark:bg-slate-900"><option value="">Select program</option>{programs.map((program) => <option key={program.id} value={program.id}>{program.program_name}</option>)}</select>
-            <select name="semester" aria-label="Semester" value={classForm.semester} onChange={updateClassForm} required className="h-9 rounded-md border border-slate-300 bg-white px-2 text-sm dark:border-slate-700 dark:bg-slate-900"><option value="1st">1st semester</option><option value="2nd">2nd semester</option></select>
-            <Input name="school_year" value={classForm.school_year} onChange={updateClassForm} placeholder="School year (2026-2027)" aria-label="School year" pattern="[0-9]{4}-[0-9]{4}" required />
-            <Button type="submit" disabled={!classOptionsReady || working === "create-class"} className="md:col-span-2">Create class</Button>
+          <form className="grid gap-x-6 gap-y-6 md:grid-cols-2" onSubmit={handleCreateClass}>
+            <Input name="subject_name" value={classForm.subject_name} onChange={updateClassForm} placeholder="Subject" aria-label="Subject" className="h-11" required />
+            <Input name="section" value={classForm.section} onChange={updateClassForm} placeholder="Section" aria-label="Section" className="h-11" required />
+            <Input name="schedule" value={classForm.schedule} onChange={updateClassForm} placeholder="Schedule" aria-label="Schedule" className="h-11" required />
+            <select name="instructor_id" aria-label="Instructor" disabled={!programOptionsReady} value={classForm.instructor_id} onChange={updateClassForm} required className="h-11 rounded-md border border-slate-300 bg-white px-3 text-sm dark:border-slate-700 dark:bg-slate-900"><option value="">Select instructor</option>{instructors.map((user) => <option key={user.id} value={user.id}>{user.name}</option>)}</select>
+            <select name="program_id" aria-label="Program" disabled={resourceLoading.programs || Boolean(errors.programs)} value={classForm.program_id} onChange={updateClassForm} required className="h-11 rounded-md border border-slate-300 bg-white px-3 text-sm dark:border-slate-700 dark:bg-slate-900"><option value="">Select program</option>{programs.map((program) => <option key={program.id} value={program.id}>{program.program_name}</option>)}</select>
+            <select name="semester" aria-label="Semester" value={classForm.semester} onChange={updateClassForm} required className="h-11 rounded-md border border-slate-300 bg-white px-3 text-sm dark:border-slate-700 dark:bg-slate-900"><option value="1st">1st semester</option><option value="2nd">2nd semester</option></select>
+            <Input name="school_year" value={classForm.school_year} onChange={updateClassForm} placeholder="School year (2026-2027)" aria-label="School year" pattern="[0-9]{4}-[0-9]{4}" className="h-11" required />
+            <Button type="submit" disabled={!classOptionsReady || working === "create-class"} className="h-11 w-full justify-self-center bg-[#172f6b] px-6 py-3 text-white hover:bg-[#203f8a] md:col-span-2 md:w-[calc(50%-0.75rem)]">Create class</Button>
           </form>
+          </section>
+          <section aria-labelledby="existing-classes-title" className="min-w-0 rounded-lg border border-slate-200 bg-white p-5">
+          <h2 id="existing-classes-title" className="mb-4 text-lg font-semibold">Existing Classes</h2>
           {classes.length === 0 ? <EmptyState title="No classes found" /> : (
-            <div className="space-y-3">{classes.map((item) => <article key={item.id} className="rounded-lg border border-slate-200 p-3"><div className="flex flex-wrap items-center justify-between gap-3"><span className="font-medium">{item.subject_name}</span><Button size="sm" variant="destructive" onClick={() => { setWorking(`delete-class-${item.id}`); runAction(() => deleteClass(item.id), "Class deleted."); }}>Delete</Button></div><p className="mt-2 text-xs text-slate-500">ID {item.id} · {item.program?.program_name || "Program"}</p></article>)}</div>
+            <div className="grid gap-3 lg:grid-cols-2">{classes.map((item) => <article key={item.id} className="min-w-0 rounded-lg border border-slate-200 p-4"><div className="flex items-start justify-between gap-3"><span className="min-w-0 break-words font-medium">{item.subject_name}</span><Button size="sm" variant="destructive" className="shrink-0" onClick={() => { setWorking(`delete-class-${item.id}`); runAction(() => deleteClass(item.id), "Class deleted."); }}>Delete</Button></div><p className="mt-2 break-words text-xs text-slate-500">ID {item.id} · {item.program?.program_name || "Program"}</p></article>)}</div>
           )}
+          </section>
         </div> : null}
       </section> : null}
 
-      {showReports ? waiting("programs") ? <SectionPlaceholder form rows={0} /> : errors.programs ? (!showPrograms ? resourceError("programs") : null) : <section className="rounded-lg border border-slate-200 bg-white p-5">
-        <h2 className="mb-4 text-lg font-semibold">Export requests report</h2>
-        <form className="grid gap-3 md:grid-cols-5" onSubmit={handleDownloadReport}>
-          <select name="program_id" aria-label="Program" value={reportFilters.program_id} onChange={updateReportFilters} className="h-9 rounded-md border border-slate-300 bg-white px-2 text-sm dark:border-slate-700 dark:bg-slate-900"><option value="">All programs</option>{programs.map((program) => <option key={program.id} value={program.id}>{program.program_name}</option>)}</select>
-          <select name="status" value={reportFilters.status} onChange={updateReportFilters} className="h-8 w-full rounded-lg border border-slate-200 bg-white px-2 text-sm"><option value="">All</option><option value="pending">Pending</option><option value="approved">Approved</option><option value="noted">Noted</option><option value="invalid">Invalid</option></select>
-          <Input name="date_from" type="date" value={reportFilters.date_from} onChange={updateReportFilters} />
-          <Input name="date_to" type="date" value={reportFilters.date_to} onChange={updateReportFilters} />
-          <Button type="submit" disabled={working === "report"}>Download</Button>
-        </form>
-      </section> : null}
+      {showReports ? waiting("programs") ? <SectionPlaceholder form rows={0} /> : errors.programs ? resourceError("programs") : <AdminReports programs={programs} /> : null}
     </div>
   );
 }

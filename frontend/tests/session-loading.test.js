@@ -17,6 +17,14 @@ before(async () => {
       name: "session-loading-test-context",
       enforce: "pre",
       transform(code, id) {
+        const path = id.replaceAll("\\", "/");
+        if (path.endsWith("/src/pages/AuthCallback.jsx") || path.endsWith("/src/pages/OtpVerification.jsx")) {
+          const router = `const useNavigate = () => globalThis.__authTestNavigate;
+            const useSearchParams = () => [new URLSearchParams(globalThis.__authTestSearch || "")];
+            import { Link, Navigate } from "react-router-dom";`;
+          return code.replace(/import \{[^}]*useNavigate[^}]*\} from "react-router-dom";/, router) +
+            (path.endsWith("/OtpVerification.jsx") ? "\nexport { OtpVerificationForm as TestOtpForm };" : "");
+        }
         // Supply session states without running auth effects or changing its source file.
         if (id.replaceAll("\\", "/").endsWith("/src/context/AuthContext.jsx")) {
           return `${code}\nexport { AuthContext as SessionTestContext };`;
@@ -172,4 +180,290 @@ test("verified SPA routes show their page skeleton without replaying the startup
     if (originalWindow === undefined) delete globalThis.window;
     else globalThis.window = originalWindow;
   }
+});
+
+function mount(render) {
+  const slots = [];
+  let cursor = 0;
+  let pending = [];
+  let value;
+  let updates = 0;
+  const same = (a, b) => a && b && a.length === b.length && a.every((item, index) => Object.is(item, b[index]));
+  const dispatcher = {
+    useSyncExternalStore(subscribe, snapshot) {
+      const [value, setValue] = dispatcher.useState(() => snapshot?.() ?? null);
+      dispatcher.useEffect(() => subscribe?.(() => setValue(snapshot?.() ?? null)), [subscribe, snapshot]);
+      return value;
+    },
+    useContext() { return globalThis.__authTestContext; },
+    useState(initial) {
+      const index = cursor++;
+      if (!slots[index]) slots[index] = { value: typeof initial === "function" ? initial() : initial };
+      return [slots[index].value, next => { updates++; slots[index].value = typeof next === "function" ? next(slots[index].value) : next; }];
+    },
+    useRef(initial) {
+      const index = cursor++;
+      if (!slots[index]) slots[index] = { current: initial };
+      return slots[index];
+    },
+    useMemo(factory, deps) {
+      const index = cursor++;
+      if (!slots[index] || !same(slots[index].deps, deps)) slots[index] = { value: factory(), deps };
+      return slots[index].value;
+    },
+    useCallback(callback, deps) { return dispatcher.useMemo(() => callback, deps); },
+    useEffect(effect, deps) {
+      const index = cursor++;
+      if (!slots[index] || !same(slots[index].deps, deps)) {
+        const previous = slots[index];
+        slots[index] = { deps };
+        pending.push(() => { previous?.cleanup?.(); slots[index].cleanup = effect(); });
+      }
+    },
+  };
+  function update() {
+    cursor = 0;
+    const internals = React.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE;
+    const previous = internals.H;
+    internals.H = dispatcher;
+    try { value = render(); } finally { internals.H = previous; }
+    const effects = pending;
+    pending = [];
+    effects.forEach(effect => effect());
+    return value;
+  }
+  update();
+  return {
+    get value() { return value; },
+    get updates() { return updates; },
+    async flush() { await new Promise(resolve => setTimeout(resolve, 0)); update(); await new Promise(resolve => setTimeout(resolve, 0)); return update(); },
+    unmount() { slots.forEach(slot => slot.cleanup?.()); },
+  };
+}
+
+
+async function withCookieProvider(run, { hint = null } = {}) {
+  const saved = ['window', 'localStorage', 'sessionStorage'].map(key => [key, Object.getOwnPropertyDescriptor(globalThis, key)]);
+  const items = new Map(hint ? [['alrm_session_version', hint]] : []);
+  const storage = { getItem: key => items.get(key) ?? null, setItem: (key, value) => items.set(key, value), removeItem: key => items.delete(key) };
+  const calls = [];
+  Object.defineProperty(globalThis, 'window', { configurable: true, value: new EventTarget() });
+  for (const key of ['localStorage', 'sessionStorage']) Object.defineProperty(globalThis, key, { configurable: true, value: storage });
+  const previousFetch = globalThis.fetch;
+  globalThis.fetch = (path, options) => new Promise(resolve => calls.push({ path, options, resolve }));
+  const { AuthProvider } = await server.ssrLoadModule('/src/context/AuthContext.jsx');
+  const client = await server.ssrLoadModule('/src/api/client.js');
+  client.resetCsrfToken?.();
+  let page;
+  try {
+    page = mount(() => AuthProvider({ children: null }));
+    await run({ page, calls, items, client, state: () => page.value.props.value });
+  } finally {
+    page?.unmount();
+    globalThis.fetch = previousFetch;
+    for (const [key, descriptor] of saved) {
+      if (descriptor) Object.defineProperty(globalThis, key, descriptor);
+      else delete globalThis[key];
+    }
+  }
+}
+const cookieUser = { id: 'verified-student', role: 'student', program_id: 'one', year_level: '1st', school_student_id: '2026-001' };
+
+test('provider restores a cookie on startup with no marker and treats guest 401 normally', async () => {
+  await withCookieProvider(async ({ page, calls, state }) => {
+    assert.equal(state().loading, true);
+    assert.equal(state().user, null);
+    assert.equal(calls[0].path, '/api/me');
+    assert.equal(calls[0].options.headers.has('Authorization'), false);
+    calls[0].resolve(Response.json({ data: cookieUser }));
+    await page.flush();
+    assert.deepEqual(state().user, cookieUser);
+    assert.equal(state().loading, false);
+  });
+  await withCookieProvider(async ({ page, calls, state }) => {
+    calls[0].resolve(new Response('', { status: 401 }));
+    await page.flush();
+    assert.equal(state().user, null);
+    assert.equal(state().sessionError, '');
+    assert.equal(state().loading, false);
+  }, { hint: 'forged-admin' });
+});
+
+test('provider preserves a verified user during outage and supports retry', async () => {
+  await withCookieProvider(async ({ page, calls, state }) => {
+    calls[0].resolve(Response.json({ data: cookieUser }));
+    await page.flush();
+    const refresh = state().refreshUser();
+    calls.at(-1).resolve(new Response('', { status: 503 }));
+    await refresh;
+    await page.flush();
+    assert.deepEqual(state().user, cookieUser);
+    assert.match(state().sessionError, /try again/i);
+    const retry = state().refreshUser();
+    calls.at(-1).resolve(Response.json({ data: { ...cookieUser, name: 'Updated' } }));
+    await retry;
+    await page.flush();
+    assert.equal(state().user.name, 'Updated');
+    assert.equal(state().sessionError, '');
+  });
+});
+
+test('another tab logging out invalidates a pending restoration without an existing marker', async () => {
+  await withCookieProvider(async ({ page, calls, state, items }) => {
+    const restoration = calls[0];
+    const version = `expired:${crypto.randomUUID()}`;
+    items.set('alrm_session_version', version);
+    const event = new Event('storage');
+    Object.assign(event, { key: 'alrm_session_version', newValue: version });
+    window.dispatchEvent(event);
+    await page.flush();
+    assert.equal(state().loading, false);
+    assert.equal(state().user, null);
+    restoration.resolve(Response.json({ data: cookieUser }));
+    await page.flush();
+    assert.equal(state().user, null);
+    assert.equal(state().sessionError, '');
+  });
+});
+
+test('provider rejects legacy bearer completion and ignores stale restoration after cookie login', async () => {
+  await withCookieProvider(async ({ page, calls, state, client, items }) => {
+    assert.equal(typeof state().completeCookieLogin, 'function');
+    await assert.rejects(state().completeCookieLogin({ data: { token: 'legacy-secret' } }), /confirm|cookie/i);
+    const old = calls[0];
+    const sessionVersion = client.markSessionChanged();
+    const completion = state().completeCookieLogin({ data: { authenticated: true, user: cookieUser }, sessionVersion });
+    calls.at(-1).resolve(Response.json({ data: cookieUser }));
+    assert.deepEqual(await completion, cookieUser);
+    old.resolve(new Response('', { status: 401 }));
+    await page.flush();
+    assert.deepEqual(state().user, cookieUser);
+    assert.equal(items.has('auth_token'), false);
+    assert.equal(items.get('alrm_session_version'), sessionVersion);
+  });
+});
+
+test('logout awaits cookie clearance and late logout completion cannot erase a newer login', async () => {
+  await withCookieProvider(async ({ page, calls, state, client, items }) => {
+    calls[0].resolve(Response.json({ data: cookieUser }));
+    await page.flush();
+    items.set('pending_otp_login', 'pending');
+    let completed = false;
+    const logout = state().logout({ redirectToSignedOut: true }).then(() => { completed = true; });
+    await page.flush();
+    assert.equal(state().logoutDestination, '/signed-out', 'The route guard needs the destination before session-expiry notifications arrive');
+    assert.equal(calls.at(-1).path, '/api/auth/csrf');
+    calls.at(-1).resolve(Response.json({ success: true, data: { csrf_token: 'proof' } }));
+    await page.flush();
+    assert.equal(calls.at(-1).path, '/api/logout');
+    assert.equal(calls.at(-1).options.headers.get('X-CSRF-Token'), 'proof');
+    assert.equal(completed, false);
+    assert.equal(items.get('pending_otp_login'), 'pending');
+    calls.at(-1).resolve(Response.json({ success: true, data: { revoked: true } }));
+    await logout;
+    await page.flush();
+    assert.equal(state().user, null);
+    assert.equal(state().logoutDestination, '/signed-out');
+    assert.equal(items.has('pending_otp_login'), false);
+    const version = client.markSessionChanged();
+    const login = state().completeCookieLogin({ data: { authenticated: true, user: cookieUser }, sessionVersion: version });
+    calls.at(-1).resolve(Response.json({ data: cookieUser }));
+    await login;
+    await page.flush();
+    assert.deepEqual(state().user, cookieUser);
+  });
+});
+
+test('OTP APIs use protected cookie requests, accept authenticated exchange and never retry mutations', async () => {
+  await withCookieProvider(async ({ page, calls, state, items }) => {
+    calls[0].resolve(new Response('', { status: 401 }));
+    await page.flush();
+    const otp = await server.ssrLoadModule('/src/api/otp.js');
+    const writes = [];
+    globalThis.fetch = async (url, options) => {
+      assert.equal(options.credentials, 'include');
+      assert.equal(options.headers.has('Authorization'), false);
+      if (url === '/api/auth/csrf') return Response.json({ success: true, data: { csrf_token: 'signed-proof' } });
+      assert.equal(options.headers.get('X-CSRF-Token'), 'signed-proof');
+      writes.push([url, JSON.parse(options.body)]);
+      return Response.json({ success: true, data: { authenticated: true, user: cookieUser } });
+    };
+    const exchange = await otp.exchangeOtpCode('one-time');
+    assert.equal(exchange.data.authenticated, true);
+    assert.equal(exchange.data.token, undefined);
+    assert.equal(typeof exchange.sessionVersion, 'string');
+    await otp.sendOtp({ token: 'ignored-legacy', pending: 'pending', userId: 'one', email: 'student@example.test' });
+    await otp.verifyOtp({ token: 'ignored-legacy', pending: 'pending', userId: 'one', code: '123456' });
+    assert.ok(writes.every(([, body]) => !('token' in body)));
+    assert.equal(items.has('auth_token'), false);
+    let attempts = 0;
+    globalThis.fetch = async url => {
+      if (url === '/api/auth/csrf') return Response.json({ success: true, data: { csrf_token: 'signed-proof' } });
+      attempts++;
+      return Response.json({ message: 'Upstream unavailable' }, { status: 502 });
+    };
+    await assert.rejects(otp.checkTrustedDevice({ pending: 'pending' }, { retries: 2, delayMs: 0 }), /unavailable/);
+    assert.equal(attempts, 1);
+    assert.equal(state().user, null);
+  });
+});
+
+test('pending OTP state has a ten-minute lifetime and never retains obsolete pending bearer data', async () => {
+  await withCookieProvider(async ({ calls, page, items }) => {
+    calls[0].resolve(new Response('', { status: 401 }));
+    await page.flush();
+    const otp = await server.ssrLoadModule('/src/api/otp.js');
+    items.set('pending_otp_token', 'obsolete-bearer');
+    otp.setPendingLogin('short-lived-pending');
+    otp.setPendingOtpSession({ token: 'do-not-store', email: 'student@example.test', userId: 'one' });
+    assert.equal(items.has('pending_otp_token'), false);
+    assert.equal(otp.getPendingLogin(), 'short-lived-pending');
+    const now = Date.now;
+    try {
+      Date.now = () => now() + 600001;
+      assert.equal(otp.getPendingLogin(), null);
+      assert.equal(otp.getPendingOtpUserId(), null);
+      assert.equal(otp.getPendingOtpEmail(), null);
+    } finally { Date.now = now; }
+  });
+});
+
+test('OAuth callback removes credential params before exchange and refuses legacy bearer URLs', async () => {
+  await withCookieProvider(async ({ calls, page }) => {
+    calls[0].resolve(new Response('', { status: 401 }));
+    await page.flush();
+    const { AuthCallback } = await server.ssrLoadModule('/src/pages/AuthCallback.jsx');
+    const destinations = [];
+    globalThis.__authTestNavigate = (path, options) => destinations.push([path, options]);
+    const completed = [];
+    globalThis.__authTestContext = { completeCookieLogin: async response => { completed.push(response); return cookieUser; } };
+    window.location = { href: 'https://alrm.test/auth/callback?code=one-time&token=legacy#access_token=secret' };
+    window.history = { state: { router: 'preserved' }, replaceState(state, _title, url) { window.location.href = new URL(url, window.location.href).href; assert.deepEqual(state, { router: 'preserved' }); } };
+    globalThis.__authTestSearch = 'code=one-time';
+    globalThis.fetch = async (url, options) => {
+      assert.doesNotMatch(window.location.href, /code=|token=|secret/);
+      if (url === '/api/auth/csrf') return Response.json({ success: true, data: { csrf_token: 'proof' } });
+      assert.equal(url, '/api/auth/exchange');
+      assert.equal(JSON.parse(options.body).code, 'one-time');
+      return Response.json({ success: true, data: { authenticated: true, user: cookieUser } });
+    };
+    const callback = mount(() => AuthCallback());
+    await callback.flush();
+    assert.equal(completed.length, 1);
+    assert.equal(completed[0].data.authenticated, true);
+    assert.equal(destinations.at(-1)[0], '/dashboard');
+    callback.unmount();
+    globalThis.__authTestSearch = 'token=legacy-bearer';
+    window.location.href = 'https://alrm.test/auth/callback?token=legacy-bearer';
+    const legacy = mount(() => AuthCallback());
+    await legacy.flush();
+    assert.equal(completed.length, 1);
+    const html = renderToStaticMarkup(legacy.value);
+    assert.match(html, /one-time|code/i);
+    assert.doesNotMatch(window.location.href, /token=/);
+    legacy.unmount();
+    delete globalThis.__authTestContext;
+    delete globalThis.__authTestNavigate;
+    delete globalThis.__authTestSearch;
+  });
 });

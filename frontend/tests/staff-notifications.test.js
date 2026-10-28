@@ -1,3 +1,4 @@
+import { mockApiFetch } from "./helpers/mockApiFetch.js";
 import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
@@ -24,7 +25,7 @@ async function load(path) {
 test("staff notifications use authenticated shared GET and PATCH endpoints", async () => {
   const api = await load("api/notifications.js");
   const calls = [];
-  mock.method(globalThis, "fetch", async (url, options) => {
+  mockApiFetch(async (url, options) => {
     calls.push({ url: String(url), method: options.method || "GET", headers: options.headers, body: options.body });
     const data = calls.length === 1 ? [] : calls.length === 2 ? { id: "note/one", is_read: true } : null;
     return Response.json({ success: true, data });
@@ -33,13 +34,13 @@ test("staff notifications use authenticated shared GET and PATCH endpoints", asy
   await api.markNotificationRead("note/one");
   await api.markAllNotificationsRead();
   assert.deepEqual(calls.map(call => [call.url, call.method]), [["/api/notifications", "GET"], ["/api/notifications/note%2Fone/read", "PATCH"], ["/api/notifications/read-all", "PATCH"]]);
-  assert.ok(calls.every(call => call.headers.get("Authorization") === "Bearer test-session"));
+  assert.ok(calls.every(call => call.headers.get("Authorization") === null));
   assert.ok(calls.every(call => call.body === undefined));
 });
 
 test("notification errors and unconfirmed read operations never become fake success", async () => {
   const api = await load("api/notifications.js");
-  const fetch = mock.method(globalThis, "fetch", async () => Response.json({ message: "Forbidden" }, { status: 403 }));
+  const fetch = mockApiFetch(async () => Response.json({ message: "Forbidden" }, { status: 403 }));
   await assert.rejects(api.getNotifications(), /Forbidden/);
   fetch.mock.mockImplementation(async () => Response.json({ success: true, data: {} }));
   await assert.rejects(api.getNotifications(), /unexpected/i);
@@ -51,16 +52,34 @@ test("notification errors and unconfirmed read operations never become fake succ
 test("email preference writes use the authenticated profile endpoint and require a confirmed boolean", async () => {
   const api = await load("api/notifications.js");
   const calls = [];
-  const fetch = mock.method(globalThis, "fetch", async (url, options) => {
+  const fetch = mockApiFetch(async (url, options) => {
     calls.push({ url: String(url), method: options.method, body: JSON.parse(options.body), auth: options.headers.get("Authorization") });
     return Response.json({ success: true, data: { email_notifications_enabled: true } });
   });
   assert.equal(await api.saveEmailNotificationPreference(true), true);
-  assert.deepEqual(calls, [{ url: "/api/me/notification-preferences", method: "PATCH", body: { email_notifications_enabled: true }, auth: "Bearer test-session" }]);
+  assert.deepEqual(calls, [{ url: "/api/me/notification-preferences", method: "PATCH", body: { email_notifications_enabled: true }, auth: null }]);
   fetch.mock.mockImplementation(async () => Response.json({ message: "The route could not be found." }, { status: 404 }));
   await assert.rejects(api.saveEmailNotificationPreference(false), /route could not be found/i);
   fetch.mock.mockImplementation(async () => Response.json({ success: true, data: { email_notifications_enabled: "false" } }));
   await assert.rejects(api.saveEmailNotificationPreference(false), /confirm/i);
+});
+
+test("an unresponsive email preference request is cancelled instead of locking the switch indefinitely", async () => {
+  const api = await load("api/notifications.js");
+  const controller = new AbortController();
+  mock.method(AbortSignal, "timeout", milliseconds => {
+    if (milliseconds === 10000) return new AbortController().signal;
+    assert.equal(milliseconds, 15000);
+    return controller.signal;
+  });
+  mockApiFetch(async (_url, options) => {
+    assert.equal(options.signal, controller.signal);
+    if (options.signal.aborted) throw options.signal.reason;
+    return new Promise((_resolve, reject) => options.signal.addEventListener("abort", () => reject(options.signal.reason), { once: true }));
+  });
+  const saving = api.saveEmailNotificationPreference(false);
+  controller.abort(new DOMException("Request timed out", "TimeoutError"));
+  await assert.rejects(saving, { name: "TimeoutError" });
 });
 
 test("staff feeds honor the saved request and threshold preferences without inventing decisions", async () => {
@@ -217,7 +236,7 @@ test("the reference layout has accessible controls and uses the server's email p
 
 test("a student preview cannot load or display its student inbox inside the instructor bell", async () => {
   const Bell = (await server.ssrLoadModule("/src/components/notifications/NotificationBell.jsx")).default;
-  const fetch = mock.method(globalThis, "fetch", async () => { throw new Error("Preview must not load a different role's inbox"); });
+  const fetch = mockApiFetch(async () => { throw new Error("Preview must not load a different role's inbox"); });
   const html = renderToStaticMarkup(React.createElement(MemoryRouter, null, React.createElement(Bell, { user: { id: "student-preview", role: "student" }, audience: "instructor" })));
   assert.match(html, /instructor account required/i);
   assert.equal(fetch.mock.callCount(), 0);

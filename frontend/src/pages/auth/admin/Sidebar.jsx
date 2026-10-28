@@ -1,11 +1,8 @@
 import { NavLink, matchPath, useLocation, useNavigate } from "react-router-dom";
 import {
-  GraduationCap,
   LayoutDashboard,
   LogOut,
   Settings,
-  UserCog,
-  Users,
   UsersRound,
   FileInput,
   FileSearchCorner,
@@ -39,24 +36,9 @@ const menuItems = [
     icon: LayoutDashboard,
   },
   {
-    label: "Students",
-    path: "/students",
-    icon: UsersRound,
-  },
-  {
-    label: "Instructors",
-    path: "/instructors",
-    icon: Users,
-  },
-  {
-    label: "Programs",
-    path: "/programs",
-    icon: GraduationCap,
-  },
-  {
     label: "User Management",
     path: "/user-management",
-    icon: UserCog,
+    icon: UsersRound,
   },
   {
     label: "Program Overview",
@@ -109,7 +91,7 @@ function Sidebar({ children }) {
           <SidebarBrand wide />
         </SidebarHeader>
 
-        <SidebarContent className="bg-[#0d1526] px-4 py-12 group-data-[collapsible=icon]:px-4">
+        <SidebarContent className="bg-[#0d1526] px-4 py-8 group-data-[collapsible=icon]:px-4">
           <SidebarMenu className="gap-2">
             {menuItems.map((item) => {
               const Icon = item.icon;
@@ -122,7 +104,7 @@ function Sidebar({ children }) {
                     isActive={isActive}
                     tooltip={item.label}
                     className={cn(
-                      "h-11 gap-4 rounded-[7px] px-5 text-[18px] font-semibold text-slate-100 hover:bg-white/10 hover:text-white group-data-[collapsible=icon]:size-11! group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0!",
+                      "h-11 gap-4 rounded-[7px] px-5 text-[15px] font-bold text-slate-100 hover:bg-white/10 hover:text-white group-data-[collapsible=icon]:size-11! group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0!",
                       isActive &&
                         "bg-[#203b82] text-white hover:bg-[#203b82]",
                     )}
@@ -150,7 +132,7 @@ function Sidebar({ children }) {
                     <SidebarMenuButton
                       type="button"
                       tooltip="Logout"
-                      className="h-11 gap-4 rounded-[7px] px-5 text-[18px] font-semibold text-slate-100 hover:bg-red-500/15 hover:text-white group-data-[collapsible=icon]:size-11! group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0!"
+                      className="h-11 gap-4 rounded-[7px] px-5 text-[15px] font-bold text-slate-100 hover:bg-red-500/15 hover:text-white group-data-[collapsible=icon]:size-11! group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0!"
                     />
                   }
                 >

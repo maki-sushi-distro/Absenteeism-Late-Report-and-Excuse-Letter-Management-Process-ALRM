@@ -7,7 +7,7 @@ export const ROLE_LABELS = {
 };
 
 export function userDisplayId(user) {
-  return (user.role === "student" ? user.school_student_id : user.faculty_id || user.employee_id) || "Unavailable";
+  return (user.role === "student" ? user.school_student_id : user.faculty_id || user.employee_id) || (user.role === "student" ? "Unassigned" : "Unavailable");
 }
 
 function headedPrograms(user, programs) {
@@ -18,7 +18,7 @@ export function userDepartment(user, programs = []) {
   const program = user.program || (user.program_id != null && programs.find((item) => String(item.id) === String(user.program_id)));
   return program?.program_name || program?.name
     || headedPrograms(user, programs).map((item) => item.program_name || item.name).filter(Boolean).join(" / ")
-    || "Unavailable";
+    || (user.role === "student" ? "Unassigned" : "Unavailable");
 }
 
 export function userStatus(user) {
@@ -33,12 +33,13 @@ export function userPermissions(user, currentUserId) {
   };
 }
 
-export function studentYearLabel(user) {
-  const year = String(user.year_level || "").match(/^[1-4]/)?.[0];
-  return year ? `${["", "1st", "2nd", "3rd", "4th"][Number(year)]} Year` : "Year unavailable";
+export function studentYearSection(user) {
+  const year = String(user.year_level || "").trim();
+  const section = typeof user.section === "string" ? user.section.trim() : "";
+  return [year, section].filter(Boolean).join(" / ") || "Unassigned";
 }
 
-export function filterUsers(users, { tab = "approved", status = "approved", role = "", program = "", search = "" } = {}, programs = []) {
+export function filterUsers(users, { tab = "approved", status = "approved", role = "", program = "", year = "", search = "" } = {}, programs = []) {
   const query = search.trim().toLocaleLowerCase();
   const result = users.filter((user) => {
     if (userStatus(user) !== (tab === "waiting" ? "pending" : status)) return false;
@@ -47,16 +48,13 @@ export function filterUsers(users, { tab = "approved", status = "approved", role
       ? user.role === role || user.heads_program === true || user.headed_program_exists === true || headed.length > 0
       : user.role === role;
     if (role && !matchesRole) return false;
+    if (role === "student" && year && (String(user.year_level || "").match(/^[1-4]/)?.[0] || "unassigned") !== year) return false;
     if (program && String(user.program_id || user.program?.id) !== String(program)
       && !headed.some((item) => String(item.id) === String(program))) return false;
     return !query || [user.name, user.email, userDisplayId(user), userDepartment(user, programs)]
       .some((value) => String(value || "").toLocaleLowerCase().includes(query));
   });
   return result.sort((a, b) => {
-    if (tab === "approved" && role === "student") {
-      const yearOrder = studentYearLabel(a).localeCompare(studentYearLabel(b));
-      if (yearOrder) return yearOrder;
-    }
     return String(a.name || "").localeCompare(String(b.name || "")) || String(a.id).localeCompare(String(b.id));
   });
 }

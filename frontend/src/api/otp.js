@@ -1,127 +1,63 @@
-import { API_URL } from "./client";
+import { apiFetch } from "./client.js";
 
 const PENDING_TOKEN_KEY = "pending_otp_token";
 const PENDING_EMAIL_KEY = "pending_otp_email";
 const PENDING_USER_ID_KEY = "pending_otp_user_id";
 const PENDING_LOGIN_KEY = "pending_otp_login";
-const EXCHANGE_ENDPOINT = "/api/auth/exchange";
-const RESEND_ENDPOINT = "/api/auth/otp/resend";
-const VERIFY_ENDPOINT = "/api/auth/otp/verify";
-const CHECK_TRUSTED_ENDPOINT = "/api/auth/otp/check-trusted";
-
-// Mga status na ibinabalik ng Render/Vercel habang gumigising ang backend.
-const RETRYABLE_STATUSES = [502, 503, 504];
-
-function sleep(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-async function readJson(res) {
-  try {
-    return await res.json();
-  } catch {
-    return null;
-  }
-}
+const PENDING_EXPIRES_KEY = "pending_otp_expires_at";
+const PENDING_LIFETIME_MS = 10 * 60 * 1000;
 
 async function expectJson(res) {
-  const body = await readJson(res);
-
-  if (!res.ok) {
-    const message =
-      body?.message ||
-      (res.status === 404
-        ? "The backend OTP verification route was not found."
-        : `OTP request failed with status ${res.status}.`);
-
-    const error = new Error(message);
+  const body = await res.json().catch(() => null);
+  if (!res.ok || body?.success !== true) {
+    const error = new Error(body?.message || (res.status === 404
+      ? "The backend OTP verification route was not found."
+      : "The server did not confirm the OTP request."));
     error.status = res.status;
     error.body = body;
     throw error;
   }
-
   return body;
 }
 
-function otpHeaders(token) {
-  return {
-    Accept: "application/json",
-    "Content-Type": "application/json",
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-  };
+function store(key, value) {
+  if (value) sessionStorage.setItem(key, value);
+  else sessionStorage.removeItem(key);
 }
 
-export function setPendingOtpToken(token) {
-  if (token) {
-    sessionStorage.setItem(PENDING_TOKEN_KEY, token);
-  } else {
-    sessionStorage.removeItem(PENDING_TOKEN_KEY);
-  }
+function readPending(key) {
+  try {
+    const expiry = Number(sessionStorage.getItem(PENDING_EXPIRES_KEY));
+    if (!expiry || expiry <= Date.now() || expiry > Date.now() + PENDING_LIFETIME_MS) {
+      clearPendingOtp();
+      return null;
+    }
+    return sessionStorage.getItem(key);
+  } catch { return null; }
 }
 
+// Kept only for existing route guards; pending bearer tokens are obsolete.
 export function getPendingOtpToken() {
-  return sessionStorage.getItem(PENDING_TOKEN_KEY);
+  try { sessionStorage.removeItem(PENDING_TOKEN_KEY); } catch { /* No pending credential. */ }
+  return null;
 }
+export function getPendingOtpEmail() { return readPending(PENDING_EMAIL_KEY); }
+export function getPendingOtpUserId() { return readPending(PENDING_USER_ID_KEY); }
+export function getPendingLogin() { return readPending(PENDING_LOGIN_KEY); }
 
-export function setPendingOtpEmail(email) {
-  if (email) {
-    sessionStorage.setItem(PENDING_EMAIL_KEY, email);
-  } else {
-    sessionStorage.removeItem(PENDING_EMAIL_KEY);
-  }
-}
-
-export function getPendingOtpEmail() {
-  return sessionStorage.getItem(PENDING_EMAIL_KEY);
-}
-
-export function setPendingOtpUserId(userId) {
-  if (userId) {
-    sessionStorage.setItem(PENDING_USER_ID_KEY, userId);
-  } else {
-    sessionStorage.removeItem(PENDING_USER_ID_KEY);
-  }
-}
-
-export function getPendingOtpUserId() {
-  return sessionStorage.getItem(PENDING_USER_ID_KEY);
-}
-
-// Ang "pending" token mula sa Google callback (patunay na dumaan sa Google).
 export function setPendingLogin(pending) {
-  if (pending) {
-    sessionStorage.setItem(PENDING_LOGIN_KEY, pending);
-  } else {
-    sessionStorage.removeItem(PENDING_LOGIN_KEY);
+  if (pending && getPendingLogin() !== pending) sessionStorage.setItem(PENDING_EXPIRES_KEY, String(Date.now() + PENDING_LIFETIME_MS));
+  store(PENDING_LOGIN_KEY, pending);
+}
+export function clearPendingOtp() {
+  for (const key of [PENDING_TOKEN_KEY, PENDING_EMAIL_KEY, PENDING_USER_ID_KEY, PENDING_LOGIN_KEY, PENDING_EXPIRES_KEY]) {
+    try { sessionStorage.removeItem(key); } catch { /* Storage is optional. */ }
   }
 }
-
-export function getPendingLogin() {
-  return sessionStorage.getItem(PENDING_LOGIN_KEY);
-}
-
-export function clearPendingOtp() {
-  setPendingOtpToken(null);
-  setPendingOtpEmail(null);
-  setPendingOtpUserId(null);
-  setPendingLogin(null);
-}
-
-export function setPendingOtpSession({ token, email, userId }) {
-  setPendingOtpToken(token);
-  setPendingOtpEmail(email);
-  setPendingOtpUserId(userId);
-}
-
-export function getOtpTokenFromResponse(response, fallbackToken) {
-  return (
-    response?.data?.token ||
-    response?.data?.access_token ||
-    response?.data?.plainTextToken ||
-    response?.token ||
-    response?.access_token ||
-    fallbackToken
-  );
+export function setPendingOtpSession({ email, userId }) {
+  getPendingOtpToken();
+  store(PENDING_EMAIL_KEY, email);
+  store(PENDING_USER_ID_KEY, userId);
 }
 
 export function getExchangeCodeFromResponse(response) {
@@ -148,84 +84,31 @@ export function getOtpWaitSeconds(payload, fallbackSeconds = 0) {
 }
 
 export async function exchangeOtpCode(exchangeCode) {
-  const res = await fetch(`${API_URL}${EXCHANGE_ENDPOINT}`, {
+  const res = await apiFetch("/api/auth/exchange", {
     method: "POST",
-    credentials: "include",
-    headers: otpHeaders(),
-    body: JSON.stringify({
-      code: exchangeCode,
-      exchange_code: exchangeCode,
-    }),
+    body: JSON.stringify({ code: exchangeCode, exchange_code: exchangeCode }),
   });
-
-  return expectJson(res);
-}
-
-export async function checkTrustedDevice(
-  { pending },
-  { retries = 6, delayMs = 5000 } = {},
-) {
-  let lastError;
-
-  for (let attempt = 0; attempt <= retries; attempt++) {
-    try {
-      const res = await fetch(`${API_URL}${CHECK_TRUSTED_ENDPOINT}`, {
-        method: "POST",
-        credentials: "include",
-        headers: otpHeaders(),
-        body: JSON.stringify({ pending }),
-      });
-
-      if (RETRYABLE_STATUSES.includes(res.status) && attempt < retries) {
-        await sleep(delayMs);
-        continue;
-      }
-
-      return await expectJson(res);
-    } catch (err) {
-      lastError = err;
-
-      const retryable = !err.status || RETRYABLE_STATUSES.includes(err.status);
-
-      if (!retryable || attempt >= retries) throw err;
-      await sleep(delayMs);
-    }
+  const response = await expectJson(res);
+  if (response.data?.authenticated !== true || !response.data.user?.id) {
+    throw new Error("The server did not confirm your cookie sign-in.");
   }
-
-  throw lastError;
+  return { ...response, sessionVersion: res.sessionVersion };
 }
 
-export async function sendOtp({ token, userId, email, pending }) {
-  const res = await fetch(`${API_URL}${RESEND_ENDPOINT}`, {
-    method: "POST",
-    credentials: "include",
-    headers: otpHeaders(token),
-    body: JSON.stringify({
-      token,
-      user_id: userId,
-      email,
-      pending,
-    }),
-  });
-
-  return expectJson(res);
+export async function checkTrustedDevice({ pending }) {
+  return expectJson(await apiFetch("/api/auth/otp/check-trusted", {
+    method: "POST", body: JSON.stringify({ pending }),
+  }));
 }
 
-export async function verifyOtp({ token, userId, email, code, pending }) {
-  const res = await fetch(`${API_URL}${VERIFY_ENDPOINT}`, {
-    method: "POST",
-    credentials: "include",
-    headers: otpHeaders(token),
-    body: JSON.stringify({
-      token,
-      user_id: userId,
-      email,
-      pending,
-      otp: code,
-      code,
-      otp_code: code,
-    }),
-  });
+export async function sendOtp({ userId, email, pending }) {
+  return expectJson(await apiFetch("/api/auth/otp/resend", {
+    method: "POST", body: JSON.stringify({ user_id: userId, email, pending }),
+  }));
+}
 
-  return expectJson(res);
+export async function verifyOtp({ userId, email, code, pending }) {
+  return expectJson(await apiFetch("/api/auth/otp/verify", {
+    method: "POST", body: JSON.stringify({ user_id: userId, email, pending, otp: code, code, otp_code: code }),
+  }));
 }

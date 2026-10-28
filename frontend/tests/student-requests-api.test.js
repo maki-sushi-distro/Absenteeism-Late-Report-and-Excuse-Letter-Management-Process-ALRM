@@ -1,3 +1,4 @@
+import { mockApiFetch } from "./helpers/mockApiFetch.js";
 import assert from "node:assert/strict";
 import { afterEach, beforeEach, mock, test } from "node:test";
 import {
@@ -24,7 +25,7 @@ afterEach(() => {
 
 function captureJsonRequest(responseBody) {
   const requests = [];
-  mock.method(globalThis, "fetch", async (url, options) => {
+  mockApiFetch(async (url, options) => {
     requests.push({
       url: String(url),
       method: options.method || "GET",
@@ -40,7 +41,7 @@ function captureEvidenceViewer(type) {
   const link = { click: mock.fn() };
   window.open = () => popup;
   globalThis.document = { createElement: () => link };
-  mock.method(globalThis, "fetch", async () => new Response("file bytes", { headers: { "Content-Type": type } }));
+  mockApiFetch(async () => new Response("file bytes", { headers: { "Content-Type": type } }));
   mock.method(URL, "createObjectURL", () => "blob:test-attachment");
   mock.method(URL, "revokeObjectURL", () => {});
   mock.method(globalThis, "setTimeout", (callback) => { callback(); return 0; });
@@ -93,7 +94,7 @@ test("request update sends selected and cleared proofs via PATCH", async () => {
 
 test("create and update preserve backend proof validation errors", async () => {
   const errors = { proof_types: ["Invalid array."], "proof_types.0": ["Invalid proof label."] };
-  mock.method(globalThis, "fetch", async () => Response.json({ message: "Validation failed.", errors }, { status: 422 }));
+  mockApiFetch(async () => Response.json({ message: "Validation failed.", errors }, { status: 422 }));
   for (const submit of [
     () => createStudentRequest({ proof_types: ["Bad"] }),
     () => updateStudentRequest("request-one", { proof_types: ["Bad"] }),

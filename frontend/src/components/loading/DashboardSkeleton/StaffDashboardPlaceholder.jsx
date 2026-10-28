@@ -30,13 +30,18 @@ export function ProgramHeaderPlaceholder() {
 export default function StaffDashboardPlaceholder({ variant }) {
   const admin = variant === "admin";
   const program = variant === "program";
+  if (admin) return <div className="grid min-w-0 gap-5">
+    <ProgramHeaderPlaceholder />
+    <div className="grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-4">{Array.from({ length: 4 }, (_, index) => <MetricPlaceholder key={index} />)}</div>
+    <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1.75fr)_minmax(280px,1fr)]"><ActivityChartPlaceholder /><div data-slot="approval-placeholder"><SectionPlaceholder rows={4} /></div></div>
+    <div className="grid gap-3"><Skeleton className="h-6 w-32" /><div className="grid gap-4 md:grid-cols-3">{Array.from({ length: 3 }, (_, index) => <Skeleton key={index} className="h-16 w-full rounded-md" />)}</div></div>
+  </div>;
   return <div className="grid min-w-0 gap-6">
     {program && <ProgramHeaderPlaceholder />}
-    <div className={`grid min-w-0 gap-4 ${admin ? "sm:grid-cols-2 xl:grid-cols-4" : program ? "sm:grid-cols-3" : "md:grid-cols-3"}`}>
-      {Array.from({ length: admin ? 8 : 3 }, (_, index) => <MetricPlaceholder key={index} />)}
+    <div className={`grid min-w-0 gap-4 ${program ? "sm:grid-cols-3" : "md:grid-cols-3"}`}>
+      {Array.from({ length: 3 }, (_, index) => <MetricPlaceholder key={index} />)}
     </div>
     {program && <ActivityChartPlaceholder />}
     <SectionPlaceholder rows={program ? 3 : 5} />
-    {admin && <><div className="grid gap-6 xl:grid-cols-2"><SectionPlaceholder form /><SectionPlaceholder form /></div><SectionPlaceholder form rows={0} /></>}
   </div>;
 }

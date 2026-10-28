@@ -1,3 +1,4 @@
+import { mockApiFetch } from "./helpers/mockApiFetch.js";
 import assert from "node:assert/strict";
 import { afterEach, beforeEach, mock, test } from "node:test";
 import { getAdminStudent, getAdminStudents } from "../src/api/adminStudents.js";
@@ -32,7 +33,7 @@ afterEach(() => mock.restoreAll());
 
 function captureJsonRequest(responseBody = { success: true }) {
   const requests = [];
-  mock.method(globalThis, "fetch", async (url, options) => {
+  mockApiFetch(async (url, options) => {
     requests.push({
       url: String(url),
       method: options.method || "GET",
@@ -115,7 +116,7 @@ test("admin student listing uses the users endpoint and filters locally", async 
 
 test("admin student profile resolves its program without treating the user UUID as a school ID", async () => {
   const requests = [];
-  mock.method(globalThis, "fetch", async (url) => {
+  mockApiFetch(async (url) => {
     requests.push(String(url));
     if (String(url).includes("/api/admin/programs")) {
       return Response.json({ success: true, data: [{ id: "program-one", program_name: "BS Information Systems" }] });

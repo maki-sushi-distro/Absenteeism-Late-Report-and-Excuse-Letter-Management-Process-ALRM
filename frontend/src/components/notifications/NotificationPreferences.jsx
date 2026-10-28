@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { BellRing } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import useNotificationPreferences from "@/hooks/useNotificationPreferences";
@@ -12,18 +12,37 @@ export default function NotificationPreferences({ user, userId = user?.id, role 
   const [emailEnabled, setEmailEnabled] = useState(user?.email_notifications_enabled === true);
   const [savingEmail, setSavingEmail] = useState(false);
   const [emailError, setEmailError] = useState("");
+  const emailSave = useRef({ active: false, desired: emailEnabled, confirmed: emailEnabled });
 
   async function changeEmailPreference(checked) {
-    if (!emailAvailable || savingEmail) return;
-    setSavingEmail(true);
+    if (!emailAvailable || !userId) return;
+    setEmailEnabled(checked);
     setEmailError("");
+    const save = emailSave.current;
+    save.desired = checked;
+    if (save.active) return;
+    save.active = true;
+    setSavingEmail(true);
     try {
-      const saved = await saveEmailNotificationPreference(checked);
-      setEmailEnabled(saved);
-      onEmailSaved?.();
-    } catch (saveError) {
-      setEmailError(saveError.message || "Email notification preference could not be saved.");
+      while (true) {
+        const requested = save.desired;
+        try {
+          save.confirmed = await saveEmailNotificationPreference(requested);
+        } catch (saveError) {
+          if (save.desired !== requested) continue;
+          setEmailEnabled(save.confirmed);
+          setEmailError(saveError.name === "TimeoutError" || saveError.name === "AbortError"
+            ? "The save timed out. Please try again or reload to check your saved preference."
+            : saveError.message || "Email notification preference could not be saved.");
+          break;
+        }
+        if (save.desired !== requested) continue;
+        setEmailEnabled(save.confirmed);
+        onEmailSaved?.();
+        break;
+      }
     } finally {
+      save.active = false;
       setSavingEmail(false);
     }
   }
@@ -41,7 +60,7 @@ export default function NotificationPreferences({ user, userId = user?.id, role 
     <div className="mt-2.5 grid gap-[15px] pl-[26px]">
       {options.map(option => <div key={option.key} className="flex min-h-9 items-center justify-between gap-4">
         <div className="min-w-0"><label htmlFor={`${prefix}-preference-${option.key}`} className={`block text-[13.45px] font-medium leading-[18px] text-[#171717] ${option.key === "email" && !emailAvailable ? "" : "cursor-pointer"}`}>{option.label}</label><p id={`${prefix}-preference-${option.key}-description`} className="text-[12.35px] font-normal leading-[18px] text-[#464646]">{option.description}</p></div>
-        <Switch id={`${prefix}-preference-${option.key}`} checked={option.key === "email" ? emailEnabled : (preferences[option.key] ?? false)} disabled={!userId || (option.key === "email" && (!emailAvailable || savingEmail))} onCheckedChange={checked => option.key === "email" ? changeEmailPreference(checked) : updatePreference(option.key, checked)} aria-label={option.label} aria-busy={option.key === "email" && savingEmail} aria-describedby={`${prefix}-preference-${option.key}-description${option.key === "email" && !emailAvailable ? ` ${prefix}-email-help` : ""}`} title={option.key === "email" && !emailAvailable ? "Email preferences are not available from the server yet." : undefined} className="p-px data-[size=default]:h-[18px] data-[size=default]:w-8 data-checked:bg-[#173568] data-unchecked:bg-[#b5b5b5] data-disabled:opacity-100 [&>[data-slot=switch-thumb]]:size-3.5! [&>[data-slot=switch-thumb][data-checked]]:translate-x-3.5!" />
+        <Switch id={`${prefix}-preference-${option.key}`} checked={option.key === "email" ? emailEnabled : (preferences[option.key] ?? false)} disabled={!userId || (option.key === "email" && !emailAvailable)} onCheckedChange={checked => option.key === "email" ? changeEmailPreference(checked) : updatePreference(option.key, checked)} aria-label={option.label} aria-busy={option.key === "email" && savingEmail} aria-describedby={`${prefix}-preference-${option.key}-description${option.key === "email" && !emailAvailable ? ` ${prefix}-email-help` : ""}`} title={option.key === "email" && !emailAvailable ? "Email preferences are not available from the server yet." : undefined} className="cursor-pointer p-px data-[size=default]:h-[18px] data-[size=default]:w-8 data-checked:bg-[#173568] data-unchecked:bg-[#b5b5b5] data-disabled:opacity-100 [&>[data-slot=switch-thumb]]:size-3.5! [&>[data-slot=switch-thumb][data-checked]]:translate-x-3.5!" />
       </div>)}
       {!emailAvailable && <p id={`${prefix}-email-help`} className="sr-only">Email preferences are not available from the server yet.</p>}
       {error && <p role="alert" className="text-sm text-red-600">{error}</p>}

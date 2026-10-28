@@ -1,3 +1,4 @@
+import { mockApiFetch } from "./helpers/mockApiFetch.js";
 import assert from "node:assert/strict";
 import { after, afterEach, before, beforeEach, mock, test } from "node:test";
 import { existsSync } from "node:fs";
@@ -88,10 +89,10 @@ test("absent and late tabs show only matching students while keeping each studen
 
 test("class records load through the existing authenticated instructor request endpoint", async () => {
   assert.equal(typeof instructorApi.getInstructorClassRecords, "function");
-  const fetch = mock.method(globalThis, "fetch", async (url, options) => {
+  const fetch = mockApiFetch(async (url, options) => {
     assert.ok(String(url).endsWith("/api/instructor/requests"));
     assert.equal(options.method || "GET", "GET");
-    assert.equal(options.headers.get("Authorization"), "Bearer instructor-session");
+    assert.equal(options.headers.get("Authorization"), null);
     return Response.json({ success: true, data: [report("one")] });
   });
   assert.equal((await instructorApi.getInstructorClassRecords()).length, 1);
@@ -100,7 +101,7 @@ test("class records load through the existing authenticated instructor request e
 
 test("malformed and forbidden class records responses stay errors instead of becoming an empty roster", async () => {
   assert.equal(typeof instructorApi.getInstructorClassRecords, "function");
-  const fetch = mock.method(globalThis, "fetch", async () => Response.json({ data: {} }));
+  const fetch = mockApiFetch(async () => Response.json({ data: {} }));
   await assert.rejects(instructorApi.getInstructorClassRecords(), /unexpected/i);
   fetch.mock.mockImplementation(async () => Response.json({ message: "Forbidden." }, { status: 403 }));
   await assert.rejects(instructorApi.getInstructorClassRecords(), /Forbidden/);

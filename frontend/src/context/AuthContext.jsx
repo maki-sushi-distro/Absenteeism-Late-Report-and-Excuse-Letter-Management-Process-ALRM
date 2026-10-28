@@ -1,94 +1,89 @@
-import { createContext, useCallback, useContext, useEffect, useRef, useState, useSyncExternalStore } from 'react';
-import { apiFetch, getToken, setToken, subscribeToTokenChanges } from '../api/client';
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { getSessionVersion, purgeLegacyCredentials, subscribeToSessionChanges } from '../api/client';
+import { logout as logoutRequest } from '../api/auth';
 import { clearPendingOtp } from '../api/otp';
 import { getSessionUser } from '../api/session';
 
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
-  const token = useSyncExternalStore(subscribeToTokenChanges, getToken, () => null);
-  const [session, setSession] = useState({ token: null, user: null, error: '', loading: false });
+  const [session, setSession] = useState({ version: null, user: null, error: '', loading: true });
   const requestVersion = useRef(0);
   const [logoutDestination, setLogoutDestination] = useState(null);
 
-  const loadUser = useCallback((nextToken) => {
-    const version = ++requestVersion.current;
-    if (!nextToken) return Promise.resolve(null);
-
-    return getSessionUser(nextToken).then((user) => {
-      if (getToken() !== nextToken) return null;
-
-      if (version === requestVersion.current) {
-        clearPendingOtp();
-        setSession({ token: nextToken, user, error: '', loading: false });
-      }
+  const loadUser = useCallback(({ silent = false } = {}) => {
+    const version = getSessionVersion();
+    const request = ++requestVersion.current;
+    setSession(current => ({ version, user: current.version === version ? current.user : null,
+      error: '', loading: !silent || !current.user }));
+    return getSessionUser().then(user => {
+      if (version !== getSessionVersion() || request !== requestVersion.current) return null;
+      clearPendingOtp();
+      setSession({ version, user, error: '', loading: false });
       return user;
-    }, () => {
-      if (getToken() === nextToken && version === requestVersion.current) {
-        setSession((current) => ({
-          token: nextToken,
-          user: current.token === nextToken ? current.user : null,
-          error: 'We could not reach your account. Your saved session has been kept. Please try again.',
-          loading: false,
-        }));
+    }, error => {
+      if (version === getSessionVersion() && request === requestVersion.current) {
+        setSession(current => ({ version, user: error.status === 401 ? null : current.user,
+          error: error.status === 401 ? '' : 'We could not reach your account. Please try again.', loading: false }));
       }
       return null;
     });
   }, []);
 
   useEffect(() => {
-    if (token) loadUser(token);
-    return () => { requestVersion.current += 1; };
-  }, [loadUser, token]);
+    purgeLegacyCredentials();
+    const unsubscribe = subscribeToSessionChanges(event => {
+      if (event.expired) {
+        requestVersion.current += 1;
+        setSession({ version: getSessionVersion(), user: null, error: '', loading: false });
+      } else {
+        setLogoutDestination(null);
+        loadUser();
+      }
+    });
+    loadUser();
+    return () => { unsubscribe(); requestVersion.current += 1; };
+  }, [loadUser]);
 
-  async function refreshUser({ silent = false } = {}) {
-    if (!silent) {
-      setSession((current) => ({ ...current, loading: true, error: '' }));
+  async function completeCookieLogin(response) {
+    if (response?.data?.authenticated !== true || !response.data.user?.id) {
+      throw new Error('The server did not confirm your cookie sign-in.');
     }
-    return loadUser(getToken());
-  }
-
-  async function loginWithToken(nextToken) {
-    if (!nextToken) throw new Error('Missing login token.');
+    if (response.sessionVersion !== getSessionVersion()) throw new Error('This sign-in was replaced by a newer session.');
     setLogoutDestination(null);
-    setToken(nextToken);
-    const user = await loadUser(nextToken);
+    const user = await loadUser();
     if (!user) throw new Error('Unable to confirm your session. Please try again.');
-    clearPendingOtp();
     return user;
   }
 
   async function logout({ redirectToSignedOut = false } = {}) {
-    // The token subscription can re-render protected routes before the sidebar navigates.
+    const request = ++requestVersion.current;
     setLogoutDestination(redirectToSignedOut ? '/signed-out' : null);
-    const request = apiFetch('/api/logout', {
-      method: 'POST',
-      signal: AbortSignal.timeout(10000),
-    });
-    requestVersion.current += 1;
-    setToken(null);
-    clearPendingOtp();
-    setSession({ token: null, user: null, error: '', loading: false });
+    setSession(current => ({ ...current, loading: true, error: '' }));
     try {
-      await request;
-    } catch {
-      // The local session is already cleared if the server is unavailable.
+      const version = await logoutRequest();
+      if (version !== getSessionVersion()) return;
+      requestVersion.current += 1;
+      clearPendingOtp();
+      setLogoutDestination(redirectToSignedOut ? '/signed-out' : null);
+      setSession({ version, user: null, error: '', loading: false });
+    } catch (error) {
+      if (request === requestVersion.current) {
+        setLogoutDestination(null);
+        setSession(current => ({ ...current, error: error.message || 'Unable to sign out. Please try again.', loading: false }));
+      }
+      throw error;
     }
   }
 
-  const currentSession = Boolean(token) && session.token === token;
-  const user = currentSession ? session.user : null;
-  const loading = Boolean(token) && (!currentSession || session.loading);
-  const sessionError = currentSession ? session.error : '';
-
   return (
-    <AuthContext.Provider value={{ user, loading, sessionError, logoutDestination, loginWithToken, logout, refreshUser }}>
+    <AuthContext.Provider value={{ user: session.user, loading: session.loading, sessionError: session.error,
+      logoutDestination, completeCookieLogin, logout, refreshUser: loadUser }}>
       {children}
     </AuthContext.Provider>
   );
 }
 
-// Keep the provider hook colocated with its context for existing consumers.
 // eslint-disable-next-line react-refresh/only-export-components
 export function useAuth() {
   const ctx = useContext(AuthContext);

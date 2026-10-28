@@ -57,7 +57,7 @@ test("Vercel excludes private and unknown pages from search without blocking pub
     assert.equal(excluded(path), false, path);
   }
   assert.deepEqual(config.rewrites, [
-    { source: "/api/:path*", destination: "https://absenteeism-late-report-and-excuse.onrender.com/api/:path*" },
+    { source: "/api/:path*", destination: "/api/gateway?__alrm_path=:path*" },
     { source: "/(.*)", destination: "/index.html" },
   ]);
 });

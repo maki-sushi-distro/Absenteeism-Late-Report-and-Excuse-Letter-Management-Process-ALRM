@@ -22,10 +22,10 @@ test("student placeholders match the unequal attendance cards, gauge and three n
 
 test("staff placeholders match the actual metric counts and program-head activity chart", async () => {
   const Skeleton = (await server.ssrLoadModule("/src/components/loading/DashboardSkeleton/index.js")).default;
-  for (const [variant, count] of [["admin", 8], ["instructor", 4], ["program", 3]]) {
+  for (const [variant, count] of [["admin", 4], ["instructor", 4], ["program", 3]]) {
     const html = renderToStaticMarkup(React.createElement(Skeleton, { variant }));
     assert.equal((html.match(/data-slot="metric-placeholder"/g) || []).length, count);
-    if (["program", "instructor"].includes(variant)) assert.match(html, /data-slot="activity-chart-placeholder"/);
+    if (["admin", "program", "instructor"].includes(variant)) assert.match(html, /data-slot="activity-chart-placeholder"/);
     if (variant === "instructor") {
       assert.match(html, /data-slot="semester-summary-placeholder"/);
       assert.match(html, /data-slot="attendance-notice-placeholder"/);

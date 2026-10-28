@@ -8,14 +8,18 @@ import { createServer } from "vite";
 import { getPostLoginPath, rememberAuthenticatedPage } from "../src/api/authSecurity.js";
 
 let server;
-before(async () => { server = await createServer({ server: { middlewareMode: true, ws: false }, appType: "custom" }); });
+before(async () => { server = await createServer({ server: { middlewareMode: true, ws: false }, appType: "custom",
+  plugins: [{ name: "public-auth-test-context", enforce: "pre", transform(code, id) {
+    if (id.replaceAll("\\", "/").endsWith("/src/context/AuthContext.jsx")) return `${code}\nexport { AuthContext as TestAuthContext };`;
+  } }],
+}); });
 after(async () => { await server?.close(); });
 
 test("the signed-out page shows the current school branding and a link back to the existing login", async () => {
   const Page = (await server.ssrLoadModule("/src/pages/auth/SignedOut/index.js")).default;
-  const { AuthProvider } = await server.ssrLoadModule("/src/context/AuthContext.jsx");
+  const { TestAuthContext } = await server.ssrLoadModule("/src/context/AuthContext.jsx");
   const html = renderToStaticMarkup(React.createElement(MemoryRouter, { initialEntries: ["/signed-out"] },
-    React.createElement(AuthProvider, null, React.createElement(Page))));
+    React.createElement(TestAuthContext.Provider, { value: { user: null, loading: false, sessionError: "" } }, React.createElement(Page))));
   assert.match(html, /You&#x27;ve been signed out/);
   assert.match(html, /Thanks for using the system/);
   assert.match(html, /LV_Logo\.png/);
@@ -67,8 +71,8 @@ test("mobile signed-out Google sign-in starts the existing same-origin OAuth flo
 
 test("the public login retains Google sign-in and the current school assets", async () => {
   const Login = (await server.ssrLoadModule("/src/pages/login.jsx")).default;
-  const { AuthProvider } = await server.ssrLoadModule("/src/context/AuthContext.jsx");
-  const html = renderToStaticMarkup(React.createElement(MemoryRouter, { initialEntries: ["/login"] }, React.createElement(AuthProvider, null, React.createElement(Login))));
+  const { TestAuthContext } = await server.ssrLoadModule("/src/context/AuthContext.jsx");
+  const html = renderToStaticMarkup(React.createElement(MemoryRouter, { initialEntries: ["/login"] }, React.createElement(TestAuthContext.Provider, { value: { user: null, loading: false, sessionError: "" } }, React.createElement(Login))));
   assert.match(html, /Sign in with Google/);
   assert.match(html, /Welcome Back!/);
   assert.match(html, /alt="La Verdad Christian College logo"/);

@@ -1,3 +1,4 @@
+import { mockApiFetch } from "./helpers/mockApiFetch.js";
 import assert from "node:assert/strict";
 import { after, afterEach, before, beforeEach, mock, test } from "node:test";
 import React from "react";
@@ -58,7 +59,7 @@ test("fallbacks remain instructor-scoped and skip malformed, unsupported and dup
 test("fallback read status survives reloads per instructor, and server read state stays authoritative", async () => {
   const { mergeRequestActivity } = await dataModule();
   const { markFeedRead } = await feedModule();
-  const fetch = mock.method(globalThis, "fetch", async () => { throw new Error("No server notification exists for this entry"); });
+  const fetch = mockApiFetch(async () => { throw new Error("No server notification exists for this entry"); });
   const [item] = mergeRequestActivity([], [request], user);
   await markFeedRead(user.id, [item]);
   const readIds = getReadNotificationIds(`instructor:${user.id}`, window.localStorage);
@@ -74,7 +75,7 @@ test("mixed read operations PATCH real notification IDs only and save request ac
   const { mergeRequestActivity } = await dataModule();
   const { markFeedRead } = await feedModule();
   const calls = [];
-  mock.method(globalThis, "fetch", async (url, options) => {
+  mockApiFetch(async (url, options) => {
     calls.push([String(url), options.method]);
     return Response.json({ success: true, data: { id: note.id, is_read: true } });
   });
@@ -91,7 +92,7 @@ test("failed server reads and blocked storage never claim fallback read success"
   const { mergeRequestActivity } = await dataModule();
   const { markFeedRead } = await feedModule();
   const [item] = mergeRequestActivity([], [request], user);
-  mock.method(globalThis, "fetch", async () => Response.json({ message: "Could not save" }, { status: 503 }));
+  mockApiFetch(async () => Response.json({ message: "Could not save" }, { status: 503 }));
   await assert.rejects(markFeedRead(user.id, [item, { id: "server" }]), /Could not save/);
   assert.equal(getReadNotificationIds(`instructor:${user.id}`, window.localStorage).size, 0);
   window.localStorage.setItem = () => { throw new Error("Storage blocked"); };
@@ -101,9 +102,9 @@ test("failed server reads and blocked storage never claim fallback read success"
 test("feed loading fetches only the authenticated instructor's endpoints and preserves partial results", async () => {
   const { loadNotificationFeed } = await feedModule();
   const calls = [];
-  const fetch = mock.method(globalThis, "fetch", async (url, options) => {
+  const fetch = mockApiFetch(async (url, options) => {
     calls.push(String(url));
-    assert.equal(options.headers.get("Authorization"), "Bearer test-token");
+    assert.equal(options.headers.get("Authorization"), null);
     return Response.json({ success: true, data: String(url).endsWith("/notifications") ? [note] : [request] });
   });
   const result = await loadNotificationFeed("instructor");

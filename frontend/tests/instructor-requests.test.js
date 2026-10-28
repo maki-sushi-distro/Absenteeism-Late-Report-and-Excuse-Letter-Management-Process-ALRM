@@ -1,3 +1,4 @@
+import { mockApiFetch } from "./helpers/mockApiFetch.js";
 import assert from "node:assert/strict";
 import { after, afterEach, before, beforeEach, mock, test } from "node:test";
 import React from "react";
@@ -80,7 +81,7 @@ test("query updates preserve unrelated parameters and notification request IDs",
 test("list and decision use the authenticated API and validate the fresh decision record", async () => {
   const { loadRequests, createDecisionGate } = await load("requestApi.js");
   const calls = [];
-  mock.method(globalThis, "fetch", async (url, options) => {
+  mockApiFetch(async (url, options) => {
     calls.push({ url: String(url), options });
     return Response.json({ success: true, data: options.method === "PATCH" ? request("one", { status: "noted" }) : [request("one")] });
   });
@@ -91,12 +92,12 @@ test("list and decision use the authenticated API and validate the fresh decisio
   assert.ok(calls[1].url.endsWith("/api/instructor/requests/one/decision"));
   assert.equal(calls[1].options.method, "PATCH");
   assert.deepEqual(JSON.parse(calls[1].options.body), { status: "noted" });
-  assert.equal(calls[1].options.headers.get("Authorization"), "Bearer instructor-session");
+  assert.equal(calls[1].options.headers.get("Authorization"), null);
 });
 
 test("malformed, forbidden and mismatched decisions remain errors", async () => {
   const { loadRequests, createDecisionGate } = await load("requestApi.js");
-  const fetch = mock.method(globalThis, "fetch", async () => Response.json({ success: true, data: {} }));
+  const fetch = mockApiFetch(async () => Response.json({ success: true, data: {} }));
   await assert.rejects(loadRequests(), /unexpected/i);
   for (const data of [request("wrong", { status: "approved" }), request("one", { status: "pending" }), null]) {
     fetch.mock.mockImplementation(async () => Response.json({ success: true, data }));
@@ -109,10 +110,11 @@ test("malformed, forbidden and mismatched decisions remain errors", async () => 
 test("decision gate blocks concurrent, repeated and non-pending reviews without sending", async () => {
   const { createDecisionGate } = await load("requestApi.js");
   let finish;
-  const fetch = mock.method(globalThis, "fetch", () => new Promise(resolve => { finish = resolve; }));
+  const fetch = mockApiFetch(() => new Promise(resolve => { finish = resolve; }));
   const decide = createDecisionGate();
   const pending = decide(request("one"), "approved");
   await assert.rejects(decide(request("one"), "invalid"), /progress/i);
+  await new Promise(resolve => setTimeout(resolve, 0));
   finish(Response.json({ success: true, data: request("one", { status: "approved" }) }));
   await pending;
   await assert.rejects(decide(request("one"), "noted"), /reviewed/i);
@@ -125,7 +127,7 @@ test("failed decisions can retry, encode IDs, and preserve backend validation er
   const { createDecisionGate } = await load("requestApi.js");
   const decide = createDecisionGate();
   const record = request("one/two");
-  const fetch = mock.method(globalThis, "fetch", async () => Response.json({ message: "Request was already reviewed.", errors: { status: ["Invalid decision."] } }, { status: 422 }));
+  const fetch = mockApiFetch(async () => Response.json({ message: "Request was already reviewed.", errors: { status: ["Invalid decision."] } }, { status: 422 }));
   await assert.rejects(decide(record, "approved"), error => {
     assert.equal(error.status, 422);
     assert.deepEqual(error.errors, { status: ["Invalid decision."] });
@@ -164,7 +166,18 @@ test("table and filters expose the requested labels with route-neutral review bu
   const Filters = (await load("RequestFilters.jsx")).default;
   const Tabs = (await server.ssrLoadModule("/src/components/records/RecordTypeTabs.jsx")).default;
   const html = renderToStaticMarkup(React.createElement(MemoryRouter, null, React.createElement(Tabs, { value: "absence", onValueChange() {} }, React.createElement(Table, { records: [request("one", { status: "invalid" })], onReview() {} }))));
-  for (const text of ["Absent", "Late", "Student", "Date of Occurrence", "Type", "Submitted", "Date of Due", "Request", "Alex Cruz", "invalid", "Oct 22, 2026"]) assert.ok(html.includes(text), text);
+  for (const text of ["Absent", "Late", "Student", "Date of Occurrence", "Type", "Submitted", "Date of Due", "Request", "Action", "Alex Cruz", "invalid", "Oct 22, 2026"]) assert.ok(html.includes(text), text);
+  assert.match(html, />View<\/button>/);
+  assert.match(html, /<td[^>]*>Alex Cruz<\/td>/);
+  assert.doesNotMatch(html, /<td[^>]*text-\[#203B82\][^>]*>Alex Cruz/);
+  assert.doesNotMatch(html, /aria-label="Review request for/);
+  for (const type of ["absence", "late"]) {
+    const record = request(type, { type });
+    const onReview = mock.fn();
+    const row = Table({ records: [record], onReview }).props.children[0];
+    row.props.children.at(-1).props.children.props.onClick();
+    assert.equal(onReview.mock.calls[0].arguments[0], record);
+  }
   assert.doesNotMatch(html, /Unavailable/);
   assert.match(html, /<button[^>]*type="button"/);
   assert.doesNotMatch(html, /href=/);
@@ -172,20 +185,35 @@ test("table and filters expose the requested labels with route-neutral review bu
   for (const text of ["Search Name...", "Filter Subject", "Filter Request", "Export", 'maxLength="50"', 'value="invalid"', 'value="noted"']) assert.ok(filters.includes(text), text);
 });
 
-test("review is an accessible dialog; reviewed records expose no decision buttons or raw attachment link", async () => {
+test("reviewed requests keep disabled decision buttons at the bottom without exposing raw attachments", async () => {
   const Dialog = (await load("RequestDetailDialog.jsx")).default;
   const html = renderToStaticMarkup(React.createElement(Dialog, { request: request("one", { status: "noted", evidence_file_url: "https://private.example/file" }), onClose() {}, onReload() {} }));
   assert.match(html, /<dialog[^>]*aria-labelledby="request-dialog-title"/);
   assert.match(html, /Alex Cruz/);
   assert.match(html, /View Attachment/);
   assert.match(html, /<dt[^>]*>Date of Due<\/dt><dd[^>]*>Oct 22, 2026<\/dd>/);
-  assert.doesNotMatch(html, /https:\/\/private.example|>Approve<|>Mark Invalid</);
+  assert.doesNotMatch(html, /https:\/\/private.example/);
+  const buttons = [...html.matchAll(/<button\b([^>]*)>[\s\S]*?<\/button>/g)].filter(([button]) => />(Approve|Note|Invalid)<\/button>$/.test(button));
+  assert.equal(buttons.length, 3);
+  assert.ok(buttons.every(([, attributes]) => attributes.includes('disabled=""')));
+  assert.match(html, /already been reviewed/i);
+  assert.ok(html.indexOf('View Attachment') < html.indexOf('>Approve</button>'));
+});
+
+test("pending requests expose enabled approve and invalid decisions in the modal footer", async () => {
+  const Dialog = (await load("RequestDetailDialog.jsx")).default;
+  const html = renderToStaticMarkup(React.createElement(Dialog, { request: request("pending"), onClose() {}, onReload() {} }));
+  const buttons = [...html.matchAll(/<button\b([^>]*)>[\s\S]*?<\/button>/g)].filter(([button]) => />(Approve|Note|Invalid)<\/button>$/.test(button));
+  assert.equal(buttons.length, 3);
+  assert.ok(buttons.every(([, attributes]) => !/(?:^|\s)disabled(?:=|\s|$)/.test(attributes)));
+  assert.ok(html.indexOf('Attachment unavailable') < html.indexOf('>Approve</button>'));
+  assert.doesNotMatch(html, /already been reviewed/i);
 });
 
 test("default page mounts the instructor shell and full loading placeholder without sending a mutation", async () => {
   const Page = (await load("index.js")).default;
   const { AuthProvider } = await server.ssrLoadModule("/src/context/AuthContext.jsx");
-  const fetch = mock.method(globalThis, "fetch", async () => { throw new Error("SSR must not fetch or decide requests"); });
+  const fetch = mockApiFetch(async () => { throw new Error("SSR must not fetch or decide requests"); });
   const html = renderToStaticMarkup(React.createElement(MemoryRouter, { initialEntries: ["/instructor/class-requests?type=late&request=one&from=notification"] }, React.createElement(AuthProvider, null, React.createElement(Page))));
   for (const text of [">Request<", "Loading class requests...", 'data-layout="requests"', 'data-slot="skeleton-tabs"', 'data-slot="skeleton-toolbar"']) assert.ok(html.includes(text), text);
   assert.doesNotMatch(html, /role="tab"|placeholder="Search Name\.\.\."|Filter Subject|Filter Request/);

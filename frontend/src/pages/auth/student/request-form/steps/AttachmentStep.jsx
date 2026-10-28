@@ -1,11 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { CloudUpload, Eye, FileText, Info, RefreshCw, X } from "lucide-react";
-import FieldLabel from "../components/FieldLabel";
 import ErrorText from "../components/ErrorText";
 import FormNavigation from "../components/FormNavigation";
 import HeaderIdentity from "../components/HeaderIdentity";
 import RequestShell from "../components/RequestShell";
-import SectionBox from "../components/SectionBox";
 import { EVIDENCE, proofOptions } from "../constants";
 import { compressImage } from "../imageCompress";
 import { validateEvidenceFile } from "../evidenceValidation";
@@ -33,6 +31,7 @@ export default function AttachmentStep({
   const [dragging, setDragging] = useState(false);
   const dragDepth = useRef(0);
   const file = form.evidenceFile;
+  const evidenceError = fileError || fieldErrors.evidenceFile;
   const fileTypeLabel = file?.type === "application/pdf" ? "PDF document" : file?.type === "image/png" ? "PNG image" : "JPG image";
   const actionClass = "inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-[#CCD6E8] bg-white px-3 text-sm font-semibold text-[#101C4A] transition-colors hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:cursor-not-allowed disabled:opacity-50";
 
@@ -124,9 +123,10 @@ export default function AttachmentStep({
       <HeaderIdentity requestType={form.requestType} step={step} user={user} />
 
       {form.requestType === "absence" && (
-        <SectionBox title="Explanation" invalid={Boolean(fieldErrors.proof_types)}>
-          <div className="grid gap-2">
-            <FieldLabel>Supporting Documents / Proof of Absence</FieldLabel>
+        <section aria-labelledby="absence-proof-heading" className={`grid gap-4 rounded-md bg-[#F7F7F7] p-4 ${fieldErrors.proof_types ? "ring-2 ring-red-500" : ""}`}>
+          <h2 id="absence-proof-heading" className="text-sm font-bold uppercase text-[#203B82]">Explanation</h2>
+          <fieldset className="grid gap-3">
+            <legend className="mb-4 text-sm font-bold text-[#203B82]">Supporting Documents/ Proof of Absence</legend>
             {proofOptions.map((proof) => (
               <label
                 key={proof}
@@ -134,17 +134,19 @@ export default function AttachmentStep({
               >
                 <input
                   type="checkbox"
+                  name="proof_types"
+                  value={proof}
                   checked={(form.proof_types || []).includes(proof)}
                   onChange={() => toggleListField("proof_types", proof)}
                   aria-invalid={Boolean(fieldErrors.proof_types)}
-                  className="accent-[#101C4A]"
+                  className="accent-[#203B82]"
                 />
                 {proof}
               </label>
             ))}
-          </div>
+          </fieldset>
           <ErrorText message={fieldErrors.proof_types} />
-        </SectionBox>
+        </section>
       )}
       {form.requestType !== "absence" && <ErrorText message={fieldErrors.proof_types} />}
 
@@ -153,7 +155,7 @@ export default function AttachmentStep({
           <h2 id="attachment-heading" className="text-base font-bold leading-snug text-[#0B1229] sm:text-lg">
             Please attach any applicable supporting document(s):
           </h2>
-          <p className="text-sm text-[#7C8CAA]">Upload 1 file &bull; PDF, JPG, PNG &bull; Max 2 MB</p>
+          <p id="attachment-hint" className="text-sm text-[#7C8CAA]">Required &bull; Upload 1 file &bull; PDF, JPG, PNG &bull; Max 2 MB</p>
         </div>
         <div
           onDragEnter={(event) => {
@@ -193,6 +195,9 @@ export default function AttachmentStep({
             type="file"
             accept={EVIDENCE.accept}
             aria-label="Choose supporting document"
+            aria-required="true"
+            aria-invalid={Boolean(evidenceError)}
+            aria-describedby={evidenceError ? "attachment-error" : "attachment-hint"}
             className="hidden"
             disabled={processing}
             onChange={handleFileChange}
@@ -240,8 +245,8 @@ export default function AttachmentStep({
             File selected. You can {file.type.startsWith("image/") ? "preview" : "download"}, change, or remove it before submitting.
           </p>
         )}
-        {fileError && (
-          <p role="alert" className="text-xs font-semibold text-red-600">{fileError}</p>
+        {evidenceError && (
+          <p id="attachment-error" role="alert" className="text-xs font-semibold text-red-600">{evidenceError}</p>
         )}
       </section>
       <dialog
@@ -275,7 +280,7 @@ export default function AttachmentStep({
           <img ref={previewImageRef} alt={file ? `Preview of ${file.name}` : "Attachment preview"} className="max-h-[65dvh] max-w-full rounded-lg object-contain" />
         </div>
       </dialog>
-      <FormNavigation backDisabled={processing} nextDisabled={processing} onBack={onBack} onNext={onNext} />
+      <FormNavigation backDisabled={processing} nextDisabled={processing || !file} onBack={onBack} onNext={onNext} />
     </RequestShell>
   );
 }

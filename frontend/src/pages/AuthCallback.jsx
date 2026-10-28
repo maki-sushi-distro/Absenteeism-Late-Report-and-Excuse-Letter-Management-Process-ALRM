@@ -1,20 +1,22 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { getPostLoginPath } from "../api/authSecurity";
-import { exchangeOtpCode, getOtpTokenFromResponse } from "../api/otp";
+import { exchangeOtpCode } from "../api/otp";
+import { clearCallbackCredentials } from "../api/client";
 import { useAuth } from "../context/AuthContext";
 import AuthLoading from "@/components/loading/AuthLoading";
 
 export function AuthCallback() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { loginWithToken } = useAuth();
+  const { completeCookieLogin } = useAuth();
   const [error, setError] = useState(null);
   const hasRun = useRef(false);
 
   useEffect(() => {
     if (hasRun.current) return;
     hasRun.current = true;
+    clearCallbackCredentials();
 
     async function completeLogin() {
       try {
@@ -22,14 +24,10 @@ export function AuthCallback() {
           throw new Error("Login failed. Please use your official LV email account.");
         }
 
-        let token = searchParams.get("token") || searchParams.get("otp_token") || searchParams.get("verification_token");
-        if (!token) {
-          const code = searchParams.get("code");
-          if (!code) throw new Error("Missing login token.");
-          token = getOtpTokenFromResponse(await exchangeOtpCode(code));
-        }
-
-        const user = await loginWithToken(token);
+        const code = searchParams.get("code") || searchParams.get("exchange_code");
+        if (!code) throw new Error("Missing one-time sign-in code. Please sign in again.");
+        const response = await exchangeOtpCode(code);
+        const user = await completeCookieLogin(response);
         navigate(getPostLoginPath(user), { replace: true });
       } catch (loginError) {
         setError(loginError.message || "Login failed. Please try again.");

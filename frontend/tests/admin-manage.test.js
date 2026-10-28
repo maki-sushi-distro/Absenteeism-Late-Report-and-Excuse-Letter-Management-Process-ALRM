@@ -1,3 +1,4 @@
+import { mockApiFetch } from "./helpers/mockApiFetch.js";
 import assert from "node:assert/strict";
 import { afterEach, beforeEach, mock, test } from "node:test";
 import React from "react";
@@ -28,7 +29,7 @@ beforeEach(() => {
   });
   globalThis.window = new EventTarget();
   // Every request is mocked; an unexpected endpoint fails instead of reaching auth or production.
-  mock.method(globalThis, "fetch", async (url) => { throw new Error(`Unexpected request: ${url}`); });
+  mockApiFetch(async (url) => { throw new Error(`Unexpected request: ${url}`); });
 });
 afterEach(() => {
   mock.restoreAll();
@@ -83,7 +84,7 @@ test("the same section in a different class or term resolves by actual class ID"
 });
 
 test("collection loading includes paginated classes, programs and approved role data", async () => {
-  mock.method(globalThis, "fetch", async (url) => {
+  mockApiFetch(async (url) => {
     const request = new URL(url, "http://fixture.local");
     const page = Number(request.searchParams.get("page"));
     assert.equal(request.searchParams.get("per_page"), "100");
@@ -108,7 +109,7 @@ test("collection loading includes paginated classes, programs and approved role 
 
 test("assignment PATCH sends only instructor_id and waits for the server response", async () => {
   let respond;
-  mock.method(globalThis, "fetch", (url, options) => {
+  mockApiFetch((url, options) => {
     assert.equal(url, "/api/admin/classes/class%2Fid");
     assert.equal(options.method, "PATCH");
     assert.deepEqual(JSON.parse(options.body), { instructor_id: "i2" });
@@ -116,7 +117,7 @@ test("assignment PATCH sends only instructor_id and waits for the server respons
   });
   let completed = false;
   const saving = assignClassInstructor("class/id", "i2").then(data => { completed = true; return data; });
-  await Promise.resolve();
+  await new Promise(resolve => setTimeout(resolve, 0));
   assert.equal(completed, false);
   respond(Response.json({ success: true, data: { id: "class/id", instructor_id: "i2" } }));
   assert.equal((await saving).instructor_id, "i2");
@@ -129,7 +130,7 @@ test("missing instructor cannot be sent as an unassignment", async () => {
 });
 
 test("backend validation errors remain available to the dialog", async () => {
-  mock.method(globalThis, "fetch", async () => Response.json({
+  mockApiFetch(async () => Response.json({
     message: "Validation failed.", errors: { instructor_id: ["The selected instructor is invalid."] },
   }, { status: 422 }));
   await assert.rejects(assignClassInstructor("c1", "i2"), error => {
@@ -141,14 +142,14 @@ test("backend validation errors remain available to the dialog", async () => {
 
 test("an unsuccessful or malformed success response cannot be reported as saved", async () => {
   for (const payload of [null, { success: false, message: "Assignment rejected." }, { data: { id: "c1", instructor_id: "i1" } }]) {
-    mock.method(globalThis, "fetch", async () => Response.json(payload));
+    mockApiFetch(async () => Response.json(payload));
     await assert.rejects(assignClassInstructor("c1", "i2"), /confirm|rejected/i);
   }
 });
 
 test("collection requests forward cancellation", async () => {
   const controller = new AbortController();
-  mock.method(globalThis, "fetch", async (url, options) => {
+  mockApiFetch(async (url, options) => {
     assert.equal(options.signal, controller.signal);
     return Response.json({ data: [] });
   });
@@ -156,8 +157,37 @@ test("collection requests forward cancellation", async () => {
 });
 
 test("collection failures reject loading without supplying fake assignments", async () => {
-  mock.method(globalThis, "fetch", async () => Response.json({ message: "Service unavailable." }, { status: 503 }));
+  mockApiFetch(async () => Response.json({ message: "Service unavailable." }, { status: 503 }));
   await assert.rejects(getAdminAssignments(), /Service unavailable/);
+});
+
+test("assignment dialog has 20px corners and class removal is enabled with destructive styling", async () => {
+  const data = { classes, instructors: instructors.slice(0, 2), programs: [{ id: "p1", program_name: "BSIS" }] };
+  const server = await createServer({ server: { middlewareMode: true, ws: false }, appType: "custom", plugins: [{
+    name: "loaded-assignments", enforce: "pre", transform(code, id) {
+      if (id.replaceAll("\\", "/").endsWith("/src/pages/auth/admin/AdminManage.jsx")) {
+        return code.replace("useState(null)", `useState(${JSON.stringify(data)})`).replace("useState(true)", "useState(false)");
+      }
+    },
+  }] });
+  try {
+    const AssignmentDialog = (await server.ssrLoadModule("/src/pages/auth/admin/manage/AssignmentDialog.jsx")).default;
+    const dialog = renderToStaticMarkup(React.createElement(AssignmentDialog, { row: classes[0], data }));
+    assert.match(dialog, /<dialog\b[^>]*rounded-\[20px\]/);
+    const AdminManage = (await server.ssrLoadModule("/src/pages/auth/admin/AdminManage.jsx")).default;
+    const { Button } = await server.ssrLoadModule("/src/components/ui/button.jsx");
+    const html = renderToStaticMarkup(React.createElement(MemoryRouter, null, React.createElement(AdminManage)));
+    const removeButtons = [...html.matchAll(/<button\b[^>]*>Remove<\/button>/g)];
+    const deleteButton = renderToStaticMarkup(React.createElement(Button, { size: "sm", variant: "destructive" }, "Delete"));
+    assert.equal(removeButtons.length, classes.length);
+    for (const [remove] of removeButtons) {
+      assert.equal(remove.match(/class="([^"]*)"/)[1], deleteButton.match(/class="([^"]*)"/)[1]);
+      assert.doesNotMatch(remove, /\sdisabled=""/);
+    }
+    assert.doesNotMatch(html, /unassignment-explanation|cannot be removed without a replacement/);
+  } finally {
+    await server.close();
+  }
 });
 
 test("Manage announces its heading and loads with matching filter, action and table skeletons", async () => {

@@ -27,19 +27,27 @@ after(async () => { await server?.close(); });
 function render(Page, path = "/", loading = false) {
   return renderToStaticMarkup(React.createElement(MemoryRouter, { initialEntries: [path] }, React.createElement(Context.Provider, { value: name => ({ data: loading ? null : data[name], loading, error: "", reload() {} }) }, React.createElement(Page))));
 }
-test("overview renders actual student counts while missing risk totals remain unavailable", () => {
+test("overview renders actual student counts with an empty-state label for missing totals", () => {
   const html = render(Overview);
   assert.match(html, /Program Overview/);
   assert.match(html, />12</);
-  assert.match(html, /Unavailable/);
+  assert.match(html, /No data yet/);
+  const managePrograms = html.match(/<a\b[^>]*>Manage programs<\/a>/)?.[0];
+  assert.ok(managePrograms);
+  assert.match(managePrograms, /bg-\[#172f6b\]/);
+  assert.match(managePrograms, /text-white/);
   assert.match(html, /href="\/programs"/);
 });
-test("administrator activity explains its limited history and renders real recent flags", () => {
+test("administrator activity renders real recent flags without the informational notice", () => {
   const html = render(AdminLog);
-  assert.match(html, /up to ten recent escalations/);
+  assert.doesNotMatch(html, /up to ten recent escalations|Full submission, follow-up, and decision audit history|bg-blue-50|border-blue-200/);
   assert.match(html, /Test Student/);
   assert.match(html, /Test Instructor/);
   assert.match(html, />Flagged</);
+  assert.match(html, /aria-label="Search activity"/);
+  assert.match(html, /aria-label="Filter activity"/);
+  assert.match(html, />Clear filters<\/button>/);
+  assert.doesNotMatch(html, /<select|>Refresh<\/button>/);
 });
 test("program head activity switches between submitted and flagged designs", () => {
   const submitted = render(ProgramLog, "/program-head/activity-log");

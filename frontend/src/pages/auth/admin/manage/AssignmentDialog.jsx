@@ -54,7 +54,7 @@ export default function AssignmentDialog({ row, programId, data, onClose, onAssi
   return <dialog ref={dialog} aria-labelledby="assignment-dialog-title" aria-describedby="assignment-dialog-description" onCancel={event => {
     event.preventDefault();
     if (!saving.current) onClose();
-  }} className="fixed inset-0 m-auto max-h-[90dvh] w-[calc(100%-2rem)] max-w-[522px] overflow-y-auto border border-[#827979] bg-white px-5 pb-7 pt-4 text-slate-950 shadow-xl backdrop:bg-black/30">
+  }} className="fixed inset-0 m-auto max-h-[90dvh] w-[calc(100%-2rem)] max-w-[522px] overflow-y-auto rounded-[20px] border border-[#827979] bg-white px-5 pb-7 pt-4 text-slate-950 shadow-xl backdrop:bg-black/30">
     <div className="mb-2.5 flex items-center justify-between gap-4">
       <h2 id="assignment-dialog-title" className="text-lg font-semibold">{row ? "Edit Instructor Assignment" : "Assign Instructor"}</h2>
       <Button type="button" variant="ghost" size="icon-sm" aria-label="Close assignment dialog" disabled={busy} onClick={onClose}><X className="size-5" aria-hidden="true" /></Button>

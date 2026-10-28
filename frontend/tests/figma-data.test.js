@@ -46,6 +46,14 @@ test("flags use the actual class instructor as the supplier of the flagged-by fi
   assert.equal(event.instructor, "Instructor A");
   assert.equal(event.flaggedBy, "Instructor A");
 });
+
+test("activity search combines with action, subject and date using supplied account details", () => {
+  const rows = [{ id: "a", student: "Alex Cruz", studentId: "2026-001", email: "alex@example.test", subject: "Math", classId: "c1", action: "Flagged", instructor: "Ana Santos", date: "2026-10-28T08:00:00+08:00" }, { id: "b", student: "Bea", action: "Approved", classId: "c2", date: "2026-10-27T08:00:00+08:00" }];
+  for (const search of [" Alex ", "2026-001", "ALEX@EXAMPLE", "Math", "Ana Santos"]) assert.deepEqual(filterActivity(rows, { search, action: "Flagged", subject: "c1", date: "2026-10-28" }).map(row => row.id), ["a"]);
+  assert.equal(filterActivity(rows, { search: "Unknown" }).length, 0);
+  assert.equal(filterActivity(rows, { search: "Alex", action: "Approved" }).length, 0);
+  assert.equal(filterActivity(rows, { search: "", action: "", subject: "", date: "" }).length, 2);
+});
 test("program overview uses real per-program counts and leaves absent risk and request totals unknown", () => {
   const rows = programOverviewRows({ programs_summary: [{ id: "p1", program_name: "BSIS", student_count: 12 }] }, [{ id: "c1", program_id: "p1", instructor_id: "i1" }, { id: "c2", program_id: "p1", instructor_id: "i1" }]);
   assert.equal(rows[0].students, 12);

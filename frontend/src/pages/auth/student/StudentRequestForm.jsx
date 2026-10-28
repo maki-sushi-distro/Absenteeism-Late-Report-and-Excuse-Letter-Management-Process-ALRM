@@ -70,10 +70,8 @@ function StudentRequestForm() {
               classesError={f.classesError}
               error={f.error}
               reviewEditing={f.reviewEditing}
-              reviewProcessing={f.reviewProcessing}
               onStartEdit={f.startReviewEdit}
               onSaveEdit={f.saveReviewEdit}
-              onFileChange={f.selectReviewFile}
               toggleListField={f.toggleListField}
               submitting={f.submitting}
               uploading={f.uploading}

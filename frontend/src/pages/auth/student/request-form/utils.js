@@ -79,17 +79,17 @@ export function flowSteps(requestType) {
 export function phoneDigits(value) {
   const raw = String(value || "").trim();
   let digits = raw.replace(/\D/g, "");
-  if (raw.startsWith("+639") || (digits.length > 9 && digits.startsWith("639"))) {
-    digits = digits.slice(3);
-  } else if (digits.length > 9 && digits.startsWith("09")) {
+  if (raw.startsWith("+63") || (digits.length > 10 && digits.startsWith("63"))) {
     digits = digits.slice(2);
+  } else if (digits.length > 10 && digits.startsWith("09")) {
+    digits = digits.slice(1);
   }
-  return digits.slice(0, 9);
+  return digits.slice(0, 10);
 }
 
 export function normalizePhoneInput(value) {
   const digits = phoneDigits(value);
-  return digits ? `+639${digits}` : "";
+  return digits ? `+63${digits}` : "";
 }
 
 export function yearOptionsForProgram(program) {

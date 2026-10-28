@@ -44,12 +44,11 @@ test("upload indicator is a circular status with an honest phase label, not inve
   assert.doesNotMatch(html, /\d+%/);
 });
 
-test("review attachment shows a circular indicator and blocks replacement and removal while processing", async () => {
+test("review attachment remains read-only even when editing callbacks are supplied", async () => {
   const Attachment = (await server.ssrLoadModule("/src/pages/auth/student/request-form/components/ReviewAttachment.jsx")).default;
   const html = renderToStaticMarkup(React.createElement(Attachment, { processing: true, file: { name: "proof.pdf" }, updateField() {}, onFileChange() {} }));
-  assert.match(html, /data-slot="spinner"/);
-  assert.match(html, /<input[^>]*disabled=""/);
-  assert.match(html, /<button[^>]*disabled=""/);
+  assert.match(html, /proof.pdf/);
+  assert.doesNotMatch(html, /<(input|button)\b/);
 });
 
 test("initial data loading renders skeletons in every role dashboard and student data page", async () => {

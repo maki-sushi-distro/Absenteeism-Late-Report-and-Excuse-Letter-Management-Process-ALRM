@@ -4,7 +4,7 @@ import ReviewAttachment from "./ReviewAttachment";
 import ReviewCheckboxGroup from "./ReviewCheckboxGroup";
 import ReviewField from "./ReviewField";
 
-export default function RequestReviewEditor({ form, user, classes, classesLoading, classesError, fieldErrors = {}, updateField, toggleListField, onFileChange, processing, disabled }) {
+export default function RequestReviewEditor({ form, user, classes, classesLoading, classesError, fieldErrors = {}, updateField, toggleListField, disabled }) {
   const isAbsence = form.requestType === "absence";
   const fields = [
     { name: "requestType", label: "Request type", options: requestOptions },
@@ -31,6 +31,6 @@ export default function RequestReviewEditor({ form, user, classes, classesLoadin
       <ReviewCheckboxGroup name="absenceReasons" label="Reason of absence" options={absenceReasonOptions} selected={form.absenceReasons} onToggle={toggleListField} error={fieldErrors.absenceReasons} />
       <ReviewCheckboxGroup name="proof_types" label="Supporting document types" options={proofOptions} selected={form.proof_types || []} onToggle={toggleListField} error={fieldErrors.proof_types} />
     </>}
-    <ReviewAttachment file={form.evidenceFile} error={fieldErrors.evidenceFile} onFileChange={onFileChange} updateField={updateField} processing={processing} />
+    <ReviewAttachment file={form.evidenceFile} error={fieldErrors.evidenceFile} />
   </fieldset>;
 }

@@ -28,7 +28,7 @@ function validateStudentInfo(form) {
     errors.contactNumber = "Enter your contact number.";
   } else if (!/^(09\d{9}|\+639\d{9})$/.test(form.contactNumber.trim())) {
     errors.contactNumber =
-      "Enter all 9 digits after +639.";
+      "Enter all 10 digits after +63, starting with 9.";
   }
   if (!form.dateSubmitted) errors.dateSubmitted = "Choose a date.";
 

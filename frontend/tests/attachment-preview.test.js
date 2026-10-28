@@ -62,3 +62,19 @@ test("the absence proof checklist appears above upload and retains selected proo
   assert.ok(checkboxes.find(input => input.includes('value="Medical Certificate"')).includes('checked=""'));
   assert.doesNotMatch(await renderAttachment(), /absence-proof-heading|Supporting Documents\/ Proof of Absence/);
 });
+
+test("the final review keeps its attachment read-only before and after Edit for both request types", async () => {
+  const Summary = (await server.ssrLoadModule("/src/pages/auth/student/request-form/components/RequestSummary.jsx")).default;
+  for (const requestType of ["late", "absence"]) {
+    for (const editing of [false, true]) {
+      const html = renderToStaticMarkup(React.createElement(Summary, {
+        form: { ...initialForm, requestType, evidenceFile: new File(["proof"], "original-proof.pdf", { type: "application/pdf" }) },
+        user: {}, classes: [], editing, updateField() {}, toggleListField() {}, onFileChange() {}, onStartEdit() {},
+      }));
+      assert.match(html, /original-proof.pdf/);
+      assert.doesNotMatch(html, /type="file"|Remove supporting document|>Change<|>Choose file</);
+      // Editing other request fields remains available.
+      if (editing) assert.match(html, /<input[^>]*name="guardianName"/);
+    }
+  }
+});

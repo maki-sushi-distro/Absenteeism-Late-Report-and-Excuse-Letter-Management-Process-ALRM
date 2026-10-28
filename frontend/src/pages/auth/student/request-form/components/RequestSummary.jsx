@@ -1,5 +1,5 @@
 import { buildRequestPayload } from "../buildPayload";
-import { classLabel } from "../utils";
+import { classLabel, normalizePhoneInput } from "../utils";
 import SectionBox from "./SectionBox";
 import RequestReviewEditor from "./RequestReviewEditor";
 
@@ -23,7 +23,7 @@ export default function RequestSummary({ form, user, classes = [], editing, onSt
     ["Program", form.program],
     ["Year level", form.level],
     ["Parent/Guardian's name", payload.guardian_name],
-    ["Contact number", payload.contact_number],
+    ["Contact number", normalizePhoneInput(payload.contact_number).replace(/^\+63(9\d{2})(\d{3})(\d{4})$/, "+63-$1-$2-$3")],
     ["Date submitted", form.dateSubmitted],
     ["Subject/Class", selectedClass ? classLabel(selectedClass) : "Not selected"],
     ...(isAbsence ? [

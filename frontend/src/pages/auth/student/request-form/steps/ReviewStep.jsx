@@ -23,10 +23,8 @@ export default function ReviewStep({
   updateField,
   onBack,
   reviewEditing,
-  reviewProcessing,
   onStartEdit,
   onSaveEdit,
-  onFileChange,
   toggleListField,
 }) {
   return (
@@ -39,7 +37,7 @@ export default function ReviewStep({
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
-      <RequestSummary form={form} user={user} classes={classes} classesLoading={classesLoading} classesError={classesError} editing={reviewEditing} onStartEdit={onStartEdit} onSaveEdit={onSaveEdit} disabled={submitting || reviewProcessing} processing={reviewProcessing} fieldErrors={fieldErrors} updateField={updateField} toggleListField={toggleListField} onFileChange={onFileChange} />
+      <RequestSummary form={form} user={user} classes={classes} classesLoading={classesLoading} classesError={classesError} editing={reviewEditing} onStartEdit={onStartEdit} onSaveEdit={onSaveEdit} disabled={submitting} fieldErrors={fieldErrors} updateField={updateField} toggleListField={toggleListField} />
       {uploading && <UploadProgress label="Uploading supporting document..." />}
       <SectionBox
         invalid={Boolean(fieldErrors.declaration)}
@@ -55,7 +53,7 @@ export default function ReviewStep({
         <label className="flex items-start gap-2 text-sm text-slate-700">
           <input
             type="checkbox"
-            disabled={reviewEditing || submitting || reviewProcessing}
+            disabled={reviewEditing || submitting}
             checked={form.declaration}
             onChange={(event) =>
               updateField("declaration", event.target.checked)
@@ -71,14 +69,14 @@ export default function ReviewStep({
           type="button"
           variant="outline"
           onClick={onBack}
-          disabled={submitting || reviewProcessing}
+          disabled={submitting}
           className="h-11 rounded-[9px] border-[1.5px] border-slate-200 px-5 text-sm font-bold text-slate-500 hover:text-slate-950"
         >
           Back
         </Button>
         <Button
           type="submit"
-          disabled={submitting || reviewEditing || reviewProcessing}
+          disabled={submitting || reviewEditing}
           className="h-11 rounded-[9px] bg-[#101C4A] px-6 text-sm font-bold text-white hover:bg-[#1B2B6B]"
         >
           {submitting && !uploading && <Spinner className="mr-2" />}

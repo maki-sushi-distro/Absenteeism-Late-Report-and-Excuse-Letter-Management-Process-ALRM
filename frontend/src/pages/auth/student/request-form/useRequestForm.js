@@ -3,10 +3,8 @@ import { createStudentRequest, getStudentClasses, uploadEvidence } from "@/api/s
 import { useAuth } from "@/context/AuthContext";
 import { getStoredProfileSetup } from "@/lib/profileSetup";
 import { buildRequestPayload, proofTypeError } from "./buildPayload";
-import { EVIDENCE, LAST_STEP, LIMITS, initialForm } from "./constants";
+import { LAST_STEP, LIMITS, initialForm } from "./constants";
 import { firstInvalidRequestStep, validateReview, validateStep } from "./validation";
-import { validateEvidenceFile } from "./evidenceValidation";
-import { compressImage } from "./imageCompress";
 import {
   buildInitialForm,
   profileDefaults,
@@ -23,7 +21,6 @@ export default function useRequestForm() {
   const [uploading, setUploading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [reviewEditing, setReviewEditing] = useState(false);
-  const [reviewProcessing, setReviewProcessing] = useState(false);
   const [error, setError] = useState("");
   const [fieldErrors, setFieldErrors] = useState({});
   const [form, setForm] = useState(() =>
@@ -31,7 +28,6 @@ export default function useRequestForm() {
   );
 
   const uploadedRef = useRef(null);
-  const reviewProcessingRef = useRef(false);
 
   useEffect(() => {
     const defaults = profileDefaults(user, storedProfile);
@@ -77,6 +73,7 @@ export default function useRequestForm() {
   }, []);
 
   function updateField(name, value) {
+    if (name === "evidenceFile" && step === LAST_STEP) return;
     if (["studentName", "program", "level"].includes(name)) return;
     if (name === "guardianName" && /\p{N}/u.test(value)) return;
     if (["guardianName", "reason"].includes(name) && value.length > LIMITS[name]) return;
@@ -93,7 +90,7 @@ export default function useRequestForm() {
         classText: "",
         absenceReasons: [],
         proof_types: [],
-        evidenceFile: null,
+        evidenceFile: step === LAST_STEP ? current.evidenceFile : null,
         declaration: false,
       };
     });
@@ -141,7 +138,7 @@ export default function useRequestForm() {
   }
 
   function previousStep() {
-    if (submitting || reviewProcessing) return;
+    if (submitting) return;
     setReviewEditing(false);
     setFieldErrors({});
     setError("");
@@ -157,26 +154,10 @@ export default function useRequestForm() {
   }
 
   function saveReviewEdit() {
-    if (submitting || reviewProcessingRef.current) return;
+    if (submitting) return;
     const errors = validateReview(form, classes, classesError);
     setFieldErrors(errors);
     if (Object.keys(errors).length === 0) setReviewEditing(false);
-  }
-
-  async function selectReviewFile(picked) {
-    if (!picked || reviewProcessingRef.current || submitting) return;
-    reviewProcessingRef.current = true;
-    setReviewProcessing(true);
-    try {
-      const file = await compressImage(await validateEvidenceFile(picked));
-      if (file.size > EVIDENCE.maxBytes) throw new Error("File is too large after resizing. Maximum upload size is 2MB.");
-      updateField("evidenceFile", file);
-    } catch (issue) {
-      setFieldErrors((current) => ({ ...current, evidenceFile: issue.message || "Unable to process this file." }));
-    } finally {
-      reviewProcessingRef.current = false;
-      setReviewProcessing(false);
-    }
   }
 
   async function resolveEvidence() {
@@ -197,7 +178,7 @@ export default function useRequestForm() {
 
   async function handleSubmit(event) {
     event.preventDefault();
-    if (submitting || reviewProcessingRef.current) return;
+    if (submitting) return;
     if (reviewEditing) {
       saveReviewEdit();
       return;
@@ -270,10 +251,8 @@ export default function useRequestForm() {
     nextStep,
     previousStep,
     reviewEditing,
-    reviewProcessing,
     startReviewEdit,
     saveReviewEdit,
-    selectReviewFile,
     handleSubmit,
     resetForm,
   };

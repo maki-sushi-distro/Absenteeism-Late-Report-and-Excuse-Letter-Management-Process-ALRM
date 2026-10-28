@@ -38,7 +38,7 @@ class RoleMiddleware
 
         if (! $hasDirectRole && ! $hasProgramHeadOverride) {
             return response()->json([
-                'success' => false,
+                'succcss' => false,
                 'message' => 'You are not authorized to access this resource.',
                 'data' => null,
             ], 403);

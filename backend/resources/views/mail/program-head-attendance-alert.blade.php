@@ -36,7 +36,7 @@
                                     <p style="margin:0 0 12px;"><strong style="color:#0b2a52;">Program</strong><br>{{ $programName }}</p>
                                     <p style="margin:0 0 12px;"><strong style="color:#0b2a52;">Subject</strong><br>{{ $subjectName }}</p>
                                     <p style="margin:0 0 12px;"><strong style="color:#0b2a52;">Absence Units</strong><br>{{ $usedUnits }} of {{ $allowedUnits }} allowable units</p>
-                                    <p style="margin:0;"><strong style="color:#0b2a52;">Status</strong><br>{{ $alertStatus === 'IR' ? 'Incident Report (IR) — follow-up required' : 'Warning — approaching the absence limit' }}</p>
+                                    <p style="margin:0;"><strong style="color:#0b2a52;">Status</strong><br>{{ $alertStatus === 'IR' ? 'Critical — consultation required' : 'Preventive Warning' }}</p>
                                 </td>
                             </tr>
                         </table>

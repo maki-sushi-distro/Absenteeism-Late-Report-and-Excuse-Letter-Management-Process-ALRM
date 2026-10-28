@@ -75,8 +75,8 @@ class ProgramHeadAttendanceAlertsTest extends SecurityTestCase
         $inactive = $this->user('program_head', ['program_id' => $program->id, 'status' => 'deactivated']);
         $outsider = $this->user('program_head', ['program_id' => Program::factory()->create()->id]);
         $tracker = AttendanceTracker::create([
-            'enrollment_id' => $request->enrollment_id, 'total_absences' => 2,
-            'total_lates' => 0, 'converted_absences' => 2, 'status' => 'safe',
+            'enrollment_id' => $request->enrollment_id, 'total_absences' => 1,
+            'total_lates' => 0, 'converted_absences' => 1, 'status' => 'safe',
         ]);
 
         $this->bearer($class->instructor)->patchJson('/api/instructor/requests/'.$request->id.'/decision', ['status' => 'invalid'])->assertOk();
@@ -96,11 +96,11 @@ class ProgramHeadAttendanceAlertsTest extends SecurityTestCase
             $this->assertSame(2, UserNotification::where('user_id', $head->id)->count());
             $this->assertDatabaseHas('notifications', [
                 'user_id' => $head->id, 'channel' => 'in_app', 'type' => 'threshold_warning',
-                'message' => $student->name.' is near the absence limit in Security (9 of 9.6 units). One more absence will trigger an IR.',
+                'message' => $student->name.' reached the 10% preventive absence threshold in Security (12.5% of semester class hours; 6 of 9.6 allowable units).',
             ]);
             $this->assertDatabaseHas('notifications', [
                 'user_id' => $head->id, 'channel' => 'in_app', 'type' => 'ir_escalation',
-                'message' => $student->name.' exceeded the allowable absences in Security (12 of 9.6 units) and needs follow-up.',
+                'message' => $student->name.' reached the 15% critical absence threshold in Security (18.75% of semester class hours; 9 of 9.6 allowable units) and requires consultation.',
             ]);
             Mail::assertQueued(ProgramHeadAttendanceAlertMail::class, fn ($mail) => $mail->hasTo($head->email) && $mail->alertStatus === 'warning');
             Mail::assertQueued(ProgramHeadAttendanceAlertMail::class, fn ($mail) => $mail->hasTo($head->email) && $mail->alertStatus === 'IR');
@@ -159,7 +159,8 @@ class ProgramHeadAttendanceAlertsTest extends SecurityTestCase
             $this->assertStringContainsString('&lt;script&gt;', $html);
             $this->assertStringNotContainsString('<script>', $html);
             $this->assertStringContainsString('12 of 9.6 allowable units', $html);
-            $this->assertStringContainsString($status === 'IR' ? 'Incident Report (IR)' : 'Warning', $html);
+            $this->assertStringContainsString($status === 'IR' ? 'Critical — consultation required' : 'Preventive Warning', $html);
+            $this->assertStringContainsString($status === 'IR' ? 'Critical Attendance Consultation' : 'Preventive Attendance Warning', $mail->envelope()->subject);
         }
     }
 

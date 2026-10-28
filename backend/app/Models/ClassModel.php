@@ -61,13 +61,16 @@ class ClassModel extends Model
         return $this->weekly_hours / max(1, $this->meetings_per_week);
     }
 
+    public function totalSemesterHours(): float
+    {
+        return $this->weekly_hours * config('alrm.semester_weeks');
+    }
+
     /** 20% ng total hours: 3 hrs → 9.6, 5 hrs → 16 */
     public function allowedAbsenceUnits(): float
     {
         return round(
-            $this->weekly_hours
-                * config('alrm.semester_weeks')
-                * config('alrm.absence_limit_rate'),
+            $this->totalSemesterHours() * config('alrm.absence_limit_rate'),
             2
         );
     }

@@ -6,7 +6,6 @@ use App\Http\Controllers\Controller;
 use App\Models\AttendanceTracker;
 use App\Models\Enrollment;
 use App\Models\ExcuseRequest;
-use App\Models\FollowupFlag;
 use App\Models\UserNotification;
 use App\Services\AttendanceThresholdNotifier;
 use App\Services\AuditLoggerService;
@@ -104,7 +103,7 @@ class InstructorRequestController extends Controller
     /**
      * Increment the enrollment's attendance tracker and recompute status.
      * Warning and IR alerts are delivered to the program heads through the
-     * shared notifier. A follow-up flag is created on the IR crossing.
+     * shared notifier, including a consultation flag at the critical threshold.
      */
     private function applyToTracker(ExcuseRequest $request): void
     {
@@ -142,20 +141,6 @@ class InstructorRequestController extends Controller
 
         if ($tracker->status === $previousStatus) {
             return;
-        }
-
-        if ($tracker->status === 'IR') {
-            $program = $request->enrollment->class->program;
-            $heads = $program?->notificationHeads();
-            $programHead = $heads?->firstWhere('id', $program->program_head_id) ?? $heads?->first();
-
-            if ($programHead) {
-                FollowupFlag::firstOrCreate(['request_id' => $request->id], [
-                    'flagged_date' => now(),
-                    'escalated_to' => $programHead->id,
-                    'status' => 'open',
-                ]);
-            }
         }
 
         app(AttendanceThresholdNotifier::class)->notify($tracker, $request);

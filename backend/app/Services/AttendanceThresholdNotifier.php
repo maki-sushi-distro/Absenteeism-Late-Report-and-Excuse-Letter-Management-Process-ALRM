@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Mail\ProgramHeadAttendanceAlertMail;
 use App\Models\AttendanceTracker;
 use App\Models\ExcuseRequest;
+use App\Models\FollowupFlag;
 use App\Models\UserNotification;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
@@ -40,9 +41,26 @@ class AttendanceThresholdNotifier
 
             $used = $tracker->unitsUsed();
             $limit = $tracker->allowedUnits();
+            $percentage = $tracker->absencePercentage();
+            $preventive = config('alrm.preventive_absence_rate') * 100;
+            $critical = config('alrm.critical_absence_rate') * 100;
             $message = $tracker->status === 'warning'
-                ? "{$student->name} is near the absence limit in {$class->subject_name} ({$used} of {$limit} units). One more absence will trigger an IR."
-                : "{$student->name} exceeded the allowable absences in {$class->subject_name} ({$used} of {$limit} units) and needs follow-up.";
+                ? "{$student->name} reached the {$preventive}% preventive absence threshold in {$class->subject_name} ({$percentage}% of semester class hours; {$used} of {$limit} allowable units)."
+                : "{$student->name} reached the {$critical}% critical absence threshold in {$class->subject_name} ({$percentage}% of semester class hours; {$used} of {$limit} allowable units) and requires consultation.";
+
+            // The shared path also creates consultation flags for automation runs.
+            if ($tracker->status === 'IR') {
+                $flagRequest = $request ?? ExcuseRequest::where('enrollment_id', $tracker->enrollment_id)
+                    ->where('status', 'invalid')->latest('date_reviewed')->first();
+                if ($flagRequest) {
+                    $head = $recipients->firstWhere('id', $program->program_head_id) ?? $recipients->first();
+                    FollowupFlag::firstOrCreate(['request_id' => $flagRequest->id], [
+                        'flagged_date' => now(),
+                        'escalated_to' => $head->id,
+                        'status' => 'open',
+                    ]);
+                }
+            }
 
             $testRecipient = trim((string) config('mail.program_head_test_recipient', ''));
             if ($testRecipient === '') {

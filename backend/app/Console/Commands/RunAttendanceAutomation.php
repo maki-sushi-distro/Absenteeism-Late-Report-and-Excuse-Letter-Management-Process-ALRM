@@ -40,8 +40,8 @@ class RunAttendanceAutomation extends Command
 
     /**
      * FOLLOWUP_FLAGS: a request sitting 'pending' past the response window
-     * gets escalated to the student's Program Head. Not tied to IR crossing
-     * anymore — see §9.1.
+     * gets escalated to the student's Program Head. This overdue-request
+     * rule is independent of the 15% consultation flags in the notifier.
      */
     private function flagOverdueRequests(): int
     {

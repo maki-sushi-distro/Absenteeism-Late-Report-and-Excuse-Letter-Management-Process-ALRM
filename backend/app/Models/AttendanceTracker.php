@@ -66,24 +66,33 @@ class AttendanceTracker extends Model
         return $allowed > 0 ? $this->unitsUsed() / $allowed : 0;
     }
 
+    /** Percentage of total semester class hours, not of the 20% allowance. */
+    public function absencePercentage(): float
+    {
+        $total = $this->enrollment->class->totalSemesterHours();
+
+        return $total > 0 ? round($this->unitsUsed() / $total * 100, 2) : 0;
+    }
+
     /**
      * Policy: 3 lates = 1 absence.
-     * IR      → lumampas na sa 20% allowable units.
-     * warning → isa pang absence ay lalampas na sa limit.
+     * IR      → critical consultation at 15% of semester class hours.
+     * warning → preventive notification at 10% of semester class hours.
+     * Keep the existing IR status for API/database compatibility.
      * Tawagin tuwing nagbabago ang total_lates o total_absences.
      */
     public function recompute(): void
     {
         $this->converted_absences = $this->total_absences + (int) floor($this->total_lates / 3);
 
-        $perMeeting = $this->enrollment->class->unitsPerMeeting();
+        $total      = $this->enrollment->class->totalSemesterHours();
         $used       = $this->unitsUsed();
-        $allowed    = $this->allowedUnits();
 
         $this->status = match (true) {
-            $used > $allowed               => 'IR',
-            $used + $perMeeting > $allowed => 'warning',
-            default                        => 'safe',
+            $total <= 0 => 'safe',
+            $used >= round($total * config('alrm.critical_absence_rate'), 2) => 'IR',
+            $used >= round($total * config('alrm.preventive_absence_rate'), 2) => 'warning',
+            default => 'safe',
         };
 
         $this->save();

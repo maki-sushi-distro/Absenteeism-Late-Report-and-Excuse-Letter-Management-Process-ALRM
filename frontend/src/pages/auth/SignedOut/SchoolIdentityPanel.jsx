@@ -2,14 +2,14 @@ import schoolLogo from "@/assets/LV_Logo.png";
 import schoolPicture from "@/assets/LV_Picture.jpg";
 
 export default function SchoolIdentityPanel() {
-  return <section aria-label="ALRM System" className="relative hidden min-h-screen place-items-center overflow-hidden bg-[#111c30] text-white md:grid">
+  return <section aria-label="ALRM System" className="relative hidden min-h-screen place-items-center overflow-hidden bg-[#111c30] text-white sm:grid">
     <img src={schoolPicture} alt="" aria-hidden="true" className="absolute inset-0 size-full object-cover" />
     <div aria-hidden="true" className="absolute inset-0 bg-[#111c30]/90" />
-    <div className="relative grid justify-items-center gap-6 px-8 py-12 text-center md:-mt-20">
-      <img src={schoolLogo} alt="La Verdad Christian College logo" className="size-28 object-contain md:size-36" />
-      <div className="grid justify-items-center gap-3">
-        <p className="text-3xl font-black text-white">ALRM SYSTEM</p>
-        <p className="max-w-[240px] text-sm font-medium leading-snug text-slate-100">Absence and Late Report Management System</p>
+    <div className="relative -mt-[clamp(2rem,6.25vw,5rem)] grid justify-items-center gap-[clamp(1rem,2.5vw,2rem)] px-6 py-12 text-center lg:px-8">
+      <img src={schoolLogo} alt="La Verdad Christian College logo" className="size-[clamp(5rem,10vw,9rem)] object-contain" />
+      <div className="grid justify-items-center gap-[clamp(0.5rem,1.25vw,1rem)]">
+        <p className="text-[clamp(1.5rem,3.75vw,3rem)] font-black text-white">ALRM SYSTEM</p>
+        <p className="max-w-[260px] text-[clamp(0.75rem,1.5625vw,1.25rem)] font-normal leading-snug text-slate-100">Absence and Late Report Management System</p>
       </div>
     </div>
   </section>;

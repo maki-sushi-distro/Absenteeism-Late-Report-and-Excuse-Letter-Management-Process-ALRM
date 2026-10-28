@@ -11,7 +11,7 @@ export default function SignedOut() {
   if (!user && (loading || sessionError)) return <SessionStatus />;
   if (user) return <Navigate to={getPostLoginPath(user)} replace />;
 
-  return <main className="flex min-h-svh flex-col bg-[#1c356a] text-slate-900 md:grid md:min-h-screen md:grid-cols-[48%_52%] md:bg-white">
+  return <main className="flex min-h-svh flex-col bg-[#132351] text-slate-900 sm:grid sm:min-h-screen sm:grid-cols-[48%_52%] sm:bg-white">
     <MobileAuthBrand />
     <SchoolIdentityPanel />
     <SignedOutMessage />

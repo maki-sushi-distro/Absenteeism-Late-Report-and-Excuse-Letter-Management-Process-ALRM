@@ -28,6 +28,10 @@ class UserResource extends JsonResource
         $headsProgram = count($this->resource->headedProgramIds()) > 0;
 
         return $this->resource->only($fields) + [
+            'email_notifications_enabled' => $this->when(
+                $this->authenticatedExchange || $request->user()?->id === $this->id,
+                $this->email_notifications_enabled,
+            ),
             'heads_program' => $headsProgram,
             'headed_program_exists' => $headsProgram,
             'program' => $this->whenLoaded('program'),

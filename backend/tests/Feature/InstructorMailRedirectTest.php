@@ -95,6 +95,7 @@ class InstructorMailRedirectTest extends TestCase
     private function request(): ExcuseRequest
     {
         $instructor = new User(['name' => 'Teacher', 'email' => 'teacher@example.com', 'status' => 'approved']);
+        $instructor->forceFill(['google_id' => 'google-teacher', 'email_notifications_enabled' => true]);
         $instructor->id = 'teacher-id';
         $class = (new ClassModel(['subject_name' => 'Test Class']))->setRelation('instructor', $instructor);
         $enrollment = (new Enrollment)

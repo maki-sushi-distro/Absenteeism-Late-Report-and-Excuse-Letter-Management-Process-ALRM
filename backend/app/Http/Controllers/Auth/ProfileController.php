@@ -16,6 +16,25 @@ use Illuminate\Validation\Rule;
 
 class ProfileController extends Controller
 {
+    public function updateNotificationPreferences(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'email_notifications_enabled' => ['required', 'boolean'],
+        ]);
+
+        $user = $request->user();
+        $user->forceFill([
+            'email_notifications_enabled' => (bool) $validated['email_notifications_enabled'],
+        ])->save();
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'email_notifications_enabled' => $user->email_notifications_enabled,
+            ],
+        ]);
+    }
+
     public function programs(): JsonResponse
     {
         return response()->json([

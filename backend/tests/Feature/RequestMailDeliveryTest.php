@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Mail\InstructorExcuseRequestMail;
 use App\Mail\InstructorFollowUpMail;
 use App\Mail\StudentRequestUpdatedMail;
+use App\Models\User;
 use App\Models\UserNotification;
 use Illuminate\Mail\MailManager;
 use Illuminate\Support\Facades\DB;
@@ -13,6 +14,14 @@ use Tests\SecurityTestCase;
 
 class RequestMailDeliveryTest extends SecurityTestCase
 {
+    protected function user(string $role = 'student', array $attributes = []): User
+    {
+        $user = parent::user($role, ['google_id' => 'google-linked', ...$attributes]);
+        $user->forceFill(['email_notifications_enabled' => true])->save();
+
+        return $user;
+    }
+
     protected function setUp(): void
     {
         parent::setUp();

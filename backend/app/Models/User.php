@@ -43,12 +43,17 @@ class User extends Authenticatable
 
     public $incrementing = false;
 
+    protected $attributes = [
+        'email_notifications_enabled' => false,
+    ];
+
     protected function casts(): array
     {
         return [
             'email_verified_at' => 'datetime',
             'deactivated_at' => 'datetime',
             'password' => 'hashed',
+            'email_notifications_enabled' => 'boolean',
         ];
     }
 
@@ -163,5 +168,13 @@ class User extends Authenticatable
     public function canLogin(): bool
     {
         return UserStatus::allowsLogin($this->status);
+    }
+
+    public function canReceiveEmailNotifications(): bool
+    {
+        return $this->canLogin()
+            && filled($this->google_id)
+            && filled($this->email)
+            && $this->email_notifications_enabled;
     }
 }

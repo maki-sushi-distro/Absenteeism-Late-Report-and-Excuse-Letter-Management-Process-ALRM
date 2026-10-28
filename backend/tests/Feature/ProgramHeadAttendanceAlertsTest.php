@@ -6,6 +6,7 @@ use App\Mail\ProgramHeadAttendanceAlertMail;
 use App\Models\AttendanceTracker;
 use App\Models\ExcuseRequest;
 use App\Models\Program;
+use App\Models\User;
 use App\Models\UserNotification;
 use App\Services\AttendanceThresholdNotifier;
 use Illuminate\Mail\MailManager;
@@ -15,6 +16,14 @@ use Tests\SecurityTestCase;
 
 class ProgramHeadAttendanceAlertsTest extends SecurityTestCase
 {
+    protected function user(string $role = 'student', array $attributes = []): User
+    {
+        $user = parent::user($role, ['google_id' => 'google-linked', ...$attributes]);
+        $user->forceFill(['email_notifications_enabled' => true])->save();
+
+        return $user;
+    }
+
     protected function setUp(): void
     {
         parent::setUp();

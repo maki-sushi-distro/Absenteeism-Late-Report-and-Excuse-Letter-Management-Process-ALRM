@@ -62,7 +62,7 @@ class AttendanceThresholdNotifier
                 ]);
 
                 $email = $testRecipient !== '' ? $testRecipient : $recipient->email;
-                if (filled($email) && ! isset($emailTargets[strtolower($email)])) {
+                if ($recipient->canReceiveEmailNotifications() && ! isset($emailTargets[strtolower($email)])) {
                     $emailTargets[strtolower($email)] = true;
                     Mail::to($email, $testRecipient !== '' ? null : $recipient->name)->queue(
                         (new ProgramHeadAttendanceAlertMail(

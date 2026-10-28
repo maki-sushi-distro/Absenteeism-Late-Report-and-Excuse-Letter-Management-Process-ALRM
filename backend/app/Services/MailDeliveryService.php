@@ -10,10 +10,10 @@ use Throwable;
 
 class MailDeliveryService
 {
-    /** Queue request mail using the same active-account and test-recipient rules. */
+    /** Queue request mail only for linked accounts that opted in. */
     public function queue(User $user, Mailable $mail, string $audience): bool
     {
-        if (! $user->canLogin() || blank($user->email)) {
+        if (! $user->canReceiveEmailNotifications()) {
             return false;
         }
 

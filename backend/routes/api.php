@@ -46,6 +46,7 @@ Route::prefix('auth')->middleware('throttle:login')->group(function () {
 Route::middleware(['auth:sanctum', 'active'])->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/me', [AuthController::class, 'me']);
+    Route::patch('/me/notification-preferences', [ProfileController::class, 'updateNotificationPreferences']);
     Route::get('/complete-profile/programs', [ProfileController::class, 'programs']);
     Route::post('/complete-profile', [ProfileController::class, 'completeProfile']);
 

@@ -27,7 +27,11 @@ class ProgramHeadAttendanceAlertMail extends Mailable implements ShouldQueue
 
     public function envelope(): Envelope
     {
-        $label = $this->alertStatus === 'IR' ? 'Critical Attendance Consultation' : 'Preventive Attendance Warning';
+        $label = match ($this->alertStatus) {
+            'IR' => 'Attendance IR Drop Limit',
+            'critical' => 'Critical Attendance Consultation',
+            default => 'Preventive Attendance Warning',
+        };
 
         return new Envelope(subject: "[ALRM] {$label} - {$this->studentName}");
     }

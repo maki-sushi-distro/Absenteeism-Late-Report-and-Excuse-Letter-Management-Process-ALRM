@@ -15,6 +15,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'converted_absences',
     'status',
     'warning_notified_at',
+    'critical_notified_at',
     'ir_notified_at',
 ])]
 class AttendanceTracker extends Model
@@ -34,6 +35,7 @@ class AttendanceTracker extends Model
             'total_absences'      => 'integer',
             'converted_absences'  => 'integer',
             'warning_notified_at' => 'datetime',
+            'critical_notified_at' => 'datetime',
             'ir_notified_at'      => 'datetime',
         ];
     }
@@ -43,11 +45,12 @@ class AttendanceTracker extends Model
         return $this->belongsTo(Enrollment::class);
     }
 
-    /** Units (hours) na nagamit na, batay sa converted absences. */
+    /** Absences use meeting hours; each complete group of 3 lates adds 1 hour. */
     public function unitsUsed(): float
     {
         return round(
-            $this->converted_absences * $this->enrollment->class->unitsPerMeeting(),
+            $this->total_absences * $this->enrollment->class->unitsPerMeeting()
+                + floor($this->total_lates / 3),
             2
         );
     }
@@ -74,24 +77,32 @@ class AttendanceTracker extends Model
         return $total > 0 ? round($this->unitsUsed() / $total * 100, 2) : 0;
     }
 
+    public function remainingSemesterPercentage(): float
+    {
+        $total = $this->enrollment->class->totalSemesterHours();
+
+        return $total > 0 ? round(max(0, $this->allowedUnits() - $this->unitsUsed()) / $total * 100, 2) : 0;
+    }
+
     /**
-     * Policy: 3 lates = 1 absence.
-     * IR      → critical consultation at 15% of semester class hours.
-     * warning → preventive notification at 10% of semester class hours.
-     * Keep the existing IR status for API/database compatibility.
+     * Policy: 3 lates = 1 absent hour.
+     * warning → one week's class hours; critical → two weeks, with consultation.
+     * IR → allowable absence limit reached (20%, rounded up for 3-hour subjects).
      * Tawagin tuwing nagbabago ang total_lates o total_absences.
      */
     public function recompute(): void
     {
         $this->converted_absences = $this->total_absences + (int) floor($this->total_lates / 3);
 
-        $total      = $this->enrollment->class->totalSemesterHours();
+        $class      = $this->enrollment->class;
+        $total      = $class->totalSemesterHours();
         $used       = $this->unitsUsed();
 
         $this->status = match (true) {
             $total <= 0 => 'safe',
-            $used >= round($total * config('alrm.critical_absence_rate'), 2) => 'IR',
-            $used >= round($total * config('alrm.preventive_absence_rate'), 2) => 'warning',
+            $used >= $class->allowedAbsenceUnits() => 'IR',
+            $used >= $class->criticalAbsenceUnits() => 'critical',
+            $used >= $class->preventiveAbsenceUnits() => 'warning',
             default => 'safe',
         };
 

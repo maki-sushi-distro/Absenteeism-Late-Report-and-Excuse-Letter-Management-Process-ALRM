@@ -41,7 +41,7 @@ class RunAttendanceAutomation extends Command
     /**
      * FOLLOWUP_FLAGS: a request sitting 'pending' past the response window
      * gets escalated to the student's Program Head. This overdue-request
-     * rule is independent of the 15% consultation flags in the notifier.
+     * rule is independent of the critical consultation flags in the notifier.
      */
     private function flagOverdueRequests(): int
     {
@@ -96,7 +96,7 @@ class RunAttendanceAutomation extends Command
     }
 
     /**
-     * Notify program heads for warning/IR trackers using the same stage
+     * Notify program heads for warning/critical/IR trackers using the same stage
      * timestamps as request decisions so the two paths do not double-send.
      */
     private function fireThresholdNotifications(): int
@@ -106,6 +106,7 @@ class RunAttendanceAutomation extends Command
 
         AttendanceTracker::where(function ($query) {
             $query->where(fn ($query) => $query->where('status', 'warning')->whereNull('warning_notified_at'))
+                ->orWhere(fn ($query) => $query->where('status', 'critical')->whereNull('critical_notified_at'))
                 ->orWhere(fn ($query) => $query->where('status', 'IR')->whereNull('ir_notified_at'));
         })->chunkById(100, function ($trackers) use ($notifier, &$notified) {
             foreach ($trackers as $tracker) {

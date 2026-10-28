@@ -41,6 +41,7 @@ class StudentDashboardController extends Controller
 
         $thresholdStatus = match (true) {
             $trackers->contains('status', 'IR') => 'IR',
+            $trackers->contains('status', 'critical') => 'critical',
             $trackers->contains('status', 'warning') => 'warning',
             default => 'safe',
         };
@@ -68,6 +69,7 @@ class StudentDashboardController extends Controller
                     'used' => $closest?->unitsUsed() ?? 0,
                     'limit' => $closest?->allowedUnits() ?? 0,
                     'status' => $thresholdStatus,
+                    'remaining_semester_percentage' => $closest?->remainingSemesterPercentage() ?? 0,
                 ],
                 'unread_notifications' => (clone $notifications)->where('is_read', false)->count(),
                 'recent_notifications' => (clone $notifications)->latest('date_sent')->limit(5)->get(),

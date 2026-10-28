@@ -26,6 +26,7 @@ class RecomputeTrackers extends Command
             if ($this->option('reset-notified')) {
                 $tracker->forceFill([
                     'warning_notified_at' => null,
+                    'critical_notified_at' => null,
                     'ir_notified_at'      => null,
                 ])->save();
             }

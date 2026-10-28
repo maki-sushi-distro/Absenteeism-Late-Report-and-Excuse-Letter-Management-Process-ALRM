@@ -59,7 +59,7 @@ class ProgramHeadAttendanceAlertsTest extends SecurityTestCase
         $this->assertSame(2, UserNotification::where('user_id', $second->id)->count());
     }
 
-    public function test_decisions_send_both_stages_to_all_program_heads_once_without_automation_duplicates(): void
+    public function test_decisions_send_preventive_and_critical_stages_to_heads_without_automation_duplicates(): void
     {
         $student = $this->user('student');
         $request = $this->requestFor($student);
@@ -75,8 +75,8 @@ class ProgramHeadAttendanceAlertsTest extends SecurityTestCase
         $inactive = $this->user('program_head', ['program_id' => $program->id, 'status' => 'deactivated']);
         $outsider = $this->user('program_head', ['program_id' => Program::factory()->create()->id]);
         $tracker = AttendanceTracker::create([
-            'enrollment_id' => $request->enrollment_id, 'total_absences' => 1,
-            'total_lates' => 0, 'converted_absences' => 1, 'status' => 'safe',
+            'enrollment_id' => $request->enrollment_id, 'total_absences' => 0,
+            'total_lates' => 0, 'converted_absences' => 0, 'status' => 'safe',
         ]);
 
         $this->bearer($class->instructor)->patchJson('/api/instructor/requests/'.$request->id.'/decision', ['status' => 'invalid'])->assertOk();
@@ -88,7 +88,8 @@ class ProgramHeadAttendanceAlertsTest extends SecurityTestCase
         $irRequest->fill(['status' => 'pending', 'reviewed_by' => null, 'date_reviewed' => null]);
         ExcuseRequest::withoutEvents(fn () => $irRequest->save());
         $this->bearer($class->instructor)->patchJson('/api/instructor/requests/'.$irRequest->id.'/decision', ['status' => 'invalid'])->assertOk();
-        $this->assertNotNull($tracker->fresh()->ir_notified_at);
+        $this->assertNotNull($tracker->fresh()->critical_notified_at);
+        $this->assertNull($tracker->fresh()->ir_notified_at);
         $this->assertDatabaseHas('followup_flags', ['request_id' => $irRequest->id, 'escalated_to' => $primary->id]);
         $this->artisan('alrm:process-automation')->assertSuccessful();
 
@@ -96,14 +97,14 @@ class ProgramHeadAttendanceAlertsTest extends SecurityTestCase
             $this->assertSame(2, UserNotification::where('user_id', $head->id)->count());
             $this->assertDatabaseHas('notifications', [
                 'user_id' => $head->id, 'channel' => 'in_app', 'type' => 'threshold_warning',
-                'message' => $student->name.' reached the 10% preventive absence threshold in Security (12.5% of semester class hours; 6 of 9.6 allowable units).',
+                'message' => $student->name.' reached the preventive absence threshold in Security (6.25% of semester class hours; 3 of 10 allowable units; 14.58% of semester hours remaining before the IR limit).',
             ]);
             $this->assertDatabaseHas('notifications', [
-                'user_id' => $head->id, 'channel' => 'in_app', 'type' => 'ir_escalation',
-                'message' => $student->name.' reached the 15% critical absence threshold in Security (18.75% of semester class hours; 9 of 9.6 allowable units) and requires consultation.',
+                'user_id' => $head->id, 'channel' => 'in_app', 'type' => 'threshold_critical',
+                'message' => $student->name.' reached the critical absence threshold in Security (12.5% of semester class hours; 6 of 10 allowable units; 8.33% of semester hours remaining before the IR limit). Consultation is required.',
             ]);
             Mail::assertQueued(ProgramHeadAttendanceAlertMail::class, fn ($mail) => $mail->hasTo($head->email) && $mail->alertStatus === 'warning');
-            Mail::assertQueued(ProgramHeadAttendanceAlertMail::class, fn ($mail) => $mail->hasTo($head->email) && $mail->alertStatus === 'IR');
+            Mail::assertQueued(ProgramHeadAttendanceAlertMail::class, fn ($mail) => $mail->hasTo($head->email) && $mail->alertStatus === 'critical');
             $this->bearer($head)->getJson('/api/notifications')->assertOk()->assertJsonCount(2, 'data');
         }
         foreach ([$class->instructor, $inactive, $outsider] as $nonRecipient) {
@@ -118,17 +119,23 @@ class ProgramHeadAttendanceAlertsTest extends SecurityTestCase
         $request = $this->requestFor($this->user('student'));
         $head = $this->user('program_head', ['program_id' => $request->enrollment->class->program_id]);
         $tracker = AttendanceTracker::create([
-            'enrollment_id' => $request->enrollment_id, 'total_absences' => 3,
-            'total_lates' => 0, 'converted_absences' => 3, 'status' => 'warning',
+            'enrollment_id' => $request->enrollment_id, 'total_absences' => 1,
+            'total_lates' => 0, 'converted_absences' => 1, 'status' => 'warning',
         ]);
         $this->artisan('alrm:process-automation')->assertSuccessful();
         $this->artisan('alrm:process-automation')->assertSuccessful();
-        $tracker->update(['total_absences' => 4, 'converted_absences' => 4, 'status' => 'IR']);
+        $tracker->update(['total_absences' => 2]);
+        $tracker->recompute();
         $this->artisan('alrm:process-automation')->assertSuccessful();
         $this->artisan('alrm:process-automation')->assertSuccessful();
-        $this->assertSame(2, UserNotification::where('user_id', $head->id)->count());
-        Mail::assertQueued(ProgramHeadAttendanceAlertMail::class, 2);
+        $tracker->update(['total_absences' => 4]);
+        $tracker->recompute();
+        $this->artisan('alrm:process-automation')->assertSuccessful();
+        $this->artisan('alrm:process-automation')->assertSuccessful();
+        $this->assertSame(3, UserNotification::where('user_id', $head->id)->count());
+        Mail::assertQueued(ProgramHeadAttendanceAlertMail::class, 3);
         $this->assertNotNull($tracker->fresh()->warning_notified_at);
+        $this->assertNotNull($tracker->fresh()->critical_notified_at);
         $this->assertNotNull($tracker->fresh()->ir_notified_at);
     }
 
@@ -149,18 +156,22 @@ class ProgramHeadAttendanceAlertsTest extends SecurityTestCase
 
     public function test_alert_email_matches_the_existing_branding_and_escapes_student_content(): void
     {
-        foreach (['warning', 'IR'] as $status) {
+        foreach (['warning', 'critical', 'IR'] as $status) {
             $mail = new ProgramHeadAttendanceAlertMail(
                 'Program Head', '<script>alert(1)</script>', 'Applications Development', 'BSIS',
-                $status, 'Student needs follow-up.', 12, 9.6,
+                $status, 'Student needs follow-up.', 12, 10,
             );
             $html = $mail->render();
             $this->assertStringContainsString('La Verdad Christian College, Inc.', $html);
             $this->assertStringContainsString('&lt;script&gt;', $html);
             $this->assertStringNotContainsString('<script>', $html);
-            $this->assertStringContainsString('12 of 9.6 allowable units', $html);
-            $this->assertStringContainsString($status === 'IR' ? 'Critical — consultation required' : 'Preventive Warning', $html);
-            $this->assertStringContainsString($status === 'IR' ? 'Critical Attendance Consultation' : 'Preventive Attendance Warning', $mail->envelope()->subject);
+            $this->assertStringContainsString('12 of 10 allowable units', $html);
+            $this->assertStringContainsString(match ($status) {
+                'IR' => 'IR — drop limit reached', 'critical' => 'Critical — consultation required', default => 'Preventive Warning',
+            }, $html);
+            $this->assertStringContainsString(match ($status) {
+                'IR' => 'Attendance IR Drop Limit', 'critical' => 'Critical Attendance Consultation', default => 'Preventive Attendance Warning',
+            }, $mail->envelope()->subject);
         }
     }
 

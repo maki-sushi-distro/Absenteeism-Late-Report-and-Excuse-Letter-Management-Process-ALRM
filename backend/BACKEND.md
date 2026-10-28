@@ -3,7 +3,7 @@
 
 > This is the backend-only companion to `ALRM.md`. Purpose: a working guide while building the Laravel API — what already exists, what's missing, and in what order things should be done.
 
-> **Attendance policy update (October 28, 2026):** Preventive alerts start at 10% of total semester class hours; critical consultation alerts and request-linked follow-up flags start at 15%. The 20% allowable absence limit is separate. The `IR` status is retained for compatibility and now identifies the critical consultation stage. The fixed 2/3-absence rules and historical follow-up TODOs below are superseded by [the current program head alert documentation](PROGRAM-HEAD-ACCESS.md).
+> **Attendance policy update (October 28, 2026):** Preventive alerts start at one week's subject hours; critical consultation alerts start at two weeks' hours; IR identifies the 20% drop limit (rounded up to 10 hours for 3-hour weekly subjects). Three lates add one absent hour. The old 10%/15% policy, fixed 2/3-absence rules and historical follow-up TODOs below are superseded by [the current program head alert documentation](PROGRAM-HEAD-ACCESS.md).
 
 ---
 

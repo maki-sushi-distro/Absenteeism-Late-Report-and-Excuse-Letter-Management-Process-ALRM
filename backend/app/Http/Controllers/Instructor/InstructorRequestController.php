@@ -102,7 +102,7 @@ class InstructorRequestController extends Controller
 
     /**
      * Increment the enrollment's attendance tracker and recompute status.
-     * Warning and IR alerts are delivered to the program heads through the
+     * Warning, critical and IR alerts are delivered to the program heads through the
      * shared notifier, including a consultation flag at the critical threshold.
      */
     private function applyToTracker(ExcuseRequest $request): void

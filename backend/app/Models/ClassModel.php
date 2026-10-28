@@ -66,12 +66,24 @@ class ClassModel extends Model
         return $this->weekly_hours * config('alrm.semester_weeks');
     }
 
-    /** 20% ng total hours: 3 hrs → 9.6, 5 hrs → 16 */
+    public function preventiveAbsenceUnits(): float
+    {
+        return round($this->weekly_hours * config('alrm.preventive_absence_weeks'), 2);
+    }
+
+    public function criticalAbsenceUnits(): float
+    {
+        return round($this->weekly_hours * config('alrm.critical_absence_weeks'), 2);
+    }
+
+    /** 20% of semester hours; round up the limit for 3-hour weekly subjects. */
     public function allowedAbsenceUnits(): float
     {
-        return round(
+        $limit = round(
             $this->totalSemesterHours() * config('alrm.absence_limit_rate'),
             2
         );
+
+        return (float) $this->weekly_hours === 3.0 ? ceil($limit) : $limit;
     }
 }

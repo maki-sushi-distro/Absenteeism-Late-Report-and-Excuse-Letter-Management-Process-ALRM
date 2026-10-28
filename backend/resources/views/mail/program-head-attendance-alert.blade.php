@@ -36,7 +36,7 @@
                                     <p style="margin:0 0 12px;"><strong style="color:#0b2a52;">Program</strong><br>{{ $programName }}</p>
                                     <p style="margin:0 0 12px;"><strong style="color:#0b2a52;">Subject</strong><br>{{ $subjectName }}</p>
                                     <p style="margin:0 0 12px;"><strong style="color:#0b2a52;">Absence Units</strong><br>{{ $usedUnits }} of {{ $allowedUnits }} allowable units</p>
-                                    <p style="margin:0;"><strong style="color:#0b2a52;">Status</strong><br>{{ $alertStatus === 'IR' ? 'Critical — consultation required' : 'Preventive Warning' }}</p>
+                                    <p style="margin:0;"><strong style="color:#0b2a52;">Status</strong><br>{{ match ($alertStatus) { 'IR' => 'IR — drop limit reached', 'critical' => 'Critical — consultation required', default => 'Preventive Warning' } }}</p>
                                 </td>
                             </tr>
                         </table>

@@ -47,6 +47,7 @@ class ProgramHeadDashboardController extends Controller
             })->where('status', 'pending')->count(),
             'warning_count' => (clone $trackerQuery)->where('status', 'warning')->count(),
             'ir_count' => (clone $trackerQuery)->where('status', 'IR')->count(),
+            'critical_count' => (clone $trackerQuery)->where('status', 'critical')->count(),
             'recent_flags' => $this->flagQuery()
                 ->with('request.enrollment.student', 'request.enrollment.class')
                 ->latest('flagged_date')

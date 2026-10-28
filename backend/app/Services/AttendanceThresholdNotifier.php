@@ -19,6 +19,7 @@ class AttendanceThresholdNotifier
             $tracker = AttendanceTracker::whereKey($tracker->id)->lockForUpdate()->firstOrFail();
             $column = match ($tracker->status) {
                 'warning' => 'warning_notified_at',
+                'critical' => 'critical_notified_at',
                 'IR' => 'ir_notified_at',
                 default => null,
             };
@@ -42,14 +43,19 @@ class AttendanceThresholdNotifier
             $used = $tracker->unitsUsed();
             $limit = $tracker->allowedUnits();
             $percentage = $tracker->absencePercentage();
-            $preventive = config('alrm.preventive_absence_rate') * 100;
-            $critical = config('alrm.critical_absence_rate') * 100;
-            $message = $tracker->status === 'warning'
-                ? "{$student->name} reached the {$preventive}% preventive absence threshold in {$class->subject_name} ({$percentage}% of semester class hours; {$used} of {$limit} allowable units)."
-                : "{$student->name} reached the {$critical}% critical absence threshold in {$class->subject_name} ({$percentage}% of semester class hours; {$used} of {$limit} allowable units) and requires consultation.";
+            $remaining = $tracker->remainingSemesterPercentage();
+            $stage = match ($tracker->status) {
+                'warning' => 'preventive absence threshold',
+                'critical' => 'critical absence threshold',
+                'IR' => 'IR drop limit',
+            };
+            $message = "{$student->name} reached the {$stage} in {$class->subject_name} ({$percentage}% of semester class hours; {$used} of {$limit} allowable units; {$remaining}% of semester hours remaining before the IR limit).";
+            if (in_array($tracker->status, ['critical', 'IR'], true)) {
+                $message .= ' Consultation is required.';
+            }
 
             // The shared path also creates consultation flags for automation runs.
-            if ($tracker->status === 'IR') {
+            if (in_array($tracker->status, ['critical', 'IR'], true)) {
                 $flagRequest = $request ?? ExcuseRequest::where('enrollment_id', $tracker->enrollment_id)
                     ->where('status', 'invalid')->latest('date_reviewed')->first();
                 if ($flagRequest) {
@@ -72,7 +78,11 @@ class AttendanceThresholdNotifier
                 UserNotification::create([
                     'user_id' => $recipient->id,
                     'request_id' => $request?->id,
-                    'type' => $tracker->status === 'warning' ? 'threshold_warning' : 'ir_escalation',
+                    'type' => match ($tracker->status) {
+                        'warning' => 'threshold_warning',
+                        'critical' => 'threshold_critical',
+                        'IR' => 'ir_escalation',
+                    },
                     'message' => $message,
                     'channel' => 'in_app',
                     'date_sent' => now(),

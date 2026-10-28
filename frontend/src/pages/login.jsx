@@ -3,6 +3,7 @@ import { Navigate } from "react-router-dom";
 import SessionStatus from "@/components/SessionStatus";
 import { useAuth } from "@/context/AuthContext";
 import { getPostLoginPath } from "@/api/authSecurity";
+import MobileAuthBrand from "@/components/auth/MobileAuthBrand";
 import {
   Card,
   CardDescription,
@@ -58,7 +59,8 @@ function Login() {
   }
 
   return (
-    <main className="grid min-h-screen bg-white text-slate-900 md:grid-cols-[48%_52%]">
+    <main className="flex min-h-svh flex-col bg-[#1c356a] text-slate-900 md:grid md:min-h-screen md:grid-cols-[48%_52%] md:bg-white">
+      <MobileAuthBrand />
       <section
         className="relative hidden min-h-screen place-items-center overflow-hidden bg-[#07152a] bg-cover bg-center px-10 text-white md:grid"
         style={{
@@ -79,41 +81,29 @@ function Login() {
         </div>
       </section>
 
-      <section className="grid min-h-screen place-items-center px-6 py-12">
-        <div className="mb-10 grid justify-items-center gap-4 text-center md:hidden">
-          <SchoolSeal />
-          <div className="space-y-2">
-            <h1 className="text-3xl font-black tracking-normal text-slate-900">
-              ALRM SYSTEM
-            </h1>
-            <p className="max-w-[260px] text-sm font-semibold leading-snug text-slate-600">
-              Absence and Late Report Management System
-            </p>
-          </div>
-        </div>
-
-        <Card className="w-full max-w-[500px] border-0 bg-transparent py-0 shadow-none ring-0">
+      <section className="relative -mt-10 flex min-h-[calc(40svh+2.5rem)] flex-1 flex-col items-center rounded-t-[40px] bg-white px-7 pb-10 pt-12 md:m-0 md:grid md:min-h-screen md:place-items-center md:rounded-none md:px-6 md:py-12">
+        <Card className="w-full max-w-[500px] gap-2 border-0 bg-transparent py-0 shadow-none ring-0 md:gap-4">
           <CardHeader className="items-center gap-2 px-0 text-center">
-            <CardTitle className="text-[48px] font-black tracking-normal text-slate-800">
+            <CardTitle className="text-2xl font-extrabold tracking-normal text-slate-950 md:text-[48px] md:font-black md:text-slate-800">
               Welcome Back!
             </CardTitle>
-            <CardDescription className="text-[18px] text-slate-600">
+            <CardDescription className="max-w-56 text-xs leading-snug text-slate-600 md:max-w-none md:text-[18px]">
               Sign in with your La Verdad Christian College account.
             </CardDescription>
           </CardHeader>
 
-          <CardFooter className="flex-col gap-8 border-0 bg-transparent px-0 pt-10">
+          <CardFooter className="flex-col gap-7 border-0 bg-transparent px-0 pt-4 md:gap-8 md:pt-10">
             <Button
               type="button"
               variant="outline"
               onClick={handleGoogleLogin}
-              className="h-11 w-full max-w-[282px] gap-3 rounded-[5px] border-slate-300 bg-white text-base font-bold text-slate-700 shadow-sm hover:bg-slate-50"
+              className="h-11 w-full max-w-[282px] gap-3 rounded-[5px] border-slate-300 bg-white text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 md:text-base md:font-bold"
             >
               <GoogleIcon />
               Sign in with Google
             </Button>
 
-            <p className="text-center text-xs font-semibold italic text-slate-500">
+            <p className="text-center text-xs italic text-slate-500 md:font-semibold">
               Use your official LV email account to login.
             </p>
           </CardFooter>

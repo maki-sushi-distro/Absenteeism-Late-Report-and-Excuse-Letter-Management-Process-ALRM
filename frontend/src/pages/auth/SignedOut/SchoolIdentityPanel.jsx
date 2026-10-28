@@ -2,7 +2,7 @@ import schoolLogo from "@/assets/LV_Logo.png";
 import schoolPicture from "@/assets/LV_Picture.jpg";
 
 export default function SchoolIdentityPanel() {
-  return <section aria-label="ALRM System" className="relative grid min-h-[320px] place-items-center overflow-hidden bg-[#111c30] text-white md:min-h-screen">
+  return <section aria-label="ALRM System" className="relative hidden min-h-screen place-items-center overflow-hidden bg-[#111c30] text-white md:grid">
     <img src={schoolPicture} alt="" aria-hidden="true" className="absolute inset-0 size-full object-cover" />
     <div aria-hidden="true" className="absolute inset-0 bg-[#111c30]/90" />
     <div className="relative grid justify-items-center gap-6 px-8 py-12 text-center md:-mt-20">

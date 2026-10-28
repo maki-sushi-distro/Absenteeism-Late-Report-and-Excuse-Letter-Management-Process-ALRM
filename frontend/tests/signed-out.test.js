@@ -42,6 +42,40 @@ test("confirmed logout starts the existing request and navigates without waiting
   assert.equal(completed, true);
 });
 
+test("mobile signed-out Google sign-in starts the existing same-origin OAuth flow", async () => {
+  const Message = (await server.ssrLoadModule("/src/pages/auth/SignedOut/SignedOutMessage.jsx")).default;
+  const originalWindow = Object.getOwnPropertyDescriptor(globalThis, "window");
+  globalThis.window = { location: { origin: "http://localhost:5173", href: "http://localhost:5173/signed-out" } };
+  function findButton(element) {
+    if (!React.isValidElement(element)) return null;
+    if (element.type === "button") return element;
+    return React.Children.toArray(element.props.children).map(findButton).find(Boolean);
+  }
+  try {
+    const button = findButton(Message());
+    assert.ok(button, "the mobile signed-out page provides a sign-in action");
+    button.props.onClick();
+    const destination = new URL(window.location.href);
+    assert.equal(destination.origin, "http://localhost:5173");
+    assert.equal(destination.pathname, "/api/auth/google/redirect");
+    assert.equal(destination.searchParams.get("origin"), "http://localhost:5173");
+  } finally {
+    if (originalWindow) Object.defineProperty(globalThis, "window", originalWindow);
+    else delete globalThis.window;
+  }
+});
+
+test("the public login retains Google sign-in and the current school assets", async () => {
+  const Login = (await server.ssrLoadModule("/src/pages/login.jsx")).default;
+  const { AuthProvider } = await server.ssrLoadModule("/src/context/AuthContext.jsx");
+  const html = renderToStaticMarkup(React.createElement(MemoryRouter, { initialEntries: ["/login"] }, React.createElement(AuthProvider, null, React.createElement(Login))));
+  assert.match(html, /Sign in with Google/);
+  assert.match(html, /Welcome Back!/);
+  assert.match(html, /alt="La Verdad Christian College logo"/);
+  assert.match(html, /LV_Picture\.jpg/);
+  assert.doesNotMatch(html, /type="password"/);
+});
+
 test("confirmed logout explicitly identifies the destination before the route guard sees an empty session", async () => {
   const { logoutToSignedOut } = await import("../src/lib/logout.js");
   let options;

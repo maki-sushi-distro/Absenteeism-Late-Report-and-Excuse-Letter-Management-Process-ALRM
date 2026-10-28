@@ -4,15 +4,25 @@ const recipients = {
   request_decision: ["student"],
   request_updated: ["student"],
   new_request: ["instructor"],
+  request_followup: ["instructor"],
   followup_flag: ["program"],
   threshold_warning: ["instructor", "program"],
   ir_escalation: ["instructor", "program"],
   attendance_warning: ["instructor", "program"],
   attendance_ir: ["instructor", "program"],
+  pending_staff_approval: ["admin"],
+  class_assignment: ["instructor"],
+  program_head_assignment: ["instructor", "program"],
+  account_role_changed: ["student", "instructor", "program", "admin"],
+  account_status_changed: ["student", "instructor", "program", "admin"],
 };
 
-function destination(role, requestId) {
+function destination(role, requestId, type) {
   const normalized = normalizeRole(role);
+  if (["account_role_changed", "account_status_changed"].includes(type)) return "/settings";
+  if (type === "pending_staff_approval") return "/user-management";
+  if (type === "class_assignment") return "/instructor/class-records";
+  if (type === "program_head_assignment") return "/program-head/instructors";
   if (normalized === "instructor") return `/instructor/class-requests${requestId ? `?request=${encodeURIComponent(requestId)}` : ""}`;
   if (normalized === "program") return "/program-head/requests";
   if (normalized === "student") return `/student/records${requestId ? `?request=${encodeURIComponent(requestId)}` : ""}`;
@@ -30,7 +40,7 @@ export function notificationActivity(records, role, preferences, userId) {
     seen.add(record.id);
     const threshold = ["threshold_warning", "ir_escalation", "attendance_warning", "attendance_ir"].includes(record.type);
     if (!(threshold ? preferences.thresholdAlerts : preferences.requestUpdates)) return [];
-    return [{ id: record.id, type: record.type, requestId: record.request_id, message: record.message, date: record.date_sent, isRead: record.is_read === true, href: destination(role, record.request_id) }];
+    return [{ id: record.id, type: record.type, requestId: record.request_id, message: record.message, date: record.date_sent, isRead: record.is_read === true, href: destination(role, record.request_id, record.type) }];
   }).sort((a, b) => Date.parse(b.date) - Date.parse(a.date));
 }
 

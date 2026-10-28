@@ -48,6 +48,21 @@ test("notification errors and unconfirmed read operations never become fake succ
   await assert.rejects(api.markAllNotificationsRead(), /Could not save/);
 });
 
+test("email preference writes use the authenticated profile endpoint and require a confirmed boolean", async () => {
+  const api = await load("api/notifications.js");
+  const calls = [];
+  const fetch = mock.method(globalThis, "fetch", async (url, options) => {
+    calls.push({ url: String(url), method: options.method, body: JSON.parse(options.body), auth: options.headers.get("Authorization") });
+    return Response.json({ success: true, data: { email_notifications_enabled: true } });
+  });
+  assert.equal(await api.saveEmailNotificationPreference(true), true);
+  assert.deepEqual(calls, [{ url: "/api/me/notification-preferences", method: "PATCH", body: { email_notifications_enabled: true }, auth: "Bearer test-session" }]);
+  fetch.mock.mockImplementation(async () => Response.json({ message: "The route could not be found." }, { status: 404 }));
+  await assert.rejects(api.saveEmailNotificationPreference(false), /route could not be found/i);
+  fetch.mock.mockImplementation(async () => Response.json({ success: true, data: { email_notifications_enabled: "false" } }));
+  await assert.rejects(api.saveEmailNotificationPreference(false), /confirm/i);
+});
+
 test("staff feeds honor the saved request and threshold preferences without inventing decisions", async () => {
   const { notificationActivity } = await load("components/notifications/notificationData.js");
   const rows = [
@@ -152,9 +167,52 @@ test("settings remove Account & Security and use the working shared preference c
   assert.match(html, /Request activity updates/);
   assert.match(html, /Attendance threshold alerts/);
   assert.match(html, /Email notifications/);
-  assert.match(html, /managed by your school/);
-  assert.match(html, /School-managed/);
-  assert.doesNotMatch(html, /id="notification-preference-email"/);
+  assert.match(html, /id="notification-preference-email"/);
+  assert.doesNotMatch(html, /School-managed/);
+});
+
+test("preference writes preserve rapid changes, existing settings, and account-role isolation", async () => {
+  const { default: usePreferences, notificationPreferenceKey } = await server.ssrLoadModule("/src/hooks/useNotificationPreferences.js");
+  const values = new Map();
+  window.localStorage = { getItem: key => values.get(key) ?? null, setItem: (key, value) => values.set(key, value) };
+  let settings;
+  function Probe({ id = "one", role = "student" }) { settings = usePreferences(id, role); return null; }
+  const render = props => renderToStaticMarkup(React.createElement(Probe, props));
+  render();
+  settings.updatePreference("requestUpdates", false);
+  settings.updatePreference("thresholdAlerts", false);
+  const studentKey = notificationPreferenceKey("one", "student");
+  assert.deepEqual(JSON.parse(values.get(studentKey)), { requestUpdates: false, thresholdAlerts: false });
+  settings.updatePreference("requestUpdates", true);
+  assert.deepEqual(JSON.parse(values.get(studentKey)), { requestUpdates: true, thresholdAlerts: false });
+  render({ role: "instructor" });
+  settings.updatePreference("thresholdAlerts", false);
+  assert.deepEqual(JSON.parse(values.get(notificationPreferenceKey("one", "instructor"))), { requestUpdates: true, thresholdAlerts: false });
+  render({ id: "two" });
+  settings.updatePreference("requestUpdates", false);
+  assert.deepEqual(JSON.parse(values.get(notificationPreferenceKey("two", "student"))), { requestUpdates: false, thresholdAlerts: true });
+  const before = [...values];
+  settings.updatePreference("email", true);
+  settings.updatePreference("requestUpdates", "false");
+  assert.deepEqual([...values], before, "unsupported email and malformed changes must never be saved");
+});
+
+test("the reference layout has accessible controls and uses the server's email preference", async () => {
+  const Preferences = (await server.ssrLoadModule("/src/components/notifications/NotificationPreferences.jsx")).default;
+  const html = renderToStaticMarkup(React.createElement(Preferences, { user: { id: "student-one", email_notifications_enabled: true } }));
+  assert.match(html, /Excuse letter status updates/);
+  assert.match(html, /Get notified immediately when an instructor approves, denies, or notes your excuse letter\./);
+  assert.match(html, /Send copies of official portal notifications and clinic clearances to your registered email\./);
+  assert.match(html, /20% absence threshold/);
+  assert.doesNotMatch(html, /Request and threshold preferences are saved automatically/);
+  for (const name of ["requestUpdates", "thresholdAlerts", "email"]) assert.match(html, new RegExp(`for="student-preference-${name}"`));
+  const emailControl = html.match(/<span\b[^>]*aria-label="Email notifications"[^>]*>/)?.[0];
+  assert.ok(emailControl);
+  assert.match(emailControl, /aria-checked="true"/);
+  assert.doesNotMatch(emailControl, /aria-disabled="true"/);
+  assert.equal((html.match(/role="switch"/g) || []).length, 3);
+  const unavailable = renderToStaticMarkup(React.createElement(Preferences, { user: { id: "student-one" } }));
+  assert.match(unavailable.match(/<span\b[^>]*aria-label="Email notifications"[^>]*>/)?.[0] || "", /aria-disabled="true"/);
 });
 
 test("a student preview cannot load or display its student inbox inside the instructor bell", async () => {

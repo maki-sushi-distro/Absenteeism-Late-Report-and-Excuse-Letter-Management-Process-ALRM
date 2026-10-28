@@ -339,7 +339,7 @@ function UnknownRoleState({ role }) {
 }
 
 function Settings() {
-  const { user, loading } = useAuth();
+  const { user, loading, refreshUser } = useAuth();
 
   const normalizedRole = useMemo(() => normalizeRole(user?.role), [user?.role]);
   const config = normalizedRole ? ROLE_CONFIG[normalizedRole] : null;
@@ -381,7 +381,7 @@ function Settings() {
 
           {normalizedRole === "administrator" && <AdminPolicyCard />}
 
-          <NotificationPreferences key={user?.id} userId={user?.id} role={normalizedRole} />
+          <NotificationPreferences key={user?.id} user={user} role={normalizedRole} onEmailSaved={() => refreshUser({ silent: true })} />
         </div>
       </div>
     </SettingsLayout>

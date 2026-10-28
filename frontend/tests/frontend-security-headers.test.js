@@ -16,7 +16,8 @@ test('production CSP blocks executable injection and permits the actual metadata
   assert.deepEqual(directives['connect-src'], ["'self'"]);
   assert.doesNotMatch(directives['script-src'].join(' '), /unsafe-inline|unsafe-eval|https:|\*/);
   const html = await readFile(new URL('../index.html', import.meta.url), 'utf8');
-  const metadata = html.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/)[1];
+  // HTML parsing normalizes line endings before CSP checks inline script text.
+  const metadata = html.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/)[1].replace(/\r\n?/g, '\n');
   assert.ok(directives['script-src'].includes(`'sha256-${createHash('sha256').update(metadata).digest('base64')}'`));
   assert.ok(directives['img-src'].includes('blob:'));
   assert.deepEqual(directives['font-src'], ["'self'"]);
@@ -42,4 +43,19 @@ test('the build validates inline metadata after Vite emits index.html', () => {
   assert.equal(hook.order, 'post');
   assert.throws(() => hook.handler({}, { 'index.html': { source: '<script>unexpected()</script>' } }), /CSP hash/);
   assert.throws(() => hook.handler({}, {}), /index.html/);
+});
+
+test('Windows and Linux HTML produce the same CSP-approved inline metadata', async () => {
+  const plugin = cookieGatewayPlugin({});
+  const html = (await readFile(new URL('../index.html', import.meta.url), 'utf8')).replace(/\r\n?/g, '\n');
+  assert.equal(typeof plugin.transformIndexHtml?.handler, 'function');
+  assert.equal(plugin.transformIndexHtml.order, 'pre');
+  for (const source of [html, html.replace(/\n/g, '\r\n')]) {
+    const transformed = plugin.transformIndexHtml.handler(source);
+    assert.equal(transformed, html);
+    assert.doesNotThrow(() => plugin.generateBundle.handler({}, { 'index.html': { source: transformed } }));
+    assert.throws(() => plugin.generateBundle.handler({}, {
+      'index.html': { source: transformed.replace('"name": "ALRM System"', '"name": "Changed metadata"') },
+    }), /CSP hash/);
+  }
 });

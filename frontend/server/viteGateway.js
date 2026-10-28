@@ -42,6 +42,11 @@ export function cookieGatewayPlugin(env) {
   }
   return {
     name: 'alrm-cookie-gateway',
+    transformIndexHtml: {
+      order: 'pre',
+      // Keep inline-script bytes identical across Windows and Linux builds.
+      handler(html) { return html.replace(/\r\n?/g, '\n'); },
+    },
     configureServer(server) { mount(server, true); },
     configurePreviewServer(server) { mount(server, false); },
     generateBundle: {

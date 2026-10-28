@@ -1,5 +1,5 @@
-// Hash of the static JSON-LD in index.html. The build checks that it stays valid.
-const METADATA_HASH = "'sha256-4Ku3a9aJ0Hb6lEDb3f/TDgiAxunFHITKRYu7WHQfjDU='";
+// Hash of the static JSON-LD with LF line endings, enforced by the Vite plugin.
+const METADATA_HASH = "'sha256-xhcNgFXm8JEdYjnSgojUoMAHj66BYrNaAkzTVXnmZKs='";
 
 export function contentSecurityPolicy({ development = false } = {}) {
   return [

@@ -102,10 +102,10 @@ export default function AdminUserManagement() {
 
   return (
     <div className="min-w-0 w-full space-y-5 text-slate-950">
-      <h1 className="sr-only">User Management</h1>
-      <nav aria-label="User approval views" className="flex flex-wrap gap-3">
+      <h1 className="text-2xl font-bold">User Management</h1>
+      <nav aria-label="User approval views" className="flex flex-wrap gap-1 border-b border-slate-200">
         {[["approved", "Approved Users"], ["waiting", "Waiting for Approval"]].map(([value, label]) => (
-          <button key={value} type="button" aria-current={filters.tab === value ? "page" : undefined} disabled={working} onClick={() => changeFilter("tab", value)} className={`border-b px-2.5 py-2.5 text-[19px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-[#172f6b] ${filters.tab === value ? "border-black text-black" : "border-transparent text-[#827979] hover:text-slate-950"}`}>
+          <button key={value} type="button" aria-current={filters.tab === value ? "page" : undefined} disabled={working} onClick={() => changeFilter("tab", value)} className={`min-h-10 min-w-24 border-b-2 px-5 py-2 text-base font-bold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 ${filters.tab === value ? "border-[#173D83] text-[#173D83]" : "border-transparent text-slate-500 hover:text-[#173D83]"}`}>
             {label}
           </button>
         ))}

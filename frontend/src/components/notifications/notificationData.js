@@ -49,11 +49,15 @@ export function notificationActivity(records, role, preferences, userId) {
   }).sort((a, b) => Date.parse(b.date) - Date.parse(a.date));
 }
 
+function isSubmissionActivity(item) {
+  return item.requestId && (["new_request", "submitted_request"].includes(item.type) || (!Object.hasOwn(recipients, item.type) && /\bsubmitted\b.*\brequest\b/i.test(item.message || "")));
+}
+
 export function mergeRequestActivity(activity, requests, user, readIds = new Set()) {
   if (normalizeRole(user.role) !== "instructor") return activity;
   const seen = new Set();
   const combined = activity.filter(item => {
-    if (item.type !== "new_request" || !item.requestId) return true;
+    if (!isSubmissionActivity(item)) return true;
     if (seen.has(String(item.requestId))) return false;
     seen.add(String(item.requestId));
     return true;
@@ -78,7 +82,9 @@ export function mergeRequestActivity(activity, requests, user, readIds = new Set
 
 function mergeAuditActivity(activity, logs, user, readIds, localKey, href) {
   const combined = [...activity];
+  const submitted = new Set(combined.filter(isSubmissionActivity).map(item => String(item.requestId)));
   for (const row of auditActivity(logs)) {
+    if (row.action === "Submitted" && row.requestId && submitted.has(String(row.requestId))) continue;
     const id = `audit-log:${row.id}`;
     const detail = row.subject === "Unavailable" ? "" : ` in ${row.subject}`;
     combined.push({ id, type: "audit_log", source: "audit", readKey: localKey, requestId: row.requestId,
@@ -87,6 +93,7 @@ function mergeAuditActivity(activity, logs, user, readIds, localKey, href) {
       readStatusTitle: "Activity log notification: read status is saved on this browser.",
       unreadTitle: "Unread admin activity on this browser",
     });
+    if (row.action === "Submitted" && row.requestId) submitted.add(String(row.requestId));
   }
   return combined.sort((a, b) => Date.parse(b.date) - Date.parse(a.date));
 }

@@ -83,6 +83,15 @@ test("new program-head audit activity links to the program activity log", async 
   assert.equal(item.readKey, `program-activity:${programUser.id}`);
 });
 
+test("a server submission notification replaces the matching audit-log notification", async () => {
+  const { mergeProgramAuditActivity } = await import("../src/components/notifications/notificationData.js");
+  const serverItem = { id: "server-request", type: "school_notice", requestId: "request-one", message: "Alex Student submitted a request: Alex Student's absence request for Information Management.", date: oldLog.timestamp, isRead: false, href: "/program-head/requests" };
+
+  const activity = mergeProgramAuditActivity([serverItem], [oldLog], programUser, new Set());
+
+  assert.deepEqual(activity, [serverItem]);
+});
+
 test("reading an admin audit notification stays local and never PATCHes a server notification", async () => {
   const { markFeedRead } = await import("../src/components/notifications/notificationFeed.js");
   const { mergeAdminAuditActivity } = await import("../src/components/notifications/notificationData.js");

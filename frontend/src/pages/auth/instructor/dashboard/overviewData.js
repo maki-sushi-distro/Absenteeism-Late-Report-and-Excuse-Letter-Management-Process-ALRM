@@ -1,7 +1,7 @@
 import { getInstructorDashboard } from "@/api/instructor";
 import { apiFetch, ApiError } from "@/api/client";
 import { buildClassRecords } from "../InstructorClassRecords/recordData";
-import { submittedDate } from "../InstructorRequests/requestData";
+import { requestCourse, submittedDate } from "../InstructorRequests/requestData";
 import { formatSchedule } from "../../student/request-form/utils";
 
 const schoolDay = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila", year: "numeric", month: "2-digit", day: "2-digit" });
@@ -70,7 +70,7 @@ export function buildInstructorOverview(dashboard, requests, now = new Date(), w
     const day = dayKey(submittedDate(record));
     if (day === todayKey) today[key] += 1;
     if (day && day < week.start) week.hasPrevious = true;
-    const course = record.enrollment?.class;
+    const course = requestCourse(record);
     if (!course?.id) continue;
     sources.set(course.id, course);
     if (!weekly.has(course.id)) weekly.set(course.id, { absences: 0, lates: 0 });

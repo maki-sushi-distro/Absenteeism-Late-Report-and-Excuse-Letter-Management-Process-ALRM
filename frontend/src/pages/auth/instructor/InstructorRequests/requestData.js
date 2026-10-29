@@ -1,8 +1,10 @@
 import { programShortName } from "../../../../lib/programs.js";
+import { historicalRequestClass } from "../../../../lib/requestHistory.js";
 
 export const requestStatuses = ["pending", "approved", "noted", "invalid", "cancelled"];
 export const submittedDate = request => request.date_submitted || request.created_at || null;
 export const occurrenceDate = request => request.type === "absence" ? request.start_date_of_absence || null : null;
+export const requestCourse = request => historicalRequestClass(request);
 export function dueDate(request) {
   const value = submittedDate(request);
   if (!value) return null;
@@ -26,7 +28,7 @@ export function filterRequests(records, { type = "absence", subject = "", status
   const name = search.slice(0, 50).trim().toLowerCase();
   const timestamp = record => Date.parse(submittedDate(record)) || 0;
   return records.filter(record => record?.id != null && record.type === type &&
-    (!subject || String(record.enrollment?.class?.id) === subject) &&
+    (!subject || String(requestCourse(record)?.id) === subject) &&
     (!status || record.status === status) &&
     (!name || String(record.enrollment?.student?.name || "").toLowerCase().includes(name)))
     .sort((a, b) => timestamp(b) - timestamp(a) || String(a.id).localeCompare(String(b.id)));
@@ -35,7 +37,7 @@ export function filterRequests(records, { type = "absence", subject = "", status
 export function groupRequests(records) {
   const groups = new Map();
   for (const record of records) {
-    const course = record?.enrollment?.class;
+    const course = requestCourse(record);
     const id = course?.id == null ? "" : String(course.id);
     if (!groups.has(id)) groups.set(id, { id, course, label: classLabel(course), records: [] });
     groups.get(id).records.push(record);

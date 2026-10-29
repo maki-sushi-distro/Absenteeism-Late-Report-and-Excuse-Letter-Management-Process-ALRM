@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { ArrowRight, BookOpen, GraduationCap, TriangleAlert } from "lucide-react";
-import { monthlyActivity, requestStudent } from "./programHeadData";
+import { monthlyActivity, requestClass, requestStudent } from "./programHeadData";
 import { ErrorState } from "@/components/common/ErrorState";
 import { ActivityChartPlaceholder, MetricPlaceholder, ProgramHeaderPlaceholder, SectionPlaceholder } from "@/components/loading/DashboardSkeleton/StaffDashboardPlaceholder";
 
@@ -32,7 +32,7 @@ function Activity({ requests }) {
 
 function RiskPreview({ flags }) {
   return <section className={`${panel} rounded-md p-5`}><div className="flex items-center justify-between gap-3"><h2 className="font-semibold">Students at risk</h2><Link className="inline-flex items-center gap-1 text-sm font-medium text-blue-800 hover:underline dark:text-blue-300" to="/program-head/flagged">View all <ArrowRight className="size-4" /></Link></div>
-    <div className="mt-4 divide-y divide-slate-200 dark:divide-slate-800">{flags.length ? flags.slice(0, 5).map((flag) => <div key={flag.id} className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)_auto] items-center gap-x-6 gap-y-2 py-3 text-left text-sm"><span className="break-words font-medium">{requestStudent(flag.request || {})}</span><span className="break-words text-slate-500 dark:text-slate-400">{flag.request?.enrollment?.class?.subject_name || "Class unavailable"}</span><span className="capitalize text-rose-700 dark:text-rose-300">{flag.status}</span></div>) : <p className="py-4 text-sm text-slate-500 dark:text-slate-400">No escalated students in this program.</p>}</div>
+    <div className="mt-4 divide-y divide-slate-200 dark:divide-slate-800">{flags.length ? flags.slice(0, 5).map((flag) => <div key={flag.id} className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)_auto] items-center gap-x-6 gap-y-2 py-3 text-left text-sm"><span className="break-words font-medium">{requestStudent(flag.request || {})}</span><span className="break-words text-slate-500 dark:text-slate-400">{requestClass(flag.request || {})?.subject_name || "Class unavailable"}</span><span className="capitalize text-rose-700 dark:text-rose-300">{flag.status}</span></div>) : <p className="py-4 text-sm text-slate-500 dark:text-slate-400">No escalated students in this program.</p>}</div>
   </section>;
 }
 

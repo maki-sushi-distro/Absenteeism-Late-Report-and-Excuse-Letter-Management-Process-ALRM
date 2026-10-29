@@ -1,3 +1,4 @@
+import { historicalRequestClass } from "../../../../lib/requestHistory.js";
 export { programShortName } from "../../../../lib/programs.js";
 
 export function studentProfile(user, classes = []) {
@@ -28,7 +29,7 @@ export function requestTotals(requests = []) {
 
 export function recentRequestActivity(requests = [], limit = 5) {
   return requests.flatMap((item) => {
-    const subject = item.enrollment?.class?.subject_name || item.subjects_missed || "your class";
+    const subject = historicalRequestClass(item)?.subject_name || item.subjects_missed || "your class";
     const label = `${item.type === "late" ? "Late report" : "Excuse letter"} #${String(item.id).slice(0, 8)} for ${subject}`;
     const action = { approved: "approved", noted: "noted", invalid: "marked invalid" }[item.status];
     return action && item.date_reviewed

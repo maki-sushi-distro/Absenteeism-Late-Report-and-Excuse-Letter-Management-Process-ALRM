@@ -23,7 +23,6 @@ function initialForm(item) {
     semester: item?.semester || "",
     section: item?.section || "",
     school_year: item?.school_year || "",
-    instructor_id: item?.instructor_id || item?.instructor?.id || "",
     schedule: Array.isArray(item?.schedule) ? item.schedule.map((meeting) => ({ ...meeting, room: meeting.room || "" })) : [],
     weekly_hours: item?.weekly_hours ?? "",
     meetings_per_week: item?.meetings_per_week ?? "",
@@ -55,7 +54,7 @@ function TextInput({ error, label, name, onChange, type = "text", value }) {
   return <div className="grid gap-2"><Label htmlFor={name}>{label}</Label><Input id={name} name={name} type={type} value={value} onChange={onChange} aria-invalid={Boolean(error)} className="h-10" /><FieldError>{error}</FieldError></div>;
 }
 
-export default function ClassForm({ item = null, instructors, onCancel, onSave, programs, saving = false }) {
+export default function ClassForm({ item = null, onCancel, onSave, programs, saving = false }) {
   const [form, setForm] = useState(() => initialForm(item));
   const [curricula, setCurricula] = useState([]);
   const [curriculum, setCurriculum] = useState(null);
@@ -157,7 +156,6 @@ export default function ClassForm({ item = null, instructors, onCancel, onSave, 
         <div className="grid gap-2"><Label>Academic units</Label><Input readOnly value={selectedSubject?.credit_units ?? item?.credit_units ?? "Unavailable"} className="h-10 bg-slate-50" /></div>
         <TextInput name="section" label="Section" value={form.section} onChange={change} error={errors.section} />
         <TextInput name="school_year" label="School Year" value={form.school_year} onChange={change} error={errors.school_year} />
-        <Select name="instructor_id" label="Instructor (optional)" value={form.instructor_id} onChange={change} error={errors.instructor_id}><option value="">Unassigned</option>{instructors.map((instructor) => <option key={instructor.id} value={instructor.id}>{instructor.name || instructor.email}</option>)}</Select>
       </div>
 
       <div className="rounded-lg border border-slate-200 p-4">

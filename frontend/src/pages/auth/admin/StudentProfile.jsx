@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/empty";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
+import { historicalRequestClass } from "@/lib/requestHistory";
 import {
   Table,
   TableBody,
@@ -197,6 +198,8 @@ function attendanceSummary(student) {
 }
 
 function requestClass(request) {
+  const course = historicalRequestClass(request);
+  if (course) return course.subject_name || course.name || "Unassigned";
   return valueFrom(
     request,
     [

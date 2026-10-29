@@ -15,7 +15,7 @@ import RequestCoursesTable from "./RequestCoursesTable";
 import RequestsTable from "./RequestsTable";
 import RequestPagination from "./RequestPagination";
 import RequestDetailDialog from "./RequestDetailDialog";
-import { filterRequests, requestCourses, requestStatuses, updateRequestParams } from "./requestData";
+import { filterRequests, requestCourse, requestCourses, requestStatuses, updateRequestParams } from "./requestData";
 import { loadRequests } from "./requestApi";
 import { exportRequests } from "./requestCsv";
 
@@ -29,7 +29,7 @@ export default function InstructorRequests() {
   const [page, setPage] = useState(1);
   const [exportError, setExportError] = useState("");
   const records = resource.data || [];
-  const selected = records.find(record => String(record.id) === params.get("request") && (!classId || String(record.enrollment?.class?.id) === classId));
+  const selected = records.find(record => String(record.id) === params.get("request") && (!classId || String(requestCourse(record)?.id) === classId));
   const type = ["absence", "late"].includes(params.get("type")) ? params.get("type") : selected?.type === "late" ? "late" : "absence";
   const subject = params.get("subject") || "";
   const status = requestStatuses.includes(params.get("status")) ? params.get("status") : "";
@@ -37,7 +37,7 @@ export default function InstructorRequests() {
   const allCourses = requestCourses(records, programs);
   const listRecords = records.filter(record => (!["absence", "late"].includes(params.get("type")) || record.type === type) && (!status || record.status === status));
   const courses = requestCourses(listRecords, programs);
-  const activeClassId = classId || (selected?.enrollment?.class?.id ? String(selected.enrollment.class.id) : "");
+  const activeClassId = classId || (requestCourse(selected)?.id ? String(requestCourse(selected).id) : "");
   const course = allCourses.find(item => item.id === activeClassId);
   const visibleCourses = subject ? courses.filter(item => item.id === subject) : courses;
   const filtered = filterRequests(records, { type, subject: activeClassId, status, search });

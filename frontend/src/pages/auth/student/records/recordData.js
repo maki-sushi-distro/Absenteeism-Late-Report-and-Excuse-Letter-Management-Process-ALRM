@@ -1,7 +1,8 @@
 import { requestReason } from "../request-form/buildPayload.js";
+import { historicalRequestClass } from "../../../../lib/requestHistory.js";
 
 export function subjectOf(record) {
-  return record.enrollment?.class?.subject_name || record.subjects_missed || "Unknown subject";
+  return historicalRequestClass(record)?.subject_name || record.subjects_missed || "Unknown subject";
 }
 
 export function typeOf(record) {

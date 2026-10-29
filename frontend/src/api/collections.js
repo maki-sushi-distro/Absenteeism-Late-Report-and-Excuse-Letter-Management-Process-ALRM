@@ -1,13 +1,13 @@
 import { apiFetch, ApiError } from "./client.js";
 
-export async function getCollection(path, { signal } = {}) {
+export async function getCollection(path, { signal, perPage = 100 } = {}) {
   const [pathname, search = ""] = path.split("?");
   const query = new URLSearchParams(search);
   const records = [];
   let lastPage = 1;
   for (let page = 1; page <= lastPage; page++) {
     query.set("page", String(page));
-    query.set("per_page", "100");
+    query.set("per_page", String(perPage));
     const endpoint = pathname.startsWith("/api/") ? pathname : `/api${pathname}`;
     const response = await apiFetch(`${endpoint}?${query}`, { signal });
     const payload = await response.json().catch(() => null);

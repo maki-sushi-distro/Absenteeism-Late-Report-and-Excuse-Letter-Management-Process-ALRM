@@ -146,7 +146,6 @@ export function AdminDashboard({ view = "dashboard" }) {
   const showReports = view === "reports";
   const staffUsers = users.filter((user) => ["instructor", "program_head", "administrator"].includes(user.role));
   const programHeads = users.filter((user) => ["instructor", "program_head"].includes(user.role));
-  const instructors = users.filter((user) => user.role === "instructor" && user.status !== "deactivated");
 
   if (view === "dashboard") return <AdminOverview resources={resources} onRetry={loadData} />;
 
@@ -205,7 +204,7 @@ export function AdminDashboard({ view = "dashboard" }) {
           {!showPrograms && errors.programs ? resourceError("programs") : null}
           {errors.users ? resourceError("users") : null}
           <div className="flex justify-end"><Button type="button" onClick={() => setClassEditor({ item: null })} disabled={Boolean(working)} className="bg-[#172f6b] text-white hover:bg-[#203f8a]">Create Class</Button></div>
-          {classEditor && <ClassForm key={classEditor.item?.id || "new"} item={classEditor.item} programs={visiblePrograms} instructors={instructors} saving={working === "save-class"} onCancel={() => setClassEditor(null)} onSave={handleSaveClass} />}
+          {classEditor && <ClassForm key={classEditor.item?.id || "new"} item={classEditor.item} programs={visiblePrograms} saving={working === "save-class"} onCancel={() => setClassEditor(null)} onSave={handleSaveClass} />}
           <section aria-labelledby="existing-classes-title" className="min-w-0 rounded-lg border border-slate-200 bg-white p-5">
           <h2 id="existing-classes-title" className="mb-4 text-lg font-semibold">Existing Classes</h2>
           {visibleClasses.length === 0 ? <EmptyState title="No classes found" /> : (

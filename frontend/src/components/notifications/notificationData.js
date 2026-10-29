@@ -1,4 +1,5 @@
 import { normalizeRole } from "../../lib/roles.js";
+import { historicalRequestClass } from "../../lib/requestHistory.js";
 import { auditActivity } from "../../pages/auth/admin/overviewData.js";
 
 const recipients = {
@@ -85,9 +86,9 @@ export function mergeRequestActivity(activity, requests, user, readIds = new Set
   });
   for (const request of requests) {
     const student = request?.enrollment?.student;
-    const course = request?.enrollment?.class;
+    const course = historicalRequestClass(request);
     if (!request?.id || seen.has(String(request.id)) || !["absence", "late"].includes(request.type)) continue;
-    if (!student?.name || !course?.subject_name || String(course.instructor_id) !== String(user.id)) continue;
+    if (!student?.name || !course?.subject_name) continue;
     if (!Number.isFinite(Date.parse(request.date_submitted))) continue;
     seen.add(String(request.id));
     const id = `request-submitted:${request.id}`;

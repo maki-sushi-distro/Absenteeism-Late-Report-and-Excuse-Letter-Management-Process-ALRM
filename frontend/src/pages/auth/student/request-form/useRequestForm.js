@@ -205,6 +205,20 @@ export default function useRequestForm() {
       setSubmitted(true);
       refreshUser({ silent: true }).catch(() => {});
     } catch (submitError) {
+      if (submitError?.status === 409) {
+        try {
+          const refreshedClasses = await getStudentClasses();
+          setClasses(refreshedClasses);
+          setForm((current) => ({ ...current, classId: "", classText: "", declaration: false }));
+          setReviewEditing(true);
+          setError("The teaching assignment changed. Review your classes and choose the subject again before submitting.");
+        } catch (refreshError) {
+          setClasses([]);
+          setClassesError(refreshError?.message || "Your updated classes could not be loaded.");
+          setError("The teaching assignment changed, but the updated class list could not be loaded. Please try again.");
+        }
+        return;
+      }
       setError(submitError?.message || "Unable to submit your request.");
       const proofError = proofTypeError(submitError?.validationErrors || submitError?.body?.errors);
       if (proofError) {

@@ -1,4 +1,4 @@
-import { classLabel, dueDate, formatDate, occurrenceDate, submittedDate } from "./requestData";
+import { classLabel, dueDate, formatDate, occurrenceDate, requestCourse, submittedDate } from "./requestData";
 
 export function csvCell(value) {
   const text = String(value ?? "");
@@ -9,7 +9,7 @@ export function csvCell(value) {
 export function requestsCsv(records) {
   const rows = [["Class", "Student", "Date of Occurrence", "Type", "Submitted", "Date of Due", "Request"]];
   for (const record of records) rows.push([
-    classLabel(record.enrollment?.class), record.enrollment?.student?.name || "Unavailable",
+    classLabel(requestCourse(record)), record.enrollment?.student?.name || "Unavailable",
     formatDate(occurrenceDate(record)), record.type, formatDate(submittedDate(record)),
     formatDate(dueDate(record)), record.status,
   ]);

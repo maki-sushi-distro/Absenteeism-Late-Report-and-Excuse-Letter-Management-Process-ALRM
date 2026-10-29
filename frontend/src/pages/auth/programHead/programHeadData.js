@@ -1,3 +1,5 @@
+import { historicalInstructor, historicalRequestClass } from "../../../lib/requestHistory.js";
+
 export function requestDate(request) {
   const value = request.date_submitted || request.created_at;
   const date = value ? new Date(value) : null;
@@ -9,14 +11,14 @@ export function requestStudent(request) {
 }
 
 export function requestClass(request) {
-  return request.enrollment?.class;
+  return historicalRequestClass(request);
 }
 
 export function instructorRows(requests) {
   const rows = new Map();
   for (const request of requests) {
     const classRecord = requestClass(request);
-    const instructor = classRecord?.instructor;
+    const instructor = historicalInstructor(classRecord);
     if (!instructor?.id) continue;
     if (!rows.has(instructor.id)) rows.set(instructor.id, {
       id: instructor.id, name: instructor.name || "Instructor", classes: new Map(), absences: 0, lates: 0,

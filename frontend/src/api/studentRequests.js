@@ -48,8 +48,8 @@ function listFrom(body) {
   return [];
 }
 
-export async function getStudentClasses() {
-  const res = await apiFetch("/api/classes");
+export async function getStudentClasses({ signal } = {}) {
+  const res = await apiFetch("/api/classes", { signal });
   const body = await expectJson(res);
 
   return listFrom(body);

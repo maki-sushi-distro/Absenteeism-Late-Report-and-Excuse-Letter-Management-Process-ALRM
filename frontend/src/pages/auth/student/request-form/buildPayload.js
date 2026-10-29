@@ -1,4 +1,5 @@
 import { assertValidInputs, isWholeNumber, sanitizeText } from "../../../../lib/inputValidation.js";
+import { historicalRequestClass } from "../../../../lib/requestHistory.js";
 
 function buildReason(form, isAbsence) {
   if (isAbsence) {
@@ -17,6 +18,7 @@ export function buildRequestPayload(form, classes, evidence = null) {
 
   return {
     class_id: matchedClass?.class_id || form.classId,
+    teaching_assignment_id: matchedClass?.teaching_assignment_id,
     type: form.requestType,
     subjects_missed: matchedClass?.subject_name || "",
     minutes_late: isAbsence ? null : Number(form.minutesLate),
@@ -48,7 +50,7 @@ export function requestReason(record) {
 export function buildRequestEditForm(record) {
   return {
     type: record.type,
-    subjects_missed: record.subjects_missed || record.enrollment?.class?.subject_name || "",
+    subjects_missed: record.subjects_missed || historicalRequestClass(record)?.subject_name || "",
     reason: requestReason(record),
     minutes_late: String(record.minutes_late ?? ""),
     start_date_of_absence: record.start_date_of_absence?.slice(0, 10) || "",

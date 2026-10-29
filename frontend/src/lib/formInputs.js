@@ -73,10 +73,6 @@ export function prepareClassInput(data, partial = false) {
     payload[key] = sanitizeText(data[key]);
     errors[key] = isIdentifier(payload[key]) ? '' : `Select a valid ${label}.`;
   }
-  if (!partial || Object.hasOwn(data, 'instructor_id')) {
-    payload.instructor_id = data.instructor_id ? sanitizeText(data.instructor_id) : null;
-    errors.instructor_id = payload.instructor_id === null || isIdentifier(payload.instructor_id) ? '' : 'Select a valid instructor.';
-  }
   for (const [key, choices] of [['semester', ['1st', '2nd']], ['year_level', yearLevels]]) {
     if (partial && !Object.hasOwn(data, key)) continue;
     payload[key] = data[key];

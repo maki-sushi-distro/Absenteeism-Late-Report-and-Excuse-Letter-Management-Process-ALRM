@@ -1,8 +1,8 @@
-import { classLabel, dueDate, formatDate, occurrenceDate, submittedDate } from "./requestData";
+import { classLabel, dueDate, formatDate, occurrenceDate, requestCourse, submittedDate } from "./requestData";
 
 export default function RequestFacts({ request }) {
   const fields = [
-    ["Student", request.enrollment?.student?.name], ["Class", classLabel(request.enrollment?.class)],
+    ["Student", request.enrollment?.student?.name], ["Class", classLabel(requestCourse(request))],
     ["Type", request.type === "absence" ? "Absent" : "Late"],
     ["Date of Occurrence", formatDate(occurrenceDate(request))],
     ...(request.type === "absence" ? [["End of Absence", formatDate(request.end_date_of_absence)]] : [["Minutes Late", request.minutes_late]]),

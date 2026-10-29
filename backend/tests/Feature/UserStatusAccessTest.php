@@ -181,4 +181,41 @@ class UserStatusAccessTest extends SecurityTestCase
 
         $this->assertSame('deactivated', $target->refresh()->status);
     }
+
+    public function test_admin_can_assign_an_external_pending_accounts_role_before_approval(): void
+    {
+        $admin = $this->makeUser('approved', 'administrator');
+        $external = $this->makeUser('pending', 'student', [
+            'email' => 'visitor@gmail.com', 'google_id' => 'external-google-id',
+        ]);
+
+        $this->bearer($external)->getJson('/api/instructor/dashboard')->assertForbidden();
+        $this->bearer($external)
+            ->patchJson("/api/admin/users/{$external->id}/status", ['status' => 'approved'])
+            ->assertForbidden();
+
+        $this->bearer($admin)
+            ->patchJson("/api/admin/users/{$external->id}/role", ['role' => 'instructor'])
+            ->assertOk();
+        $this->assertSame('pending', $external->refresh()->status);
+        $this->assertSame('instructor', $external->role);
+        $this->bearer($external)->getJson('/api/instructor/dashboard')->assertForbidden();
+
+        $this->bearer($admin)
+            ->patchJson("/api/admin/users/{$external->id}/status", ['status' => 'approved'])
+            ->assertOk();
+        $this->assertSame('approved', $external->fresh()->status);
+        $this->bearer($external)->getJson('/api/instructor/requests')->assertOk();
+    }
+
+    public function test_external_pending_accounts_appear_in_the_admin_review_list(): void
+    {
+        $admin = $this->makeUser('approved', 'administrator');
+        $external = $this->makeUser('pending', 'student', [
+            'email' => 'visitor@gmail.com', 'google_id' => 'external-google-id',
+        ]);
+
+        $this->bearer($admin)->getJson('/api/admin/users?status=pending')
+            ->assertOk()->assertJsonFragment(['id' => $external->id]);
+    }
 }

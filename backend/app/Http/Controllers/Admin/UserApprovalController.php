@@ -259,11 +259,19 @@ class UserApprovalController extends Controller
      */
     public function updateRole(Request $request, User $user): JsonResponse
     {
+        $domain = strtolower(substr(strrchr($user->email, '@') ?: '', 1));
+        $isPendingExternal = $user->status === 'pending'
+            && ! in_array($domain, [
+                strtolower((string) config('institution.student_domain')),
+                strtolower((string) config('institution.staff_domain')),
+            ], true);
+
         $validated = $request->validate([
-            'role' => ['required', 'string', Rule::in(self::ASSIGNABLE_ROLES)],
+            'role' => ['required', 'string', Rule::in($isPendingExternal ? self::CREATABLE_ROLES : self::ASSIGNABLE_ROLES)],
         ]);
 
-        if ($user->role === null || ($user->role === 'student' && $validated['role'] !== 'program_head')) {
+        if (! $isPendingExternal
+            && ($user->role === null || ($user->role === 'student' && $validated['role'] !== 'program_head'))) {
             return response()->json([
                 'success' => false,
                 'message' => 'This endpoint reassigns staff roles or promotes an existing student to program head.',

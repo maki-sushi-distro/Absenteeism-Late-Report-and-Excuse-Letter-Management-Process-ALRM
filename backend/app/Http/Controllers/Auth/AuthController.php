@@ -180,18 +180,13 @@ class AuthController extends Controller
         $studentDomain = strtolower((string) config('institution.student_domain'));
         $staffDomain = strtolower((string) config('institution.staff_domain'));
 
-        if (! in_array($domain, [$studentDomain, $staffDomain], true)) {
-            return redirect()->away(
-                $frontendUrl.'/login?error=invalid_domain'
-            );
-        }
-
         $isStudent = $domain === $studentDomain;
+        $isStaff = $domain === $staffDomain;
+        $isInstitutional = $isStudent || $isStaff;
 
         $user = User::query()->firstOrNew(['email' => $email]);
 
         $isNewUser = ! $user->exists;
-        $isFirstLogin = $isNewUser || is_null($user->google_id);
 
         if (! $isNewUser && ! $user->canLogin()) {
             return redirect()->away(
@@ -207,11 +202,12 @@ class AuthController extends Controller
 
         if ($isNewUser) {
             $user->name = mb_substr($googleUser->getName() ?: $email, 0, 255);
-            $user->role = $isStudent ? 'student' : self::DEFAULT_STAFF_ROLE;
-            $user->status = $isStudent ? 'approved' : 'pending';
+            // External accounts start with the least-privileged role and cannot
+            // access role routes until an administrator reviews their account.
+            $user->role = $isStaff ? self::DEFAULT_STAFF_ROLE : 'student';
+            $user->status = $isInstitutional ? 'approved' : 'pending';
             $user->password = null;
-        } elseif ($user->status === 'pending'
-            && ($isFirstLogin || ($isStudent && $user->role === 'student'))) {
+        } elseif ($user->status === 'pending' && $isInstitutional) {
             $user->name = mb_substr($googleUser->getName() ?: $email, 0, 255);
             $user->status = 'approved';
             $user->password = null;
@@ -306,7 +302,6 @@ class AuthController extends Controller
         $userId = Cache::get("auth_pending:{$pending}");
         $user = $userId ? User::whereKey($userId)->lockForUpdate()->first() : null;
 
-        // Recheck after obtaining the same user lock used by OTP verification.
         if ($user && Cache::get("auth_pending:{$pending}") !== $user->id) {
             $user = null;
         }

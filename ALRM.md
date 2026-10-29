@@ -56,12 +56,13 @@ LVCC uses two separate institutional Google Workspace domains, which the system 
 | User type | Email domain | Maps to role |
 |---|---|---|
 | Student | `@student.laverdad.edu.ph` | `student` |
-| Faculty / Staff (Instructor, Program Head, Admin) | `@laverdad.edu.ph` | `instructor` / `program_head` / `administrator` (assigned by Admin on approval) |
+| Faculty / Staff (Instructor, Program Head, Admin) | `@laverdad.edu.ph` | `instructor` by default; Admin can reassign staff roles |
 
 **Login logic (Google OAuth, not a registration form):**
-- On the Google OAuth callback, the backend validates the email against these two domains — anything outside both is rejected, even if Google auth itself succeeded.
+- The Google OAuth callback requires a verified Google email. Both exact institutional domains are auto-approved. Other domains create pending accounts that need administrator approval; Google OAuth must allow external users for them to reach this callback.
 - If the domain is `@student.laverdad.edu.ph` → account is created (or matched, on return visits) with `role = student`, `status = approved` immediately. **No Admin step for students at all** — Google Workspace membership already is the identity check, so a separate approval gate would just be redundant friction.
-- If the domain is `@laverdad.edu.ph` → account is created as `pending`, and the **Administrator assigns** the specific staff role (Instructor, Program Head, or Administrator), since the domain alone doesn't distinguish between those three. This is role *assignment*, not a legitimacy check — Google already handled that part.
+- If the domain is `@laverdad.edu.ph` → the account is automatically `approved`, with `instructor` as the default role. Pre-registered roles are preserved. Admin can assign another staff role. Existing pending institutional accounts are approved on verified Google sign-in, while deactivated accounts remain blocked.
+- Other domains → default `student` role and `pending` status. Admin may assign the intended role before approval. OTP verification does not bypass the pending restriction on role routes.
 - **One person who is both Instructor and Program Head:** rather than a full multi-role system, `users.role` stays single-valued (e.g. `instructor`), and Program Head access for that person is granted via the existing `PROGRAMS.program_head_id` FK as a secondary check — if a user's ID shows up as `program_head_id` on any program, they get Program Head views/routes in addition to their primary role. No extra approval step, no schema change. A true many-role-per-user system (pivot table) is deferred — see Phase 5.
 
 ---
@@ -179,7 +180,7 @@ flowchart TB
 | password | string, hashed, nullable | kept nullable since accounts are created via Google OAuth, not a password form |
 | role | enum, nullable | `administrator`, `program_head`, `instructor`, `student` — null for staff until Admin assigns |
 | program_id | bigint (FK → PROGRAMS), nullable | for students/program heads/instructors |
-| status | enum, nullable | `approved` (auto, for students) or `pending` (staff, until Admin assigns their specific role) — students never sit in `pending` |
+| status | enum, nullable | `approved` automatically for official student/staff domains; `pending` for external Google accounts until administrator approval; `deactivated` remains blocked |
 | created_at / updated_at | timestamp | |
 
 ### `PROGRAMS`
@@ -271,7 +272,7 @@ flowchart TB
 ```
 GET   /api/auth/google/redirect             → sends the user to Google's OAuth consent screen
 GET   /api/auth/google/callback             → validates domain, find-or-creates the user,
-                                               auto-approves students, marks staff pending role assignment
+                                               auto-approves official student/staff emails; external emails require admin approval
 POST  /api/logout
 GET   /api/me
 ```
@@ -302,7 +303,7 @@ GET   /api/program-head/requests           → program-wide, includes auto-escal
 ### Administrator
 ```
 GET    /api/admin/dashboard                → college-wide
-GET    /api/admin/users                    → staff pending role assignment (user.status = pending); students never appear here
+GET    /api/admin/users                    → accounts awaiting review (user.status = pending), including external accounts
 PATCH  /api/admin/users/{id}/approve       → staff-only — assigns the specific staff role (Instructor/Program Head/Admin)
 CRUD   /api/admin/programs
 CRUD   /api/admin/classes

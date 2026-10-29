@@ -23,6 +23,6 @@ dist-ssr
 *.sln
 *.sw?
 *.mjs
-*.env
-*.env.example
-*.env.local
+.env
+.env.example
+.env.local

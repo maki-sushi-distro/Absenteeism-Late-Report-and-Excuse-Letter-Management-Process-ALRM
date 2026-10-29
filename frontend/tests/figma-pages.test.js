@@ -5,7 +5,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter } from "react-router-dom";
 import { createServer } from "vite";
 
-let server, Context, Overview, AdminLog, ProgramLog, ProgramAccess;
+let server, Context, Overview, AdminLog, ProgramLog, ProgramAccess, AdminReports;
 const request = { id: "r1", type: "absence", status: "pending", date_submitted: "2026-10-01T10:00:00Z", enrollment: { student: { name: "Test Student" }, class: { id: "c1", subject_name: "Test Class", instructor: { name: "Test Instructor" } } } };
 const data = {
   getAdminDashboard: { total_programs: 1, total_students: 12, warning_count: 1, ir_count: 1, pending_requests: 1, programs_summary: [{ id: "p1", program_name: "BSIS", student_count: 12 }], recent_flags: [{ id: "f1", flagged_date: "2026-10-01", request }] },
@@ -24,6 +24,7 @@ before(async () => {
   ({ default: AdminLog } = await server.ssrLoadModule("/src/pages/auth/admin/AdminActivityLog.jsx"));
   ({ default: ProgramLog } = await server.ssrLoadModule("/src/pages/auth/programHead/ProgramHeadActivityLog.jsx"));
   ({ default: ProgramAccess } = await server.ssrLoadModule("/src/routes/ProgramHeadAccess.jsx"));
+  ({ default: AdminReports } = await server.ssrLoadModule("/src/pages/auth/admin/reports/AdminReports.jsx"));
 });
 after(async () => { await server?.close(); });
 function render(Page, path = "/", loading = false) {
@@ -48,7 +49,7 @@ test("administrator activity renders real recent flags without the informational
   assert.match(html, /Audit Student/);
   assert.match(html, /Audit Instructor/);
   assert.match(html, />Approved</);
-  assert.match(html, />Actor</);
+  assert.match(html, />Instructor</);
   assert.match(html, /aria-label="Search activity"/);
   assert.match(html, /aria-label="Filter activity"/);
   assert.match(html, />Clear filters<\/button>/);
@@ -59,8 +60,13 @@ test("program head activity renders its scoped audit log", () => {
   assert.match(html, /Program Audit Student/);
   assert.match(html, /Program Audit Actor/);
   assert.match(html, />Followed up</);
-  assert.match(html, />Actor</);
+  assert.match(html, />Instructor</);
   assert.doesNotMatch(html, /role="tab"|Flagged by|<select/);
+});
+test("administrator report status filter omits noted", () => {
+  const html = renderToStaticMarkup(React.createElement(AdminReports, { programs: [] }));
+  for (const status of ["All statuses", "Pending", "Approved", "Invalid"]) assert.match(html, new RegExp(`>${status}<`));
+  assert.doesNotMatch(html, /<option value="noted">Noted<\/option>/);
 });
 test("activity loading replaces filters and rows with skeletons", () => {
   const html = render(AdminLog, "/activity-log", true);

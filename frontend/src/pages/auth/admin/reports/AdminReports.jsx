@@ -43,7 +43,7 @@ export default function AdminReports({ programs }) {
       <h1 className="mb-5 text-lg font-semibold">Generate requests report</h1>
       <form className="grid items-end gap-4 md:grid-cols-2 xl:grid-cols-5" onSubmit={generate}>
         <label className="grid gap-2 text-sm">Program<select name="program_id" value={filters.program_id} onChange={change} className={field}><option value="">All programs</option>{programs.map(program => <option key={program.id} value={program.id}>{program.program_name}</option>)}</select></label>
-        <label className="grid gap-2 text-sm">Status<select name="status" value={filters.status} onChange={change} className={field}><option value="">All statuses</option>{["pending", "approved", "noted", "invalid"].map(status => <option key={status} value={status}>{status[0].toUpperCase() + status.slice(1)}</option>)}</select></label>
+        <label className="grid gap-2 text-sm">Status<select name="status" value={filters.status} onChange={change} className={field}><option value="">All statuses</option>{["pending", "approved", "invalid"].map(status => <option key={status} value={status}>{status[0].toUpperCase() + status.slice(1)}</option>)}</select></label>
         <label className="grid gap-2 text-sm">From<Input name="date_from" type="date" value={filters.date_from} onChange={change} className="h-11" /></label>
         <label className="grid gap-2 text-sm">To<Input name="date_to" type="date" min={filters.date_from || undefined} value={filters.date_to} onChange={change} className="h-11" /></label>
         <Button type="submit" disabled={loading} className="h-11 bg-[#172f6b] text-white hover:bg-[#203f8a]">Generate</Button>

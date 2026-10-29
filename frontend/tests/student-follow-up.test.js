@@ -68,18 +68,27 @@ test("follow-up does not retry network failures and passes cancellation to the e
   assert.equal(fetch.mock.callCount(), 1);
 });
 
-test("record actions enable pending follow-up only when a callback is supplied", async () => {
+test("a successful follow-up starts an exact 24-hour cooldown", async () => {
+  const { followUpCooldownExpiresAt } = await server.ssrLoadModule("/src/pages/auth/student/records/useRequestFollowUp.js");
+  const sentAt = "2026-10-29T08:00:00.000Z";
+
+  assert.equal(followUpCooldownExpiresAt(sentAt), Date.parse(sentAt) + 24 * 60 * 60 * 1000);
+  assert.equal(followUpCooldownExpiresAt(undefined, 1_000), 1_000 + 24 * 60 * 60 * 1000);
+});
+
+test("pending records use an accessible bell-check follow-up button", async () => {
   const Actions = (await server.ssrLoadModule("/src/pages/auth/student/records/RecordActions.jsx")).default;
   const props = { record, description: "Math", onView() {}, onFollowUp() {} };
   const html = renderToStaticMarkup(React.createElement(Actions, props));
-  const followUp = html.match(/<button[^>]*>[\s\S]*?Follow up[\s\S]*?<\/button>/g)?.at(-1);
+  const followUp = html.match(/<button[^>]*aria-label="Follow up on Math"[^>]*>[\s\S]*?<\/button>/)?.[0];
   assert.ok(followUp);
   assert.doesNotMatch(html, /disabled=""/);
   assert.match(html, /aria-busy="false"/);
   assert.match(html, /flex-nowrap/);
+  assert.match(followUp, /lucide-bell-check/);
   assert.match(followUp, /h-7/);
-  assert.match(followUp, /text-xs/);
-  assert.doesNotMatch(followUp, /w-24/);
+  assert.match(followUp, /w-7/);
+  assert.doesNotMatch(followUp, />Follow up</);
   const unavailable = renderToStaticMarkup(React.createElement(Actions, { ...props, onFollowUp: undefined }));
   assert.match(unavailable, /disabled=""/);
 });
@@ -94,6 +103,22 @@ test("sending shows a spinner only for the active row and disables follow-ups on
   const other = renderToStaticMarkup(React.createElement(Actions, { ...props, record: { ...record, id: "another-request" } }));
   assert.match(other, /disabled=""/);
   assert.doesNotMatch(other, /animate-spin/);
+});
+
+test("cooldown replaces the follow-up action with a disabled 24-hour countdown", async () => {
+  const Actions = (await server.ssrLoadModule("/src/pages/auth/student/records/RecordActions.jsx")).default;
+  const html = renderToStaticMarkup(React.createElement(Actions, {
+    record,
+    description: "Math",
+    onView() {},
+    onFollowUp() {},
+    cooldownSeconds: 86_399,
+  }));
+
+  assert.match(html, /disabled=""/);
+  assert.match(html, /aria-label="Follow up available in 23:59:59"/);
+  assert.match(html, /lucide-bell-check/);
+  assert.match(html, />23:59:59</);
 });
 
 test("reviewed and cancelled requests do not offer follow-up and view remains available", async () => {

@@ -13,7 +13,7 @@ import RequestPagination from "@/pages/auth/instructor/InstructorRequests/Reques
 const emptyFilters = { search: "", action: "", subject: "", date: "" };
 const actions = { Submitted: "border-orange-200 bg-orange-50 text-orange-700", Updated: "border-blue-200 bg-blue-50 text-blue-800", Cancelled: "border-slate-300 bg-slate-50 text-slate-700", "Followed up": "border-orange-200 bg-orange-50 text-orange-700", Flagged: "border-yellow-300 bg-yellow-50 text-yellow-900", Approved: "border-green-200 bg-green-50 text-green-700", Denied: "border-red-200 bg-red-50 text-red-700", Noted: "border-blue-200 bg-blue-50 text-blue-800", Resolved: "border-green-200 bg-green-50 text-green-700" };
 
-export default function ActivityTable({ rows = [], loading, error, onRetry, flagged = false, programLog = false, auditLog = false }) {
+export default function ActivityTable({ rows = [], loading, error, onRetry, flagged = false, programLog = false }) {
   const [filters, setFilters] = useState(emptyFilters);
   const [page, setPage] = useState(1);
   const visible = filterActivity(rows, filters);
@@ -44,7 +44,7 @@ export default function ActivityTable({ rows = [], loading, error, onRetry, flag
         </div>
       </FilterMenu>
     </div>}
-    <div className="overflow-x-auto"><table className="w-full min-w-[760px] table-fixed text-left text-sm"><caption className="sr-only">{flagged ? "Flagged request activity" : "Request activity"}</caption><thead><tr className="border-b border-[#bccae5] text-[#203B82]">{(flagged ? ["Students", "Date", "Class", "Record", "Flagged by"] : programLog ? ["Students", "Date", "Requests", "Action", "Instructor"] : ["Date", "Student", "Request", "Action", auditLog ? "Actor" : "Instructor"]).map(label => <th key={label} scope="col" className="w-1/5 px-4 py-4 font-semibold">{label}</th>)}</tr></thead><tbody>
+    <div className="overflow-x-auto"><table className="w-full min-w-[760px] table-fixed text-left text-sm"><caption className="sr-only">{flagged ? "Flagged request activity" : "Request activity"}</caption><thead><tr className="border-b border-[#bccae5] text-[#203B82]">{(flagged ? ["Students", "Date", "Class", "Record", "Flagged by"] : programLog ? ["Students", "Date", "Requests", "Action", "Instructor"] : ["Date", "Student", "Request", "Action", "Instructor"]).map(label => <th key={label} scope="col" className="w-1/5 px-4 py-4 font-semibold">{label}</th>)}</tr></thead><tbody>
       {pagination.pageRecords.map(row => <tr key={row.id} className="border-b border-[#cbd6ed]">
         {(flagged ? [row.student, new Date(row.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }), row.subject, row.type, row.flaggedBy] : programLog ? [row.student, new Date(row.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }), row.type, row.action, row.instructor] : [new Date(row.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }), row.student, row.type, row.action, row.instructor]).map((value, index) => <td key={index} className="break-words px-4 py-5">{!flagged && index === 3 ? <span className={`inline-flex min-w-24 justify-center rounded-md border px-2 py-1 text-xs font-medium ${actions[row.action] || "border-slate-200 bg-slate-50"}`}>{value}</span> : value || "Unavailable"}</td>)}
       </tr>)}

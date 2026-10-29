@@ -157,7 +157,7 @@ export default function StudentRecords() {
   const [attachmentError, setAttachmentError] = useState("");
   const [openingAttachment, setOpeningAttachment] = useState(false);
   const dialogRef = useRef(null);
-  const { followingUpId, notice, followUp, dismissNotice } = useRequestFollowUp();
+  const { followingUpId, cooldownSecondsById, notice, followUp, dismissNotice } = useRequestFollowUp(user?.id);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -280,7 +280,7 @@ export default function StudentRecords() {
                   <td className="break-words px-4 py-4">{subjectOf(record)}</td>
                   <td className="whitespace-nowrap px-4 py-4">{formatDate(recordDate(record))}</td>
                   <td className="px-4 py-4"><StatusBadge value={record.status} /></td>
-                  <td className="px-4 py-4"><RecordActions record={record} onView={viewRecord} description={`${subjectOf(record)}, ${formatDate(recordDate(record))}`} onFollowUp={followUp} followingUpId={followingUpId} /></td>
+                  <td className="px-4 py-4"><RecordActions record={record} onView={viewRecord} description={`${subjectOf(record)}, ${formatDate(recordDate(record))}`} onFollowUp={followUp} followingUpId={followingUpId} cooldownSeconds={cooldownSecondsById[record.id] || 0} /></td>
                 </tr>
               ))}
             </tbody>

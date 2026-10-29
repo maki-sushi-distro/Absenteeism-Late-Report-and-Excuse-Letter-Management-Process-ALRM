@@ -87,7 +87,7 @@ function Login() {
             <CardTitle className="text-[clamp(1.375rem,calc(1rem+2vw),3rem)] font-bold leading-tight tracking-normal text-black sm:font-black sm:text-slate-800">
               Welcome Back!
             </CardTitle>
-            <CardDescription className="max-w-56 text-[clamp(0.6875rem,calc(0.5rem+0.9vw),1.125rem)] font-normal leading-snug text-[#737373] sm:max-w-none sm:text-slate-600">
+            <CardDescription className="max-w-56 text-center text-[clamp(0.6875rem,calc(0.5rem+0.9vw),1.125rem)] font-normal leading-snug text-[#737373] sm:max-w-none sm:text-slate-600">
               Sign in with your La Verdad Christian College account.
             </CardDescription>
           </CardHeader>

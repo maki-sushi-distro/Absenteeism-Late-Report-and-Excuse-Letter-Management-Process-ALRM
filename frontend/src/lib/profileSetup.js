@@ -68,6 +68,29 @@ function hasValue(value) {
   return value !== undefined && value !== null && String(value).trim() !== "";
 }
 
+export function isProfileSetupReady({
+  role,
+  userId,
+  programId,
+  selectedProgramId,
+  studentNumber = "",
+  yearLevel = "",
+  yearOptions = [],
+}) {
+  const normalizedRole = normalizeRole(role);
+  const hasSelectedProgram =
+    hasValue(programId) &&
+    hasValue(selectedProgramId) &&
+    String(programId) === String(selectedProgramId);
+
+  if (!hasSelectedProgram) return false;
+  if (normalizedRole === "student") {
+    return hasValue(studentNumber) && yearOptions.some((year) => year.value === yearLevel);
+  }
+
+  return ["instructor", "program"].includes(normalizedRole) && hasValue(userId);
+}
+
 /**
  * Server data lang ang pinagbabatayan (galing sa /api/auth/me).
  * Student:  program_id + year_level + school_student_id

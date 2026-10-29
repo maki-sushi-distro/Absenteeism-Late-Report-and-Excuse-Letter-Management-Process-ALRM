@@ -21,6 +21,7 @@ import {
   YEAR_LEVELS,
   clearLegacyProfileSetup,
   isProfileSetupComplete,
+  isProfileSetupReady,
   splitVerifiedName,
 } from "@/lib/profileSetup";
 import { normalizeRole } from "@/lib/roles";
@@ -98,6 +99,7 @@ function ProfileSetup() {
   // Ang role ay galing sa server at read-only. Hindi ito ipinapadala.
   const serverRole = normalizeRole(user?.role);
   const isStudent = serverRole === "student";
+  const isStaff = ["instructor", "program"].includes(serverRole);
   const roleLabel = ROLE_LABELS[user?.role] || user?.role || "";
 
   const parsedName = useMemo(() => splitVerifiedName(user?.name), [user?.name]);
@@ -124,6 +126,15 @@ function ProfileSetup() {
   const availableYearOptions = isAssociateComputerTechnology(selectedProgram)
     ? ASSOCIATE_YEAR_LEVELS
     : YEAR_LEVELS;
+  const formReady = isProfileSetupReady({
+    role: serverRole,
+    userId: user?.id,
+    programId: form.programId,
+    selectedProgramId: selectedProgram ? programId(selectedProgram) : "",
+    studentNumber: form.studentNumber,
+    yearLevel: form.yearLevel,
+    yearOptions: availableYearOptions,
+  });
 
   // Isang beses: linisin ang lumang localStorage setup.
   useEffect(() => {
@@ -197,6 +208,7 @@ function ProfileSetup() {
 
     if (!serverRole) nextErrors.role = "Your account has no role. Contact an administrator.";
     if (!selectedProgram) nextErrors.programId = "Select a program from the available list.";
+    if (isStaff && !user?.id) nextErrors.accountId = "Your account ID is unavailable. Contact an administrator.";
     if (isStudent && !form.studentNumber.trim()) {
       nextErrors.studentNumber = "Enter your student ID.";
     }
@@ -313,6 +325,13 @@ function ProfileSetup() {
                 <FieldError message={errors.role} />
               </div>
 
+              {isStaff && (
+                <div className="grid min-w-0 gap-2">
+                  <ReadOnlyIdentityField label="Account ID" value={user?.id} />
+                  <FieldError message={errors.accountId} />
+                </div>
+              )}
+
               <div className="grid min-w-0 gap-2">
                 <Label htmlFor="setup-program">Program</Label>
                 {programsLoading ? <LoadingSkeleton variant="field" label="Loading programs..." /> : <select
@@ -410,7 +429,7 @@ function ProfileSetup() {
             <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
               <Button
                 type="submit"
-                disabled={submitting || programsLoading || Boolean(programsError)}
+                disabled={!formReady || submitting || programsLoading || Boolean(programsError)}
                 className="h-10 rounded-[5px] bg-[#0b4bd3] px-5 font-bold text-white hover:bg-[#083da9]"
               >
                 {submitting && <Spinner className="mr-2" />}

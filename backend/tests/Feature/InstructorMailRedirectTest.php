@@ -56,7 +56,7 @@ class InstructorMailRedirectTest extends TestCase
         config(['mail.default' => 'array']);
         Mail::swap(new MailManager($this->app));
         $user = new User(['name' => 'OTP User', 'email' => 'otp-user@example.com']);
-        $user->notify(new SendOtpCode('123456'));
+        $user->notifyNow(new SendOtpCode('123456'));
 
         $messages = Mail::mailer()->getSymfonyTransport()->messages();
         $this->assertCount(1, $messages);
@@ -91,7 +91,7 @@ class InstructorMailRedirectTest extends TestCase
 
         foreach (['student', 'instructor'] as $role) {
             $user = new User(['name' => 'OTP User', 'role' => $role, 'email' => $role.'@example.com']);
-            $user->notify(new SendOtpCode('123456'));
+            $user->notifyNow(new SendOtpCode('123456'));
         }
         $messages = Mail::mailer()->getSymfonyTransport()->messages();
         $this->assertCount(2, $messages);

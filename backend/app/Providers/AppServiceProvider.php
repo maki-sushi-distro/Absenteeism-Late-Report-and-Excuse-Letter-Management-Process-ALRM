@@ -76,7 +76,9 @@ class AppServiceProvider extends ServiceProvider
 
         Mail::extend('brevo', function () {
             $transport = (new BrevoTransportFactory(client: HttpClient::create([
-                'timeout' => 10, 'max_duration' => 15, 'max_redirects' => 0,
+                'timeout' => config('mail.brevo_timeout', 20),
+                'max_duration' => config('mail.brevo_max_duration', 25),
+                'max_redirects' => 0,
             ])))->create(
                 new Dsn(
                     'brevo+api',

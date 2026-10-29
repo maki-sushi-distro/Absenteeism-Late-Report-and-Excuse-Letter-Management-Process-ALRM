@@ -44,13 +44,13 @@ class OtpController extends Controller
 
         $code = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
 
-        OtpCode::create([
+        $otp = OtpCode::create([
             'user_id' => $user->id,
             'code' => $code,
             'expires_at' => now()->addMinutes(5),
         ]);
 
-        $user->notify(new SendOtpCode($code));
+        $user->notify(new SendOtpCode($code, otpId: $otp->id));
     }
 
     /**
@@ -171,7 +171,7 @@ class OtpController extends Controller
             'expires_at' => now()->addMinutes(5),
         ])->save();
 
-        $user->notify(new SendOtpCode($code));
+        $user->notify(new SendOtpCode($code, otpId: $otp->id));
 
         return response()->json([
             'success' => true,

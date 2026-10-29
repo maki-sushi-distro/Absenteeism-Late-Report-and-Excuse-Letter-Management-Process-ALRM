@@ -16,6 +16,11 @@ return [
 
     'default' => env('MAIL_MAILER', 'log'),
 
+    'otp_queue_connection' => env('OTP_QUEUE_CONNECTION', 'database'),
+
+    'brevo_timeout' => (float) env('BREVO_TIMEOUT', 20),
+    'brevo_max_duration' => (float) env('BREVO_MAX_DURATION', 25),
+
     /*
     |--------------------------------------------------------------------------
     | Mailer Configurations

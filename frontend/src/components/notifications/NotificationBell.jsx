@@ -10,10 +10,10 @@ import NotificationAccountNotice from "./NotificationAccountNotice";
 
 function AccountNotifications({ user }) {
   const [open, setOpen] = useState(false);
-  const notifications = useServerNotifications(user);
-  const count = notifications.activity.filter(item => !item.isRead).length;
+  const notifications = useServerNotifications(user, { preview: true, enabled: open });
+  const count = notifications.unreadCount;
   const close = () => setOpen(false);
-  return <Popover open={open} onOpenChange={value => { setOpen(value); if (value && !notifications.loading) notifications.reload(); }}>
+  return <Popover open={open} onOpenChange={setOpen}>
     <PopoverTrigger aria-label="Notifications" title="Notifications" className="relative rounded-full p-2 text-slate-900 hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-blue-500">
       <Bell aria-hidden="true" className="size-5" strokeWidth={2} />
       {!notifications.loading && !notifications.error && count > 0 && <span className="absolute right-0 top-0 min-w-4 rounded-full bg-[#203b82] px-1 text-center text-[10px] font-bold leading-4 text-white">{count > 99 ? "99+" : count}<span className="sr-only"> unread notifications</span></span>}

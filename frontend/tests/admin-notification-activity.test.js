@@ -24,12 +24,13 @@ test("admin feed loads audit logs and keeps the first successful batch read", as
   mockApiFetch(async url => {
     const path = new URL(String(url), "https://example.test").pathname;
     calls.push(path);
+    if (path === "/api/notifications/unread-count") return Response.json({ success: true, data: { unread_count: 0 } });
     return Response.json({ success: true, data: path === "/api/admin/audit-logs" ? [oldLog] : [] });
   });
 
   const feed = await loadNotificationFeed(user.role, user.id);
 
-  assert.deepEqual(calls.sort(), ["/api/admin/audit-logs", "/api/notifications"]);
+  assert.deepEqual(calls.sort(), ["/api/admin/audit-logs", "/api/notifications", "/api/notifications/unread-count"]);
   assert.deepEqual(feed.auditLogs, [oldLog]);
   assert.deepEqual([...feed.auditReadIds], ["audit-log:audit-old"]);
 });
@@ -65,12 +66,13 @@ test("program-head feed loads its scoped audit endpoint and baselines existing r
   mockApiFetch(async url => {
     const path = new URL(String(url), "https://example.test").pathname;
     calls.push(path);
+    if (path === "/api/notifications/unread-count") return Response.json({ success: true, data: { unread_count: 0 } });
     return Response.json({ success: true, data: path === "/api/program-head/audit-logs" ? [oldLog] : [] });
   });
 
   const feed = await loadNotificationFeed(programUser.role, programUser.id);
 
-  assert.deepEqual(calls.sort(), ["/api/notifications", "/api/program-head/audit-logs"]);
+  assert.deepEqual(calls.sort(), ["/api/notifications", "/api/notifications/unread-count", "/api/program-head/audit-logs"]);
   assert.deepEqual(feed.auditLogs, [oldLog]);
   assert.deepEqual([...feed.auditReadIds], ["audit-log:audit-old"]);
 });

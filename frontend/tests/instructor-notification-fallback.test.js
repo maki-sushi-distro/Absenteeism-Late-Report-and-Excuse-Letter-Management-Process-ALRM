@@ -105,21 +105,24 @@ test("feed loading fetches role-appropriate endpoints and preserves partial resu
   const fetch = mockApiFetch(async (url, options) => {
     calls.push(String(url));
     assert.equal(options.headers.get("Authorization"), null);
+    if (String(url).endsWith("/unread-count")) return Response.json({ success: true, data: { unread_count: 1 } });
     return Response.json({ success: true, data: String(url).endsWith("/notifications") ? [note] : [request] });
   });
   const result = await loadNotificationFeed("instructor");
   assert.deepEqual(result.notifications, [note]);
   assert.deepEqual(result.requests, [request]);
   assert.equal(result.warning, "");
-  assert.deepEqual(calls.sort(), ["/api/instructor/requests", "/api/notifications"]);
+  assert.deepEqual(calls.sort(), ["/api/instructor/requests", "/api/notifications", "/api/notifications/unread-count"]);
   calls.length = 0;
   await loadNotificationFeed("administrator");
-  assert.deepEqual(calls.sort(), ["/api/admin/audit-logs?page=1&per_page=100", "/api/notifications"]);
-  fetch.mock.mockImplementation(async url => String(url).endsWith("/notifications") ? Response.json({ message: "Notifications unavailable" }, { status: 503 }) : Response.json({ success: true, data: [request] }));
+  assert.deepEqual(calls.sort(), ["/api/admin/audit-logs?page=1&per_page=100", "/api/notifications", "/api/notifications/unread-count"]);
+  fetch.mock.mockImplementation(async url => String(url).endsWith("/notifications") ? Response.json({ message: "Notifications unavailable" }, { status: 503 })
+    : String(url).endsWith("/unread-count") ? Response.json({ success: true, data: { unread_count: 0 } }) : Response.json({ success: true, data: [request] }));
   const partial = await loadNotificationFeed("instructor");
   assert.deepEqual(partial.requests, [request]);
   assert.match(partial.warning, /notifications/i);
-  fetch.mock.mockImplementation(async url => String(url).endsWith("/notifications") ? Response.json({ success: true, data: [note] }) : Response.json({ success: true, data: {} }));
+  fetch.mock.mockImplementation(async url => String(url).endsWith("/notifications") ? Response.json({ success: true, data: [note] })
+    : String(url).endsWith("/unread-count") ? Response.json({ success: true, data: { unread_count: 1 } }) : Response.json({ success: true, data: {} }));
   const malformed = await loadNotificationFeed("instructor");
   assert.deepEqual(malformed.notifications, [note]);
   assert.match(malformed.warning, /request/i);

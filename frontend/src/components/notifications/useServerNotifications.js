@@ -4,14 +4,18 @@ import useNotificationPreferences from "@/hooks/useNotificationPreferences";
 import useNotificationReadState from "@/pages/auth/student/notifications/useNotificationReadState";
 import { normalizeRole } from "@/lib/roles";
 import { mergeAdminAuditActivity, mergeProgramAuditActivity, mergeRequestActivity, notificationActivity } from "./notificationData";
-import { loadNotificationFeed, markFeedRead } from "./notificationFeed";
+import { getCachedNotificationPreview, loadNotificationFeed, loadNotificationPreview, markFeedRead } from "./notificationFeed";
 
 const changedEvent = "alrm:notifications-updated";
 
-export default function useServerNotifications(user) {
+export function notificationResourceOptions(preview, enabled, initialData) {
+  return { enabled: preview ? enabled : true, initialData };
+}
+
+export default function useServerNotifications(user, { preview = false, enabled = true } = {}) {
   const { id, role } = user;
-  const load = useCallback(() => loadNotificationFeed(role, id), [id, role]);
-  const resource = useApiResource(load, id);
+  const load = useCallback(() => preview ? loadNotificationPreview(id) : loadNotificationFeed(role, id), [id, preview, role]);
+  const resource = useApiResource(load, id, notificationResourceOptions(preview, enabled, getCachedNotificationPreview(id)));
   const { preferences } = useNotificationPreferences(user.id, user.role);
   const normalizedRole = normalizeRole(role);
   const localReadKey = normalizedRole === "admin" ? `admin-activity:${id}` : normalizedRole === "program" ? `program-activity:${id}` : `instructor:${id}`;
@@ -27,7 +31,7 @@ export default function useServerNotifications(user) {
   }, [resource.reload]);
 
   async function saveRead(items, all = false) {
-    if (busy.current || !items.length) return;
+    if (busy.current || (!all && !items.length)) return;
     busy.current = true;
     setWorking(true);
     setReadError("");
@@ -45,15 +49,17 @@ export default function useServerNotifications(user) {
 
   const serverActivity = notificationActivity(resource.data?.notifications || [], role, preferences, id);
   const fallbackReadIds = new Set([...localReadIds, ...(resource.data?.auditReadIds || [])]);
-  const activity = normalizedRole === "admin"
+  const activity = preview ? serverActivity : normalizedRole === "admin"
     ? mergeAdminAuditActivity(serverActivity, preferences.requestUpdates ? resource.data?.auditLogs || [] : [], user, fallbackReadIds)
     : normalizedRole === "program"
       ? mergeProgramAuditActivity(serverActivity, preferences.requestUpdates ? resource.data?.auditLogs || [] : [], user, fallbackReadIds)
     : mergeRequestActivity(serverActivity, preferences.requestUpdates ? resource.data?.requests || [] : [], user, localReadIds);
   const readIds = new Set(activity.filter(item => item.isRead).map(item => item.id));
+  const activityUnreadCount = activity.filter(item => !item.isRead).length;
+  const unreadCount = resource.data?.unreadCount ?? activityUnreadCount;
   const readStatusTitle = activity.some(item => item.source) ? "Notification reads are saved to your account; activity log reads are saved on this browser." : "Saved to your account";
-  return { activity, readIds, loading: resource.loading, error: resource.error, warning: resource.data?.warning, reload: resource.reload, readError, working, readStatusTitle,
-    canMarkAll: !working && !resource.loading && !resource.error && activity.some(item => !item.isRead),
+  return { activity, readIds, unreadCount, loading: resource.loading, error: resource.error, warning: resource.data?.warning, reload: resource.reload, readError: readError || resource.data?.readError || "", working, readStatusTitle,
+    canMarkAll: !working && !resource.loading && !resource.error && (unreadCount > 0 || activityUnreadCount > 0),
     markRead: ids => saveRead(activity.filter(item => ids.includes(item.id) && !item.isRead)),
     markAllRead: () => saveRead(activity.filter(item => !item.isRead), true),
   };

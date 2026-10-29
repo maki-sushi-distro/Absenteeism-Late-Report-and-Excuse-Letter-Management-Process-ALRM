@@ -49,6 +49,99 @@ test("notification errors and unconfirmed read operations never become fake succ
   await assert.rejects(api.markAllNotificationsRead(), /Could not save/);
 });
 
+test("notification preview and unread-count adapters validate their server responses", async () => {
+  const api = await load("api/notifications.js");
+  const calls = [];
+  const fetch = mockApiFetch(async (url) => {
+    calls.push(String(url));
+    if (String(url).endsWith("/preview")) return Response.json({ success: true, data: { notifications: [{ id: "one" }], unread_count: 4 } });
+    return Response.json({ success: true, data: { unread_count: 4 } });
+  });
+  assert.deepEqual(await api.getNotificationPreview(), { notifications: [{ id: "one" }], unreadCount: 4 });
+  assert.equal(await api.getNotificationUnreadCount(), 4);
+  assert.deepEqual(calls, ["/api/notifications/preview", "/api/notifications/unread-count"]);
+
+  fetch.mock.mockImplementation(async (url) => Response.json({ success: true, data: String(url).endsWith("/preview") ? { notifications: [], unread_count: -1 } : { unread_count: 1.5 } }));
+  await assert.rejects(api.getNotificationPreview(), /unexpected/i);
+  await assert.rejects(api.getNotificationUnreadCount(), /unexpected/i);
+});
+
+test("preview loading caches per account and marks only returned unread notifications", async () => {
+  const feed = await load("components/notifications/notificationFeed.js");
+  const calls = [];
+  mockApiFetch(async (url, options) => {
+    const path = String(url);
+    calls.push([path, options.method || "GET"]);
+    if (path.endsWith("/preview")) return Response.json({ success: true, data: { notifications: [
+      { id: "unread", is_read: false },
+      { id: "read", is_read: true },
+    ], unread_count: 3 } });
+    return Response.json({ success: true, data: { id: "unread", is_read: true } });
+  });
+
+  const result = await feed.loadNotificationPreview("account-one");
+  assert.deepEqual(calls, [["/api/notifications/preview", "GET"], ["/api/notifications/unread/read", "PATCH"]]);
+  assert.equal(result.notifications.find(item => item.id === "unread").is_read, true);
+  assert.equal(result.unreadCount, 2);
+  assert.deepEqual(feed.getCachedNotificationPreview("account-one"), result);
+  assert.equal(feed.getCachedNotificationPreview("account-two"), null);
+});
+
+test("preview read failure keeps loaded records visible with a read error", async () => {
+  const feed = await load("components/notifications/notificationFeed.js");
+  mockApiFetch(async (url) => String(url).endsWith("/preview")
+    ? Response.json({ success: true, data: { notifications: [{ id: "cannot-read", is_read: false }], unread_count: 1 } })
+    : Response.json({ success: false, message: "Read unavailable" }, { status: 503 }));
+
+  const result = await feed.loadNotificationPreview("read-failure-account");
+  assert.deepEqual(result.notifications.map(item => item.id), ["cannot-read"]);
+  assert.equal(result.unreadCount, 1);
+  assert.match(result.readError, /Read unavailable/);
+  assert.deepEqual(feed.getCachedNotificationPreview("read-failure-account"), result);
+});
+
+test("full notification loading includes the authoritative unread count", async () => {
+  const feed = await load("components/notifications/notificationFeed.js");
+  const calls = [];
+  mockApiFetch(async (url) => {
+    const path = String(url);
+    calls.push(path);
+    if (path.endsWith("/unread-count")) return Response.json({ success: true, data: { unread_count: 6 } });
+    return Response.json({ success: true, data: [{ id: "full" }] });
+  });
+
+  const result = await feed.loadNotificationFeed("student", "full-account");
+  assert.deepEqual(new Set(calls), new Set(["/api/notifications", "/api/notifications/unread-count"]));
+  assert.equal(result.unreadCount, 6);
+  assert.deepEqual(result.notifications, [{ id: "full" }]);
+});
+
+test("an unread-count failure does not discard a successfully loaded full feed", async () => {
+  const feed = await load("components/notifications/notificationFeed.js");
+  mockApiFetch(async (url) => String(url).endsWith("/unread-count")
+    ? Response.json({ success: false, message: "Count unavailable" }, { status: 503 })
+    : Response.json({ success: true, data: [{ id: "unread", is_read: false }, { id: "read", is_read: true }] }));
+
+  const result = await feed.loadNotificationFeed("student", "count-failure-account");
+  assert.deepEqual(result.notifications.map(item => item.id), ["unread", "read"]);
+  assert.equal(result.unreadCount, 1);
+  assert.match(result.warning, /count/i);
+});
+
+test("API resources can stay idle and retain cached data until enabled", async () => {
+  const { initialApiResourceState } = await load("hooks/useApiResource.js");
+  const cached = { notifications: [{ id: "cached" }] };
+  assert.deepEqual(initialApiResourceState(false, cached), { data: cached, error: "", loading: false });
+  assert.deepEqual(initialApiResourceState(true, cached), { data: cached, error: "", loading: true });
+});
+
+test("notification resource options keep preview lazy and full-page cached data active", async () => {
+  const { notificationResourceOptions } = await server.ssrLoadModule("/src/components/notifications/useServerNotifications.js");
+  const cached = { notifications: [{ id: "cached" }], unreadCount: 1 };
+  assert.deepEqual(notificationResourceOptions(true, false, cached), { enabled: false, initialData: cached });
+  assert.deepEqual(notificationResourceOptions(false, false, cached), { enabled: true, initialData: cached });
+});
+
 test("email preference writes use the authenticated profile endpoint and require a confirmed boolean", async () => {
   const api = await load("api/notifications.js");
   const calls = [];

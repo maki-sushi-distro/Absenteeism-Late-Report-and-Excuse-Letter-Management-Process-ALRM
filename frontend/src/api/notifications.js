@@ -15,6 +15,22 @@ export async function getNotifications() {
   return data;
 }
 
+export async function getNotificationPreview() {
+  const data = await request("/api/notifications/preview");
+  if (!Array.isArray(data?.notifications) || !Number.isSafeInteger(data?.unread_count) || data.unread_count < 0) {
+    throw new Error("The server returned an unexpected notification preview response.");
+  }
+  return { notifications: data.notifications, unreadCount: data.unread_count };
+}
+
+export async function getNotificationUnreadCount() {
+  const data = await request("/api/notifications/unread-count");
+  if (!Number.isSafeInteger(data?.unread_count) || data.unread_count < 0) {
+    throw new Error("The server returned an unexpected notification unread-count response.");
+  }
+  return data.unread_count;
+}
+
 export async function markNotificationRead(id) {
   const data = await request(`/api/notifications/${encodeURIComponent(id)}/read`, { method: "PATCH" });
   if (data?.id !== id || data.is_read !== true) throw new Error("The server did not confirm this notification was read.");

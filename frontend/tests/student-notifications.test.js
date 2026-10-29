@@ -58,11 +58,17 @@ test("notification entries link to the specific request, not a generic dashboard
   assert.match(html, /<time/);
 });
 
-test("notification panel shows loading, retryable errors, and empty results without stale entries", async () => {
+test("notification panel keeps cached entries visible during refresh", async () => {
   const activity = [{ id: "event", requestId: "r", message: "Old update", date: "2026-10-19" }];
   const loading = await renderPanel({ loading: true, activity });
-  assert.match(loading, /role="status"/);
-  assert.doesNotMatch(loading, /Old update/);
+  assert.doesNotMatch(loading, /role="status"/);
+  assert.match(loading, /Old update/);
+});
+
+test("notification panel shows initial loading, retryable errors, and empty results", async () => {
+  const activity = [{ id: "event", requestId: "r", message: "Old update", date: "2026-10-19" }];
+  const initial = await renderPanel({ loading: true, activity: [] });
+  assert.match(initial, /role="status"/);
   const failed = await renderPanel({ error: "Cannot load requests", activity });
   assert.match(failed, /role="alert"/);
   assert.match(failed, /Try again/);

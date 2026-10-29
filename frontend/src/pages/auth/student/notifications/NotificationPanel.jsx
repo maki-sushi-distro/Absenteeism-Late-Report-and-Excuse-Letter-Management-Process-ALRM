@@ -13,7 +13,7 @@ export default function NotificationPanel({ activity = [], loading, error, warni
       </button>
     </div>
     {!loading && !error && warning && <p role="alert" className="rounded-md border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-900">{warning}</p>}
-    {loading ? <LoadingSkeleton variant="list" rows={showFooter ? 3 : 6} label="Loading notifications..." />
+    {loading && !activity.length ? <LoadingSkeleton variant="list" rows={showFooter ? 3 : 6} label="Loading notifications..." />
       : error ? <div role="alert" className="rounded-md bg-red-50 p-3 text-sm text-red-700 dark:bg-red-950 dark:text-red-200">
         <p>{error}</p><button type="button" onClick={onRefresh} className="mt-2 font-semibold underline">Try again</button>
       </div>

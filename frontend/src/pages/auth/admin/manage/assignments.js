@@ -25,14 +25,15 @@ export function classLabel(row) {
 }
 
 export function assignmentSelection(source = null) {
+  const assigned = Boolean(activeTeachingAssignment(source));
   return {
-    operation: source && activeTeachingAssignment(source) ? "change_instructor" : "assign",
+    operation: source && assigned ? "change_instructor" : "assign",
     sourceClassId: source?.id || "",
     instructorId: "",
     programId: "",
     yearLevel: "",
     semester: "",
-    targetClassId: "",
+    targetClassId: source && !assigned ? String(source.id) : "",
     reason: "",
   };
 }
@@ -43,12 +44,8 @@ export function changeAssignmentSelection(selection, field, value) {
   if (field === "programId") {
     next.yearLevel = "";
     next.semester = "";
-    next.targetClassId = "";
   } else if (field === "yearLevel") {
     next.semester = "";
-    next.targetClassId = "";
-  } else if (field === "semester") {
-    next.targetClassId = "";
   }
   return next;
 }

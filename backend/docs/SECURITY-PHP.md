@@ -1,4 +1,44 @@
-# PHP security deployment: CERT-EU 2026-018
+# PHP and application security
+
+Source paths and commands in this guide are relative to `backend/`.
+For request payloads and endpoint behavior, see [API-DOCS.md](API-DOCS.md).
+
+## User and curriculum access controls
+
+- Administrator routes retain `auth:sanctum`, `active`, and
+  `role:administrator` middleware. Pending/deactivated accounts cannot use them.
+- `StoreUserRequest` checks the registered `UserPolicy::create` before creating
+  a roster entry. User listing, deletion, and role/status changes also enforce
+  the corresponding policy abilities. Email is normalized before uniqueness
+  validation; school IDs are unique across roles. Server-side role rules decide
+  program storage, and occupied Program Head assignments cannot be replaced by
+  creating another roster entry.
+- User creation, role-aware program assignment, and audit writes share a database
+  transaction. Google sign-in retains profile assignments and uses Google's name;
+  OTP requirements remain in effect.
+- Student profile completion permits only missing fields to be filled. Existing
+  program, school ID, and year values cannot be replaced or cleared through it.
+- `CurriculumPolicy` protects listing, reading, and creating curriculum revisions.
+  It is explicitly registered in `AppServiceProvider`. There is no API for editing
+  or deleting existing revisions. New source content creates a separate revision;
+  existing classes keep their selected curriculum subject IDs.
+- `SaveClassRequest` applies `ClassModelPolicy::create` or `update`. It validates
+  meeting times, rejects overlapping slots within a class, and checks that a
+  linked curriculum subject matches the class's program/year/semester. Structured
+  schedules determine contact hours; academic credit units do not.
+- Newly counted absences snapshot the missed scheduled hours. Subsequent schedule
+  edits do not rewrite recorded absence hours. Legacy count-based trackers remain
+  compatible. Weekly schedules do not model holidays or individual cancellations.
+- `AcademicCatalogSeeder` reads only the checked-in `academic_catalog.json` and
+  uses transactions and content revisions for repeatable imports. The imported
+  catalog excludes student names, IDs, enrollment statuses, and roster rows.
+  Seeding creates no user accounts, classes, or enrollments.
+
+Coverage includes `AdminUserCreationTest`, `CurriculumScheduleTest`,
+`SchoolIdNumberTest`, `AttendanceThresholdPolicyTest`, and
+`AuthControllerOAuthTest`. These use an isolated in-memory database.
+
+## PHP security deployment: CERT-EU 2026-018
 
 The PHP engine fixes CVE-2026-109618 and CVE-2026-109619. Laravel validation,
 authentication, Composer package updates, and request limits cannot replace

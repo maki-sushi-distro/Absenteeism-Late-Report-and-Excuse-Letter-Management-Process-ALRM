@@ -5,6 +5,7 @@ namespace App\Providers;
 use App\Mail\Transport\BrevoDiagnosticTransport;
 use App\Models\AttendanceTracker;
 use App\Models\ClassModel;
+use App\Models\Curriculum;
 use App\Models\ExcuseRequest;
 use App\Models\FollowupFlag;
 use App\Models\Program;
@@ -12,6 +13,7 @@ use App\Models\User;
 use App\Models\UserNotification;
 use App\Policies\AttendanceTrackerPolicy;
 use App\Policies\ClassModelPolicy;
+use App\Policies\CurriculumPolicy;
 use App\Policies\ExcuseRequestPolicy;
 use App\Policies\FollowupFlagPolicy;
 use App\Policies\ProgramPolicy;
@@ -44,8 +46,6 @@ class AppServiceProvider extends ServiceProvider
             throw new \LogicException('Production requires a delivery mailer; configure MAIL_MAILER.');
         }
 
-        // Guard evaluates this BEFORE it refreshes last_used_at. Persisted
-        // activity survives cache expiry, redeploys, and multiple replicas.
         Sanctum::authenticateAccessTokensUsing(function (PersonalAccessToken $token, bool $valid): bool {
             $lastActivity = $token->last_used_at ?? $token->created_at;
 
@@ -75,6 +75,7 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(ExcuseRequest::class, ExcuseRequestPolicy::class);
         Gate::policy(Program::class, ProgramPolicy::class);
         Gate::policy(ClassModel::class, ClassModelPolicy::class);
+        Gate::policy(Curriculum::class, CurriculumPolicy::class);
         Gate::policy(FollowupFlag::class, FollowupFlagPolicy::class);
         Gate::policy(AttendanceTracker::class, AttendanceTrackerPolicy::class);
         Gate::policy(User::class, UserPolicy::class);

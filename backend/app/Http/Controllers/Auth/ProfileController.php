@@ -63,7 +63,7 @@ class ProfileController extends Controller
         $user = $request->user();
         $isStudent = $user->role === 'student';
 
-        if ($isStudent && $user->program_id !== null && $user->school_id_number !== null) {
+        if ($isStudent && $user->program_id !== null && $user->school_id_number !== null && $user->year_level !== null) {
             return response()->json([
                 'success' => false,
                 'message' => 'Your profile is already complete. Please contact an administrator to change your program or year level.',
@@ -71,19 +71,30 @@ class ProfileController extends Controller
             ], 409);
         }
 
+        // Pre-registration may supply any subset. Keep assigned values immutable
+        // while allowing the student to submit only the fields still missing.
+        if ($isStudent) {
+            $request->mergeIfMissing($user->only(['program_id', 'school_id_number', 'year_level']));
+        }
+
         $validated = $request->validate([
-            'program_id' => ['required', 'string', 'uuid', 'exists:programs,id'],
+            'program_id' => [
+                'required', 'string', 'uuid', 'exists:programs,id',
+                Rule::when($isStudent && $user->program_id !== null, [Rule::in([$user->program_id])]),
+            ],
             'school_id_number' => [
                 Rule::requiredIf($isStudent),
                 'nullable',
                 'string',
                 'max:50',
                 Rule::unique('users', 'school_id_number')->ignore($user->id),
+                Rule::when($isStudent && $user->school_id_number !== null, ['required', Rule::in([$user->school_id_number])]),
             ],
             'year_level' => [
                 Rule::requiredIf($isStudent),
                 'nullable',
                 Rule::in(['1st', '2nd', '3rd', '4th']),
+                Rule::when($isStudent && $user->year_level !== null, ['required', Rule::in([$user->year_level])]),
             ],
             'role' => ['prohibited'],
             'status' => ['prohibited'],

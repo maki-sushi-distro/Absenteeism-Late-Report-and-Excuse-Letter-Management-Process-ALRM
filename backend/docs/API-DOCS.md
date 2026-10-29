@@ -1,8 +1,8 @@
 # ALRM API Documentation
 
-Source branch: `backend` · Source commit: `8bff496` · Reviewed: 29 October 2026
+Reviewed: 29 October 2026. Includes the current user pre-registration, versioned curriculum catalog, and schedule-based attendance changes.
 
-This guide describes the REST API implemented in `routes/api.php`, its controllers, middleware, policies, resources, and models at the commit above. Examples use illustrative data and are not captured production responses. No deployment or live Google/email integration was tested to prepare this document.
+This guide describes the REST API implemented in `routes/api.php`, its controllers, middleware, policies, resources, and models. Paths to source files and commands are relative to `backend/`. Examples use illustrative data and are not captured production responses. The catalog migrations and seed were applied and read back from the configured database; live Google/email integration was not tested as part of those changes.
 
 The [ALRM Backend Security Change Report](https://docs.google.com/document/d/1Ay8og3rio5Nl5p-FWs-ibPO4RgfGC8zf/edit) provides background. Current code takes precedence where that older report differs, including external-account approval, audit-log routes, exports, and attendance policy.
 
@@ -16,6 +16,7 @@ The [ALRM Backend Security Change Report](https://docs.google.com/document/d/1Ay
 - [Instructor decisions and follow-ups](#instructor-decisions-and-follow-ups)
 - [Dashboards and program monitoring](#dashboards-and-program-monitoring)
 - [Administrator management](#administrator-management)
+- [Curriculum catalog and class schedules](#curriculum-catalog-and-class-schedules)
 - [Reports and downloads](#reports-and-downloads)
 - [Audit logs](#audit-logs)
 - [Response fields](#response-fields)
@@ -185,12 +186,15 @@ Role access is not hierarchical: administrators do not automatically pass instru
 | POST | `/admin/programs` | Create program; `201` |
 | GET | `/admin/programs/{program}` | Program details and relations |
 | PUT/PATCH | `/admin/programs/{program}` | Update program |
-| DELETE | `/admin/programs/{program}` | Delete program with no classes/users |
+| DELETE | `/admin/programs/{program}` | Delete program with no classes/users/curriculum history |
 | GET | `/admin/classes` | Class list; **Paged** |
 | POST | `/admin/classes` | Create class and enroll matching students; `201` |
 | GET | `/admin/classes/{class}` | Class, instructor, program, and enrolled students |
 | PUT/PATCH | `/admin/classes/{class}` | Update class and enroll matching students |
 | DELETE | `/admin/classes/{class}` | Delete class with no enrollments |
+| GET | `/admin/curricula` | List curriculum revisions; optional program/version filters; **Paged** |
+| POST | `/admin/curricula` | Add a curriculum revision; `201`, or `200` for an identical existing payload |
+| GET | `/admin/curricula/{curriculum}` | Curriculum subjects, offerings, program, and sources |
 | GET | `/admin/reports/export` | Download college-wide XLSX |
 | GET | `/admin/reports/preview` | Preview export row count and date window |
 
@@ -204,12 +208,12 @@ Role access is not hierarchical: administrators do not automatically pass instru
 
 | Field | Rules |
 |---|---|
-| `program_id` | Required existing program UUID for every role |
-| `school_id_number` | Required for students; otherwise nullable; string ≤50; unique except current user |
-| `year_level` | Required for students; otherwise nullable; `1st`, `2nd`, `3rd`, `4th` |
+| `program_id` | Existing program UUID; students may omit an already assigned value; staff must supply it |
+| `school_id_number` | Required student profile value; may be omitted when already assigned. Otherwise nullable; string ≤50; unique except current user |
+| `year_level` | Required student profile value; may be omitted when already assigned. Otherwise nullable; `1st`, `2nd`, `3rd`, `4th` |
 | `role`, `status` | Prohibited |
 
-Students receive profile fields and automatic enrollment into matching program/year classes for the current semester and school year. A student with both `program_id` and `school_id_number` already set receives `409` on resubmission. Staff save `school_id_number` when supplied and link the supplied program through the many-to-many relation without detaching existing programs. Omitting the staff ID preserves its existing value. Success returns a user resource.
+Students receive profile fields and automatic enrollment into matching program/year classes for the current semester and school year. A student receives `409` only when program, school ID, and year are all already set. Missing fields can be completed without resubmitting assigned values; assigned student values cannot be changed or cleared. Staff save `school_id_number` when supplied and link the supplied program through the many-to-many relation without detaching existing programs. Omitting the staff ID preserves its existing value. Success returns a user resource.
 
 `school_id_number` is the shared institutional ID for students, instructors, program heads, and administrators. Keep it as a string to preserve leading zeros and hyphens; it is unique across all users. The internal UUID `id` remains the relationship key. Staff IDs remain optional while staff onboarding is being built; student IDs remain required.
 
@@ -228,7 +232,7 @@ Use `data.school_id_number` in the completion response and `/me` response. `year
 
 ### Email preference
 
-`PATCH /me/notification-preferences` requires `email_notifications_enabled` as a boolean. Response: `{"success":true,"data":{"email_notifications_enabled":false}}`. This controls optional email notifications; consult [MAILING.md](MAILING.md) for delivery behavior. It does not disable in-app notifications or authentication OTP.
+`PATCH /me/notification-preferences` requires `email_notifications_enabled` as a boolean. Response: `{"success":true,"data":{"email_notifications_enabled":false}}`. This controls optional email notifications; consult [Mail delivery and operations](#mail-delivery-and-operations) for delivery behavior. It does not disable in-app notifications or authentication OTP.
 
 ### Notification operations
 
@@ -344,35 +348,39 @@ Program-head students, instructors, requests, dashboard, and report export requi
 | Operation | Inputs and behavior |
 |---|---|
 | List | Optional `role=student|instructor|program_head|administrator`, `status=pending|approved|deactivated|inactive`, plus pagination. `inactive` maps to `deactivated`. Users with null roles are excluded; results ordered by name |
-| Pre-register | Required `name` string ≤255; unique email ≤255; `role` from the list above. Only institutional addresses accepted: student domain requires student role; staff domain requires a staff role. Creates pending roster entry; no password input |
+| Pre-register | Required `name` string ≤255, or first/last names plus optional middle name combined into `name`; unique email ≤255, trimmed and lowercased; `role` from the list above. Optional existing program UUID and unique `school_id_number` string ≤50. Student domain requires student role; staff domain requires a staff role. Creates pending roster entry; no password input. Year is collected through profile completion |
 | Change role | Required `role=instructor|program_head|administrator`. Existing student may only be promoted to `program_head`; null-role targets are rejected. Pending external accounts may instead receive any of the four roles, including student. Cannot change own role; unchanged role gives `409`. This operation does not approve pending users |
 | Change status | Required `status=approved|deactivated|inactive`; inactive is stored as deactivated. Cannot change own status. Pending user without a Google identity cannot be changed here (`409`); pending self-registered user may only be approved. Repeating current status gives `409` |
 | Delete | Only pending or deactivated account; active account gives `409`. Returns `data: null` |
 
-Status deactivation deletes bearer tokens and trusted-device records. A program-head role by itself does not assign a program; configure `program_head_id` on the program separately.
+Status deactivation deletes bearer tokens and trusted-device records. During pre-registration, a supplied program is stored directly for students, linked through `program_user` for instructors, and assigned through `programs.program_head_id` for Program Heads. An occupied head assignment is rejected. Administrators cannot receive a program through pre-registration. A role change alone does not create an explicit head assignment. User creation, program assignment, and audit logging run in one transaction. Lists and creation responses include both direct `program` and teaching-membership `programs` relationships. The first institutional Google sign-in uses Google's name while retaining assigned role, school ID, and program relationships.
 
 ### Programs
 
 Create requires unique `program_name` string ≤255. Optional nullable `program_head_id` must be an existing UUID for a user with primary role `instructor` or `program_head`. Update accepts either field optionally (`sometimes`). `null` can clear the head assignment. Lists load `programHead` plus class/user counts; details load `programHead`, `classes`, and `users`.
 
-Delete returns `409` when classes or users remain; success returns `data: null`.
+Delete returns `409` when classes, users, or curriculum history remain; success returns `data: null`.
 
 ### Classes
 
-All fields below are required on create and optional on PUT/PATCH update:
+Required on create: subject name, section, program, year level, semester, and school year. These are optional on PUT/PATCH update. Other fields follow the rules below:
 
 | Field | Validation |
 |---|---|
 | `subject_name` | String ≤255 |
 | `section` | String ≤50 |
-| `instructor_id` | Existing user UUID with primary role `instructor` |
-| `schedule` | String ≤4096 |
+| `instructor_id` | Optional nullable user UUID with primary role `instructor` |
+| `schedule` | Optional structured meeting array; legacy string ≤4096 accepted. Omitted times require confirmed hours/count on creation |
 | `program_id` | Existing program UUID |
 | `year_level` | `1st`, `2nd`, `3rd`, `4th` |
 | `semester` | `1st`, `2nd` |
 | `school_year` | String matching `YYYY-YYYY` |
+| `curriculum_subject_id` | Optional nullable existing subject UUID matching class program, year, and semester |
+| `credit_units` | Optional nullable numeric 0–100; copied from the selected curriculum subject when linked |
+| `weekly_hours` | Positive numeric ≤168, including fractions; derived when structured meeting times are supplied |
+| `meetings_per_week` | Integer 1–42; derived when structured meeting times are supplied |
 
-Create/update auto-enroll matching students only when the class belongs to the current semester and school year. It creates missing enrollments; it does not detach existing ones. Lists load instructor/program and enrollment count. Delete with any enrollments returns `409`; success returns `data: null`.
+Create/update auto-enroll matching students only when the class belongs to the current semester and school year. It creates missing enrollments; it does not detach existing ones. Writes and audit logging run transactionally; class updates also recompute existing tracker statuses. Lists load instructor/program and enrollment count. Delete with any enrollments returns `409`; success returns `data: null`. See [Curriculum catalog and class schedules](#curriculum-catalog-and-class-schedules) for payload examples and attendance-hour behavior.
 
 ## Reports and downloads
 
@@ -387,7 +395,7 @@ All exports are capped at 5,000 rows and throttled to 3/minute per user. A succe
 
 Head/admin date windows permit at most 730 days and include the end date. With no dates, they default to the preceding 365 days through today. With only `date_to`, start defaults to 365 days before it; with only `date_from`, end defaults to today. Instructor export has no 730-day date constraint. Narrow filters when exports exceed the row cap (`422`).
 
-Head activity CSV columns: `Student`, `Class`, `Submitted`, `Type`. Risk CSV columns: `Student`, `Class`, `Flagged date`, `Threshold`, `Percentage`. Threshold and percentage come from the current enrollment attendance tracker using the backend semester-hours calculation, not a historical snapshot. Missing trackers produce blank values; zero semester hours produce a blank percentage. Risk export is restricted to headed programs even for flags escalated to the user from elsewhere. See [PROGRAM-HEAD-EXPORT.md](PROGRAM-HEAD-EXPORT.md) for API fields and Resolve integration.
+Head activity CSV columns: `Student`, `Class`, `Submitted`, `Type`. Risk CSV columns: `Student`, `Class`, `Flagged date`, `Threshold`, `Percentage`. Threshold and percentage come from the current enrollment attendance tracker using the backend semester-hours calculation, not a historical snapshot. Missing trackers produce blank values; zero semester hours produce a blank percentage. Risk export is restricted to headed programs even for flags escalated to the user from elsewhere. Resolve uses `PATCH /program-head/followup-flags/{id}/resolve`; see the endpoint inventory and response fields above.
 
 Admin preview returns `data.row_count`, `exceeds_limit`, `max_export_rows`, `date_from`, `date_to`, and `used_default_range`. Preview can report a count above 5,000; export rejects that count. Preview is useful before requesting a download but is not a server-enforced prerequisite.
 
@@ -408,7 +416,7 @@ Supported actions: `submitted_request`, `updated_request`, `cancelled_request`, 
 
 Primary-role administrators see eligible activity college-wide. Primary-role program heads see activity in their headed programs and need at least one assignment. Instructor primary-role accounts are rejected by this controller even when program-head middleware permits entry.
 
-Items contain `id`, `action`, human-readable `description`, ISO-8601 `timestamp`, `actor: {id,name,role}`, `table_affected`, `record_id`, and a related `request` summary with `id`, `type`, `current_status`, `student: {id,name}`, and `class: {id,subject_name,program_id,instructor_id}`. `current_status` is the request's present state, not a historical snapshot at the event time. Results sort newest timestamp, then descending ID. See [AUDIT-LOG.md](AUDIT-LOG.md).
+Items contain `id`, `action`, human-readable `description`, ISO-8601 `timestamp`, `actor: {id,name,role}`, `table_affected`, `record_id`, and a related `request` summary with `id`, `type`, `current_status`, `student: {id,name}`, and `class: {id,subject_name,program_id,instructor_id}`. `current_status` is the request's present state, not a historical snapshot at the event time. Results sort newest timestamp, then descending ID.
 
 ## Response fields
 
@@ -574,6 +582,194 @@ setTimeout(() => URL.revokeObjectURL(url), 1000);
 | User response privacy | `app/Http/Resources/UserResource.php`, `app/Models/User.php` |
 | Attendance formulas | `app/Models/AttendanceTracker.php`, `app/Models/ClassModel.php` |
 
-Existing focused guides: [BACKEND.md](BACKEND.md), [AUDIT-LOG.md](AUDIT-LOG.md), [INSTRUCTOR-EXPORT.md](INSTRUCTOR-EXPORT.md), [PROGRAM-HEAD-ACCESS.md](PROGRAM-HEAD-ACCESS.md), [PROGRAM-HEAD-EXPORT.md](PROGRAM-HEAD-EXPORT.md), [MAILING.md](MAILING.md).
+Related guides: [Backend implementation guide](../BACKEND.md) and [PHP and application security](SECURITY-PHP.md). API and operational details are consolidated in this document.
 
 When routes, validation, response resources, or policies change, update this guide with them. Controllers not registered in `routes/api.php` are not public endpoints. Draft save/submit endpoints mentioned in TODO comments are not implemented routes. On a compatible configured PHP runtime, `php artisan route:list --path=api` can be used to compare the runtime route list with this inventory; it is not an integration test.
+
+## Curriculum catalog and class schedules
+
+### Seed the supplied sources
+
+The checked-in academic catalog is portable and needs no Google account, network
+download, Excel installation, or source-folder access at seed time.
+
+```sh
+php artisan migrate --path=database/migrations/2026_10_29_100000_create_curriculum_catalog.php
+php artisan migrate --path=database/migrations/2026_10_29_100001_add_absence_hours_to_attendance_tracker.php
+php artisan db:seed --class=AcademicCatalogSeeder
+```
+
+This seeds six programs, ten curriculum versions, 603 curriculum subject entries,
+and 184 master-list subject offerings. Repeating the seed retains the same IDs
+and counts. It creates no user accounts, student names, personal IDs, classes,
+or enrollments. `DatabaseSeeder` also calls it after `ProgramSeeder`, but still
+has its existing network-dependent instructor/class seeders; use the dedicated
+command above to import only this catalog.
+
+The seeder reads `database/seeders/data/academic_catalog.json` directly. The Python
+builder and redundant transcription file are not needed and have been removed.
+To publish an updated curriculum, submit a complete new revision through the
+administrator curriculum API. To update the portable baseline seed, edit the
+reviewed catalog JSON and update its source notes/fingerprints, then run
+`AcademicCatalogSeeder` again. Existing revisions and class assignments remain.
+The master-list import used only academic headers, excluding student rows and
+student-name/status columns.
+
+### Curriculum changes
+
+`curricula` identifies program + curriculum year/version + content revision.
+`curriculum_subjects` stores year, semester, code, title, and academic units.
+`program_offerings` independently preserves the master list's academic-year
+offerings. Differences between the two sources do not silently overwrite either.
+
+A changed snapshot creates a new revision. Existing classes retain their
+`curriculum_subject_id`, copied academic units, schedule, and contact hours.
+Seeding never automatically chooses a latest version, reassigns a student,
+rewrites a class, or changes attendance history. There is no edit/delete API for
+existing revisions: corrections are submitted as a complete new revision.
+
+Administrator-only endpoints use the existing auth/active/role middleware and
+the registered `CurriculumPolicy`:
+
+- `GET /api/admin/curricula?program_id=UUID&version=2025-2026`: list revisions.
+- `GET /api/admin/curricula/{id}`: subjects, offerings, and provenance.
+- `POST /api/admin/curricula`: add a complete revision. Identical repeated payloads
+  return the existing revision. Duplicate codes within one year/semester are rejected.
+
+Example creation body:
+
+```json
+{
+  "program_id": "EXISTING_PROGRAM_UUID",
+  "version": "2027-2028",
+  "sources": [{"file": "approved-curriculum-2027.pdf"}],
+  "subjects": [{
+    "year_level": "1st", "semester": "1st", "code": "CC 1",
+    "subject_name": "Introduction to Computing", "credit_units": 3,
+    "lecture_units": 3, "laboratory_units": 0,
+    "source": {"file": "approved-curriculum-2027.pdf", "page": 2}
+  }]
+}
+```
+
+### Create a class with or without meeting times
+
+`POST /api/admin/classes` and `PATCH /api/admin/classes/{id}` accept structured
+`schedule` entries. Each entry has `day` (`Mon` through `Sun`), `start`, `end`
+(`HH:mm`, local college time), and optional `room`. Meetings must end after they
+start on the same day and cannot overlap within that class.
+
+```json
+{
+  "subject_name": "Computer Programming 1",
+  "section": "BSIS 1",
+  "program_id": "EXISTING_PROGRAM_UUID",
+  "curriculum_subject_id": "SELECTED_VERSION_SUBJECT_UUID",
+  "year_level": "1st", "semester": "1st", "school_year": "2026-2027",
+  "schedule": [
+    {"day": "Mon", "start": "08:00", "end": "10:00", "room": "Lab 1"},
+    {"day": "Thu", "start": "13:00", "end": "14:00", "room": "Lab 1"}
+  ]
+}
+```
+
+`instructor_id` is optional until an instructor is assigned. A linked curriculum
+subject must match the class's program, year level, and semester; its academic
+units are copied to the class. No meeting time is inferred from the curriculum.
+
+For an unscheduled class, omit `schedule` (stored as `[]`) and supply confirmed
+`weekly_hours` and `meetings_per_week`. For example, `5` hours and `2` meetings.
+The admin can add the actual times later through PATCH. Fractional weekly hours
+are supported. Legacy free-text schedules are still accepted, with confirmed
+hours/count required when creating a class because text cannot be reliably parsed.
+
+When structured times are present, weekly hours and meeting count are derived
+from them. Conflicting explicit values are rejected. Schedule edits recompute
+existing attendance tracker statuses transactionally. No new alerts are sent by
+the class update itself; the existing attendance automation handles notifications.
+
+### Attendance thresholds
+
+Academic units and lecture/lab units are catalog data, **not** contact hours.
+No lecture/laboratory conversion multiplier is assumed. The existing configured
+warning, critical, IR, and three-lates-to-one-hour policies remain in effect.
+
+Newly invalidated absence requests use the scheduled hours on their actual
+occurrence date or inclusive date range, including unequal meeting lengths.
+For example, missing the Monday meeting above adds two absent hours; Thursday
+adds one. Those hours are stored in `attendance_tracker.absence_hours` so a later
+schedule edit cannot change hours already recorded. Dates without a scheduled
+meeting add zero hours. Holidays and individual cancellations are not represented
+by this weekly schedule model.
+
+Legacy trackers without recorded hours keep their previous count-times-average
+calculation. Their accumulated estimate is retained when the next absence is
+recorded. Unscheduled/free-text classes also use weekly hours divided by meeting
+count, since actual meeting dates/times are unavailable.
+
+### Source differences retained for review
+
+- The BSSW endorsement letter says 2022-2023; its curriculum table and current
+  master lists say 2023-2024. The catalog uses the curriculum table's label.
+- Parenthesized and negative unit annotations are preserved in `units_text`.
+  Numeric magnitudes are stored separately; they do not establish grading or
+  institutional credit-counting rules and never set contact hours.
+- BSAIS 2023-2024 PATH FIT 2 prints three units; the scan is retained as printed.
+- BSIS 2018-2019 prints three units for PE 1 and two for NSTP 1; these are not
+  silently normalized to the usual values.
+- Master-list typos, renamed subjects/electives, and subjects from other years'
+  curricula remain in the independent offerings with their source notes. They
+  are not used to auto-enroll students or automatically create class sections.
+- Supplemental ACT/BSIS professional-elective option lists are stored with the
+  curriculum's source metadata; they do not automatically choose an elective.
+
+No frontend admin form exists in this repository's current `front-end` app;
+these are backend endpoints and seeders for the form to call.
+
+## Mail delivery and operations
+
+`MailDeliveryService` handles delivery for `InstructorExcuseRequestMail`, `StudentRequestUpdatedMail`, and `InstructorFollowUpMail`. All three are queued with up to three attempts. Their existing Blade templates remain unchanged. The existing queue worker must be running; deployment configuration already includes it in `docker/supervisord.conf`.
+
+The service skips inactive accounts and blank email addresses. Instructor new-request and follow-up mail share the same case-insensitive allowlist check. An instructor test recipient redirects allowed instructor mail; a student test recipient redirects student update mail. Test redirects do not change in-app recipients. `MAIL_TEST_RECIPIENT` is a fallback for request/alert emails only, handled by the delivery services rather than `Mail::alwaysTo`. OTP emails always reach the account logging in, even if test-recipient settings are configured.
+
+For program head warning, critical, and IR testing only, set `MAIL_PROGRAM_HEAD_TEST_RECIPIENT=marwin.mandocdoc@student.laverdad.edu.ph` in the deployment environment. This overrides the generic fallback for these alerts. One email per warning/critical/IR stage is queued to that address even when several heads share the program; their individual in-app alerts stay on their actual accounts. Clear this setting to restore actual-head email recipients (also clear `MAIL_TEST_RECIPIENT` if no fallback redirect is wanted). Redeploy/restart the application and queue workers after changing the environment.
+
+In-app notifications are stored within the business transaction. Mail dispatch is deferred with `afterCommit()`, so rolled-back requests do not leave alerts or email jobs. The request observer runs during the transaction so it can reliably check the original pending status when a decision is saved. Only transitions from pending to approved, noted, or invalid queue a student decision email; cancellation does not.
+
+New submissions create one instructor in-app alert; decisions retain the existing student in-app alert from the decision controller; follow-ups create one instructor in-app alert alongside their existing cooldown-protected follow-up record. Email allowlists do not suppress these in-app alerts. Student follow-up emails now use the same `/instructor/class-requests` link as instructor submission emails.
+
+The notifications API, unread count, mark-read actions, and student dashboard only use `channel = in_app`. Historical `channel = email` rows remain in the database but do not appear in personal notification feeds and cannot be marked read through the in-app endpoints. Queuing an email no longer creates a misleading "sent" notification row; queue and failed-job records are used for delivery troubleshooting. A queued job is not proof of successful delivery.
+
+Program head threshold alerts retain their dedicated `AttendanceThresholdNotifier`, which handles stage deduplication and uses the same queued, after-commit approach for its email. Request mail recipient rules do not change program head routing.
+
+Tests use isolated databases and fake or array mail transports. `RequestMailDeliveryTest` covers request submission, repeated decisions, follow-up cooldown, redirects and allowlists, cancellation and inactive recipients, transaction rollback/commit, and separation of historical email records from in-app feeds.
+
+## Program-head and test-data maintenance
+
+Primary heads use `programs.program_head_id`; explicit co-heads use
+`program_head_assignments`. A `program_head` role also grants access to the
+account's current `users.program_id`. Teaching membership alone grants no head
+access. To add explicit co-heads without replacing the primary head:
+
+```sh
+php artisan alrm:assign-program-heads PROGRAM_UUID USER_UUID [USER_UUID ...]
+```
+
+After an intentional attendance-policy change, recompute statuses with
+`php artisan alrm:recompute-trackers`, then process outstanding stages with
+`php artisan alrm:process-automation`. Avoid `--reset-notified` unless replaying
+historical alerts is intentional. These commands can send notifications through
+the existing worker and should be run as deliberate operational actions.
+
+`DevInstructorScheduleSeeder` is optional sample data, separate from the academic
+catalog and default seeding. It fills only empty schedules for the four
+designated test-instructor accounts. It does not establish institutional meeting
+times. Use `php artisan db:seed --class=DevInstructorScheduleSeeder` only when
+test schedules are wanted. `DevInstructorClassSeeder` preserves existing
+same-subject schedules when no nonempty official source schedule is available.
+
+The student-domain instructor allowlist is defined by
+`User::STUDENT_INSTRUCTOR_EMAILS`. To audit unexpected student-domain instructors,
+use `php artisan alrm:repair-student-instructors`. The `--apply` option changes
+accounts, revokes tokens/trusted devices, and records repairs; dependencies such
+as teaching classes, memberships, or head assignments must be reviewed first.

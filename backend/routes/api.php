@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Admin\AdminDashboardController;
 use App\Http\Controllers\Admin\ClassManagementController;
+use App\Http\Controllers\Admin\CurriculumController;
 use App\Http\Controllers\Admin\ProgramController;
 use App\Http\Controllers\Admin\ReportController;
 use App\Http\Controllers\Admin\UserApprovalController;
@@ -14,8 +15,8 @@ use App\Http\Controllers\Instructor\InstructorDashboardController;
 use App\Http\Controllers\Instructor\InstructorRequestController;
 use App\Http\Controllers\Instructor\InstructorRequestExportController;
 use App\Http\Controllers\NotificationController;
-use App\Http\Controllers\ProgramHead\ProgramHeadDashboardController;
 use App\Http\Controllers\ProgramHead\FollowupFlagController;
+use App\Http\Controllers\ProgramHead\ProgramHeadDashboardController;
 use App\Http\Controllers\ProgramHead\ProgramHeadReportController;
 use App\Http\Controllers\Student\AttendanceController;
 use App\Http\Controllers\Student\ClassController;
@@ -139,6 +140,7 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
 
         Route::apiResource('programs', ProgramController::class);
         Route::apiResource('classes', ClassManagementController::class);
+        Route::apiResource('curricula', CurriculumController::class)->only(['index', 'store', 'show']);
 
         Route::get('/reports/export', [ReportController::class, 'export'])->middleware('throttle:exports');
         Route::get('/reports/preview', [ReportController::class, 'preview']);

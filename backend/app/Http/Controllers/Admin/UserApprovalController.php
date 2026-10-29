@@ -3,7 +3,9 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Admin\StoreUserRequest;
 use App\Http\Resources\UserResource;
+use App\Models\Program;
 use App\Models\TrustedDevice;
 use App\Models\User;
 use App\Services\AuditLoggerService;
@@ -11,7 +13,10 @@ use App\Support\BoundedCollection;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class UserApprovalController extends Controller
 {
@@ -38,6 +43,8 @@ class UserApprovalController extends Controller
 
     public function index(Request $request): JsonResponse
     {
+        Gate::authorize('viewAny', User::class);
+
         $request->validate([
             'role' => ['sometimes', 'string', Rule::in(self::CREATABLE_ROLES)],
             'status' => ['sometimes', 'string', Rule::in(['pending', 'approved', 'deactivated', 'inactive'])],
@@ -59,7 +66,7 @@ class UserApprovalController extends Controller
         }
 
         /** @var Builder<User> $users */
-        $users = $query->with('program')
+        $users = $query->with(['program', 'programs'])
             ->withExists(['headedProgram as heads_program'])
             ->orderBy('name');
 
@@ -79,19 +86,15 @@ class UserApprovalController extends Controller
      *
      * POST /api/admin/users
      */
-    public function store(Request $request): JsonResponse
+    public function store(StoreUserRequest $request): JsonResponse
     {
-        $validated = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'email', 'max:255', 'unique:users,email'],
-            'role' => ['required', 'string', Rule::in(self::CREATABLE_ROLES)],
-        ]);
+        $validated = $request->validated();
 
         $email = strtolower($validated['email']);
         $domain = substr(strrchr($email, '@') ?: '', 1);
 
-        $studentDomain = config('institution.student_domain');
-        $staffDomain = config('institution.staff_domain');
+        $studentDomain = strtolower((string) config('institution.student_domain'));
+        $staffDomain = strtolower((string) config('institution.staff_domain'));
 
         $isStudentDomain = $domain === $studentDomain;
         $isStaffDomain = $domain === $staffDomain;
@@ -116,15 +119,36 @@ class UserApprovalController extends Controller
             ], 422);
         }
 
-        $user = User::create([
-            'name' => $validated['name'],
-            'email' => $email,
-            'role' => $validated['role'],
-            'status' => 'pending',
-            'password' => null,
-        ]);
+        $user = DB::transaction(function () use ($validated, $email) {
+            $program = isset($validated['program_id'])
+                ? Program::query()->lockForUpdate()->findOrFail($validated['program_id'])
+                : null;
 
-        $this->auditLogger->log('pre_registered_user:'.$validated['role'], 'users', $user->id);
+            // Do not silently replace a head selected in Programs.
+            if ($validated['role'] === 'program_head' && $program?->program_head_id !== null) {
+                throw ValidationException::withMessages(['program_id' => 'This program already has a program head. Manage its assignment in Programs.']);
+            }
+
+            $user = User::create([
+                'name' => $validated['name'],
+                'email' => $email,
+                'role' => $validated['role'],
+                'program_id' => $validated['role'] === 'student' ? $program?->id : null,
+                'school_id_number' => $validated['school_id_number'] ?? null,
+                'status' => 'pending',
+                'password' => null,
+            ]);
+
+            if ($program && $validated['role'] === 'instructor') {
+                $user->programs()->attach($program->id);
+            } elseif ($program && $validated['role'] === 'program_head') {
+                $program->update(['program_head_id' => $user->id]);
+            }
+
+            $this->auditLogger->log('pre_registered_user:'.$validated['role'], 'users', $user->id);
+
+            return $user->load(['program', 'programs']);
+        });
 
         return response()->json([
             'success' => true,
@@ -146,6 +170,8 @@ class UserApprovalController extends Controller
      */
     public function destroy(User $user): JsonResponse
     {
+        Gate::authorize('delete', $user);
+
         if (! in_array($user->status, ['pending', 'deactivated'], true)) {
             return response()->json([
                 'success' => false,
@@ -178,6 +204,8 @@ class UserApprovalController extends Controller
      */
     public function updateStatus(Request $request, User $user): JsonResponse
     {
+        Gate::authorize('update', $user);
+
         $validated = $request->validate([
             'status' => ['required', 'string', Rule::in(['approved', 'deactivated', 'inactive'])],
         ]);
@@ -259,6 +287,8 @@ class UserApprovalController extends Controller
      */
     public function updateRole(Request $request, User $user): JsonResponse
     {
+        Gate::authorize('update', $user);
+
         $domain = strtolower(substr(strrchr($user->email, '@') ?: '', 1));
         $isPendingExternal = $user->status === 'pending'
             && ! in_array($domain, [

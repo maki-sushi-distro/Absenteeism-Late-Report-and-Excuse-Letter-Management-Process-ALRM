@@ -53,6 +53,11 @@ class Program extends Model
         return $this->hasMany(ClassModel::class, 'program_id');
     }
 
+    public function curricula(): HasMany
+    {
+        return $this->hasMany(Curriculum::class);
+    }
+
     /**
      * All users (instructors/program heads) belonging to this program.
      */

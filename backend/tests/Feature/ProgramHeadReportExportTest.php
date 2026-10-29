@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\FollowupFlag;
+use App\Models\AttendanceTracker;
 use App\Models\Program;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -66,6 +67,11 @@ class ProgramHeadReportExportTest extends SecurityTestCase
         $own = $this->requestFor($this->user('student', ['name' => 'Own student']));
         $own->enrollment->class->program->update(['program_head_id' => $head->id]);
         $foreign = $this->requestFor($this->user('student', ['name' => 'Foreign student']));
+        $tracker = AttendanceTracker::create([
+            'enrollment_id' => $own->enrollment_id, 'total_absences' => 2,
+            'total_lates' => 3, 'converted_absences' => 0, 'status' => 'safe',
+        ]);
+        $tracker->recompute();
         foreach ([$own, $foreign] as $request) {
             FollowupFlag::create([
                 'request_id' => $request->id, 'escalated_to' => $head->id,
@@ -74,9 +80,22 @@ class ProgramHeadReportExportTest extends SecurityTestCase
         }
         $rows = $this->csv($this->bearer($head)->getJson(self::URL.'?report_type=risk&date_from=2026-10-23&date_to=2026-10-23')->assertOk());
         $this->assertCount(2, $rows);
-        $this->assertSame(['Student', 'Class', 'Flagged date', 'Status'], $rows[0]);
-        $this->assertSame(['Own student', 'Security', '2026-10-23', 'resolved'], $rows[1]);
+        $this->assertSame(['Student', 'Class', 'Flagged date', 'Threshold', 'Percentage'], $rows[0]);
+        $this->assertSame(['Own student', 'Security', '2026-10-23', 'critical', '14.58'], $rows[1]);
         $this->assertCount(1, $this->csv($this->bearer($head)->getJson(self::URL.'?report_type=risk&date_from=2026-10-24&date_to=2026-10-24')->assertOk()));
+    }
+
+    public function test_risk_report_leaves_missing_attendance_data_blank(): void
+    {
+        $head = $this->user('program_head');
+        $request = $this->requestFor($this->user());
+        $request->enrollment->class->program->update(['program_head_id' => $head->id]);
+        FollowupFlag::create([
+            'request_id' => $request->id, 'escalated_to' => $head->id,
+            'flagged_date' => now(), 'status' => 'open',
+        ]);
+        $rows = $this->csv($this->bearer($head)->getJson(self::URL.'?report_type=risk')->assertOk());
+        $this->assertSame(['', ''], array_slice($rows[1], 3));
     }
 
     public function test_co_head_and_current_program_assignments_are_respected_and_program_filter_narrows_results(): void

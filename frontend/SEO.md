@@ -9,7 +9,7 @@ OAuth, OTP, or backend behavior was changed for SEO.
 1. Open `/login` in Google Search Console's URL Inspection tool and run Test Live URL.
 2. Check the rendered title, description, canonical URL, and Google indexing eligibility.
 3. Submit `sitemap.xml` under Sitemaps, then request indexing for `/login`.
-4. Verify `/robots.txt`, `/sitemap.xml`, and `/LV_Logo.png` return their actual file
+4. Verify `/robots.txt`, `/sitemap.xml`, and `/LV_Logo.webp` return their actual file
    contents rather than the application's HTML fallback.
 5. Check that `/login` has no `X-Robots-Tag: noindex` response header, while
    `/dashboard`, `/student/records`, `/auth/callback`, and unknown pages do.
@@ -22,7 +22,7 @@ Private pages remain crawlable so crawlers can see their `noindex` headers;
 `robots.txt` blocks only the API namespace, not scripts or styles needed to render login.
 
 The existing Search Console verification tag is retained in `index.html`.
-`public/LV_Logo.png` publishes the current school logo at a stable social-preview URL;
+`public/LV_Logo.webp` publishes the optimized school logo at a stable social-preview URL;
 the favicon uses Vite's bundled asset so it shares the in-app logo's cache entry.
 JSON-LD describes the actual educational web application, without invented ratings,
 an unsupported search action, or a claim that this is the college's main website.

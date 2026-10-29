@@ -26,7 +26,7 @@ import {
 import { normalizeRole } from "@/lib/roles";
 import { prepareProfileInput } from "@/lib/formInputs";
 import { getSelectablePrograms } from "@/lib/programs";
-import lvLogo from "@/assets/LV_Logo.png";
+import lvLogo from "@/assets/lv-logo-auth.webp";
 
 const ROLE_LABELS = {
   student: "Student",
@@ -269,6 +269,8 @@ function ProfileSetup() {
         <CardHeader className="items-center gap-3 text-center">
           <img
             src={lvLogo}
+            width="384"
+            height="384"
             alt="ALRM System logo"
             className="size-16 object-contain"
           />

@@ -1,21 +1,22 @@
-import { useState } from "react";
 import { CalendarDays, ClipboardList, GraduationCap, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import LoadingSkeleton from "@/components/loading/LoadingSkeleton";
 import { ErrorState } from "./ErrorState";
+import ResourceRefresh from "./ResourceRefresh";
 import FilterMenu, { RadioFilterGroup } from "./FilterMenu";
 import { filterActivity } from "@/pages/auth/admin/overviewData";
 import { paginateRecords } from "@/pages/auth/student/records/pagination";
 import RequestPagination from "@/pages/auth/instructor/InstructorRequests/RequestPagination";
+import { usePageViewState } from "@/hooks/usePageViewState";
 
 const emptyFilters = { search: "", action: "", subject: "", date: "" };
 const actions = { Submitted: "border-orange-200 bg-orange-50 text-orange-700", Updated: "border-blue-200 bg-blue-50 text-blue-800", Cancelled: "border-slate-300 bg-slate-50 text-slate-700", "Followed up": "border-orange-200 bg-orange-50 text-orange-700", Flagged: "border-yellow-300 bg-yellow-50 text-yellow-900", Approved: "border-green-200 bg-green-50 text-green-700", Denied: "border-red-200 bg-red-50 text-red-700", Noted: "border-blue-200 bg-blue-50 text-blue-800", Resolved: "border-green-200 bg-green-50 text-green-700" };
 
-export default function ActivityTable({ rows = [], loading, error, onRetry, flagged = false, programLog = false }) {
-  const [filters, setFilters] = useState(emptyFilters);
-  const [page, setPage] = useState(1);
+export default function ActivityTable({ rows = [], loading, error, onRetry, updatedAt, viewKey = "activity", flagged = false, programLog = false }) {
+  const [view, setView] = usePageViewState(viewKey, { filters: emptyFilters, page: 1 });
+  const { filters, page } = view;
   const visible = filterActivity(rows, filters);
   const pagination = paginateRecords(visible, page);
   const subjects = [...new Map(rows.filter(row => row.classId).map(row => [row.classId, row.subject])).entries()];
@@ -24,7 +25,8 @@ export default function ActivityTable({ rows = [], loading, error, onRetry, flag
     filters.subject && { name: "subject", label: `Subject: ${subjects.find(([id]) => id === filters.subject)?.[1] || "Selected subject"}`, Icon: GraduationCap },
     filters.date && { name: "date", label: `Date: ${filters.date}`, Icon: CalendarDays },
   ].filter(Boolean);
-  function change(key, value) { setFilters(current => ({ ...current, [key]: value })); setPage(1); }
+  function setPage(nextPage) { setView(current => ({ ...current, page: nextPage })); }
+  function change(key, value) { setView(current => ({ filters: { ...current.filters, [key]: value }, page: 1 })); }
   if (loading) return <LoadingSkeleton variant="table" columns={5} rows={6} label="Loading activity">{!programLog && <div className="space-y-3"><div className="flex flex-wrap items-center gap-4"><Skeleton className="h-10 w-full max-w-[400px]" /><Skeleton className="h-6 w-24" /></div><Skeleton className="h-8 w-24" /></div>}</LoadingSkeleton>;
   if (error) return <div className="space-y-3"><ErrorState message={error} /><Button variant="outline" onClick={onRetry}>Retry</Button></div>;
   return <div className="space-y-5">
@@ -34,7 +36,8 @@ export default function ActivityTable({ rows = [], loading, error, onRetry, flag
           <Input aria-label="Search activity" placeholder="Search Name, ID, Email..." value={filters.search} onChange={event => change("search", event.target.value)} className="h-10 rounded-lg border-[#c5d0e5] pr-10 text-sm shadow-sm" />
           <Search aria-hidden="true" className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-[#8aa0bf]" />
         </div>
-        <Button variant="ghost" onClick={() => { setFilters(emptyFilters); setPage(1); }}>Clear filters</Button>
+        <Button variant="ghost" onClick={() => setView({ filters: emptyFilters, page: 1 })}>Clear filters</Button>
+        <ResourceRefresh updatedAt={updatedAt} loading={loading} onRefresh={onRetry} />
       </div>
       <FilterMenu label="Filter activity" chips={chips} onChange={change}>
         <div className="grid gap-3 divide-y divide-slate-100 [&>fieldset:not(:first-child)]:pt-3">

@@ -7,8 +7,8 @@ import { buildInstructorOverview, loadInstructorReports, loadInstructorSnapshot 
 export function InstructorDashboard() {
   const { user } = useAuth();
   const [weekOffset, setWeekOffset] = useState(0);
-  const snapshot = useApiResource(loadInstructorSnapshot, user?.id || "");
-  const reports = useApiResource(loadInstructorReports, user?.id || "");
+  const snapshot = useApiResource(loadInstructorSnapshot, user?.id || "", { cacheKey: `instructor:dashboard:${user?.id || "unknown"}` });
+  const reports = useApiResource(loadInstructorReports, user?.id || "", { cacheKey: `instructor:reports:${user?.id || "unknown"}` });
   return <InstructorOverview user={user} overview={buildInstructorOverview(snapshot.data || {}, reports.data || [], new Date(), weekOffset)}
     loading={{ snapshot: snapshot.loading, reports: reports.loading }} errors={{ snapshot: snapshot.error, reports: reports.error }}
     onRetrySnapshot={snapshot.reload} onRetryReports={reports.reload}

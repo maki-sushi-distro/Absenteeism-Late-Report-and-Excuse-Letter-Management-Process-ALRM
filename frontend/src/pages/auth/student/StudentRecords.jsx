@@ -1,9 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { ChevronLeft, ChevronRight, Search, X } from "lucide-react";
 import { apiFetch } from "@/api/client";
 import { getStudentRequest, openEvidence, updateStudentRequest } from "@/api/studentRequests";
 import { useAuth } from "@/context/AuthContext";
+import { updateResourceCache } from "@/api/resourceCache";
+import { useApiResource } from "@/hooks/useApiResource";
 import StatusBadge from "@/components/dashboard/StatusBadge";
 import StudentPageLayout from "./StudentPageLayout";
 import { LIMITS, proofOptions } from "./request-form/constants";
@@ -144,10 +146,11 @@ export default function StudentRecords() {
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedId = searchParams.get("request");
-  const [records, setRecords] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [reload, setReload] = useState(0);
+  const recordsKey = `student:records:${user?.id || "unknown"}`;
+  const loadRecords = useCallback((_key, signal) => fetchRecords(signal), []);
+  const resource = useApiResource(loadRecords, user?.id || "", { cacheKey: recordsKey, initialData: [] });
+  const records = useMemo(() => resource.data || [], [resource.data]);
+  const { loading, error } = resource;
   const [search, setSearch] = useState("");
   const [subject, setSubject] = useState("");
   const [recordType, setRecordType] = useState("absence");
@@ -158,28 +161,6 @@ export default function StudentRecords() {
   const [openingAttachment, setOpeningAttachment] = useState(false);
   const dialogRef = useRef(null);
   const { followingUpId, cooldownSecondsById, notice, followUp, dismissNotice } = useRequestFollowUp(user?.id);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    async function load() {
-      try {
-        const data = await fetchRecords(controller.signal);
-        if (!controller.signal.aborted) {
-          setRecords(data);
-          setError("");
-        }
-      } catch (loadError) {
-        if (!controller.signal.aborted) {
-          setRecords([]);
-          setError(loadError.message);
-        }
-      } finally {
-        if (!controller.signal.aborted) setLoading(false);
-      }
-    }
-    load();
-    return () => controller.abort();
-  }, [reload, user?.id]);
 
   useEffect(() => {
     const record = records.find((item) => item.id === requestedId);
@@ -210,10 +191,8 @@ export default function StudentRecords() {
   }
 
   function refresh() {
-    setLoading(true);
-    setError("");
     setPage(1);
-    setReload((value) => value + 1);
+    resource.reload();
   }
 
   function viewRecord(record) {
@@ -324,7 +303,7 @@ export default function StudentRecords() {
         {selected && <div className="grid gap-5 p-6">
           {editing ? <RequestEditForm key={selected.id} record={selected} onCancel={() => setEditing(false)} onSaved={(updated) => {
             setSelected(updated);
-            setRecords((current) => current.map((record) => record.id === updated.id ? updated : record));
+            updateResourceCache(recordsKey, (current) => current.map((record) => record.id === updated.id ? updated : record));
             setEditing(false);
           }} /> : <>
           <dl className="grid grid-cols-[auto_1fr] gap-x-5 gap-y-3 text-sm">

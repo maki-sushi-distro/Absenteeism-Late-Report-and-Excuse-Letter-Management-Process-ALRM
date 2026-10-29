@@ -28,7 +28,7 @@ test("structured data describes the real educational app without invented rating
   assert.equal(app.name, "ALRM System");
   assert.equal(app.url, `${origin}/`);
   assert.equal(app.applicationCategory, "EducationalApplication");
-  assert.equal(app.image, `${origin}/LV_Logo.png`);
+  assert.equal(app.image, `${origin}/LV_Logo.webp`);
   assert.equal(app.aggregateRating, undefined);
   assert.equal(app.potentialAction, undefined);
 });
@@ -53,7 +53,7 @@ test("Vercel excludes private and unknown pages from search without blocking pub
   for (const path of ["/dashboard", "/student/records", "/student/request", "/settings", "/signed-out", "/instructors", "/students/1", "/classes", "/programs", "/reports", "/program-head/requests", "/instructor/class-requests", "/verify-otp", "/auth/callback", "/api/auth/google/callback", "/404", "/unknown-page", "/login/private"]) {
     assert.equal(excluded(path), true, path);
   }
-  for (const path of ["/", "/login", "/login/", "/assets/index.js", "/assets/index.css", "/LV_Logo.png", "/sitemap.xml", "/robots.txt"]) {
+  for (const path of ["/", "/login", "/login/", "/assets/index.js", "/assets/index.css", "/LV_Logo.webp", "/sitemap.xml", "/robots.txt"]) {
     assert.equal(excluded(path), false, path);
   }
   assert.deepEqual(config.rewrites, [
@@ -63,10 +63,10 @@ test("Vercel excludes private and unknown pages from search without blocking pub
 });
 
 test("social previews and the favicon use a published copy of the current school logo", async () => {
-  const logo = await readFile(new URL("../public/LV_Logo.png", import.meta.url));
-  const current = await readFile(new URL("../src/assets/LV_Logo.png", import.meta.url));
-  assert.deepEqual(logo, current);
+  const logo = await readFile(new URL("../public/LV_Logo.webp", import.meta.url));
+  assert.equal(logo.subarray(0, 4).toString(), "RIFF");
+  assert.equal(logo.subarray(8, 12).toString(), "WEBP");
   const html = await read("index.html");
-  assert.ok(html.includes(`content="${origin}/LV_Logo.png"`));
-  assert.match(html, /rel="icon" type="image\/png" href="\/src\/assets\/LV_Logo.png"/);
+  assert.ok(html.includes(`content="${origin}/LV_Logo.webp"`));
+  assert.match(html, /rel="icon" type="image\/webp" href="\/src\/assets\/lv-logo-sidebar.webp"/);
 });

@@ -17,7 +17,7 @@ export default function InstructorClassRecords() {
   const { classId } = useParams();
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
-  const resource = useApiResource(getInstructorClassRecords, user?.id || "");
+  const resource = useApiResource(getInstructorClassRecords, user?.id || "", { cacheKey: `instructor:class-records:${user?.id || "unknown"}` });
   const courses = useMemo(() => buildClassRecords(resource.data || [], [...(user?.programs || []), ...(user?.program ? [user.program] : [])]), [resource.data, user]);
   const course = courses.find(item => item.id === classId);
   const subject = params.get("subject") || "";

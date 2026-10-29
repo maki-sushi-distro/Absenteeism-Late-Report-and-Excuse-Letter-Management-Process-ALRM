@@ -1,5 +1,5 @@
 // Hash of the static JSON-LD with LF line endings, enforced by the Vite plugin.
-const METADATA_HASH = "'sha256-xhcNgFXm8JEdYjnSgojUoMAHj66BYrNaAkzTVXnmZKs='";
+const METADATA_HASH = "'sha256-GyHYrxAs3/PRQBmEHSWVMpWHWhzrAzQHQvtBd7OU2Ro='";
 
 export function contentSecurityPolicy({ development = false } = {}) {
   return [

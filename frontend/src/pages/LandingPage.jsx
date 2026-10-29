@@ -2,7 +2,7 @@ import { useRef } from "react";
 import { Link } from "react-router-dom";
 import { Bell, BriefcaseBusiness, ChartNoAxesCombined, ClipboardList, LayoutDashboard, Monitor, ShieldCheck, UserRound, UsersRound, X } from "lucide-react";
 import { googleLoginUrl } from "@/api/client";
-import lvLogo from "@/assets/LV_Logo.png";
+import lvLogo from "@/assets/lv-logo-sidebar.webp";
 import googleIcon from "@/assets/google_icon.png";
 import StudentDashboardPreview from "./landing/StudentDashboardPreview";
 import "./LandingPage.css";
@@ -39,7 +39,7 @@ export default function LandingPage() {
     <a className="landing-skip" href="#main-content">Skip to content</a>
     <header className="landing-header">
       <div className="landing-container landing-nav">
-        <a href="#main-content" className="landing-brand" aria-label="ALRM System home"><img src={lvLogo} alt="La Verdad Christian College logo" />ALRM System</a>
+        <a href="#main-content" className="landing-brand" aria-label="ALRM System home"><img src={lvLogo} alt="La Verdad Christian College logo" width="48" height="48" />ALRM System</a>
         <nav aria-label="Main navigation">
           <a href="#features">Features</a><a href="#roles">Roles</a><a href="#how-it-works">How it works</a><a href="#departments">Departments</a>
         </nav>
@@ -89,7 +89,7 @@ export default function LandingPage() {
     </main>
     <footer className="landing-footer">
       <div className="landing-container landing-footer-content">
-        <div className="landing-school"><img src={lvLogo} alt="La Verdad Christian College logo" /><div><p>La Verdad Christian College</p><span>Higher Education Department · <a href="mailto:dpo@laverdad.edu.ph">dpo@laverdad.edu.ph</a></span></div></div>
+        <div className="landing-school"><img src={lvLogo} alt="La Verdad Christian College logo" width="48" height="48" /><div><p>La Verdad Christian College</p><span>Higher Education Department · <a href="mailto:dpo@laverdad.edu.ph">dpo@laverdad.edu.ph</a></span></div></div>
         <nav aria-label="Privacy information"><button type="button" onClick={() => policy.current.showModal()}>Privacy Policy</button><button type="button" onClick={() => privacy.current.showModal()}>Data Privacy Notice</button></nav>
       </div>
     </footer>

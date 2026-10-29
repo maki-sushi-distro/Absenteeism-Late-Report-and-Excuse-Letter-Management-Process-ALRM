@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import { openEvidence } from "@/api/studentRequests";
+import { invalidateResourceCache } from "@/api/resourceCache";
 import { createDecisionGate } from "./requestApi";
 
 export default function useRequestReview(request, onReload) {
@@ -18,6 +19,7 @@ export default function useRequestReview(request, onReload) {
     setMessage("");
     try {
       const result = await decide(request, status);
+      invalidateResourceCache((key) => key.startsWith("instructor:dashboard:") || key.startsWith("instructor:reports:") || key.startsWith("instructor:class-records:"));
       setFresh({ ...request, ...result, enrollment: result.enrollment || request.enrollment });
       setMessage("Decision saved.");
       onReload();

@@ -15,7 +15,7 @@ function InstructorTable({ rows }) {
 }
 
 export function ProgramHeadInstructors() {
-  const { requests, errors, loading, refresh } = useProgramHeadRecords();
+  const { requests, errors, loading, refresh } = useProgramHeadRecords(["requests"]);
   const [search, setSearch] = useState("");
   const rows = instructorRows(requests).filter((row) => `${row.name} ${row.classes.map((item) => item.subject_name).join(" ")}`.toLowerCase().includes(search.toLowerCase()));
   return <div className="space-y-5"><header><h1 className="text-2xl font-bold">Instructors</h1><p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Instructors associated with requests in your program</p></header>
@@ -42,7 +42,7 @@ function StudentRequestTable({ requests }) {
 
 export function ProgramHeadInstructorDetail() {
   const { instructorId } = useParams();
-  const { requests, errors, loading } = useProgramHeadRecords();
+  const { requests, errors, loading } = useProgramHeadRecords(["requests"]);
   const instructor = instructorRows(requests).find((row) => row.id === instructorId);
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");

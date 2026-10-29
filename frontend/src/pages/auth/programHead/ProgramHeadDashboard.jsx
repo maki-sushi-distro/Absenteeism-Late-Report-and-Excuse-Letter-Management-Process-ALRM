@@ -5,9 +5,8 @@ import { FlaggedRecords, RequestRecords } from "./ProgramHeadRecords";
 import { useProgramHeadRecords } from "./useProgramHeadRecords";
 
 export function ProgramHeadDashboard({ view = "dashboard" }) {
-  const { dashboard, flags, requests, errors, resourceLoading, ready, refresh } = useProgramHeadRecords();
-
   const needed = view === "flagged" ? ["flags"] : view === "requests" ? ["requests"] : ["dashboard", "flags", "requests"];
+  const { dashboard, flags, requests, errors, resourceLoading, ready, refresh } = useProgramHeadRecords(needed);
   const loading = needed.some((key) => resourceLoading[key]);
   const waiting = needed.some((key) => resourceLoading[key] && !ready[key]);
   const failed = needed.some((key) => errors[key]);

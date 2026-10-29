@@ -1,5 +1,6 @@
 import { useLocation } from 'react-router-dom';
 import AuthLoading from '@/components/loading/AuthLoading';
+import SessionShellSkeleton from '@/components/loading/SessionShellSkeleton';
 import { useAuth } from '@/context/AuthContext';
 import HttpErrorPage from '@/pages/HttpErrorPage';
 
@@ -18,5 +19,5 @@ export default function SessionStatus() {
   }
 
   const authPath = /^\/(login|verify-otp)\/*$/.test(pathname) || pathname.startsWith('/auth/');
-  return <AuthLoading label={authPath ? 'Signing you in...' : 'Loading ALRM System...'} />;
+  return authPath ? <AuthLoading label="Signing you in..." /> : <SessionShellSkeleton />;
 }

@@ -1,45 +1,52 @@
+import { lazy, Suspense } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
 import { ProtectedRoute } from "./routes/ProtectedRoute";
-import Login from "./pages/login";
-import Home from "./pages/Home";
-import SignedOut from "./pages/auth/SignedOut";
-import { AuthCallback } from "./pages/AuthCallback";
-import { Dashboard } from "./pages/Dashboard";
-import OtpVerification from "./pages/OtpVerification";
-import ProfileSetup from "./pages/ProfileSetup";
-import AddInstructor from "./pages/auth/admin/AddInstructor";
-import AddStudent from "./pages/auth/admin/AddStudent";
-import Instructors from "./pages/auth/admin/Instructors";
-import AdminPageLayout from "./pages/auth/admin/AdminPageLayout";
-import { AdminDashboard as AdminWorkspace } from "./pages/auth/admin/AdminDashboard";
-import AdminUserManagement from "./pages/auth/admin/AdminUserManagement";
-import AdminProgramOverview from "./pages/auth/admin/AdminProgramOverview";
-import AdminActivityLog from "./pages/auth/admin/AdminActivityLog";
-import AdminManage from "./pages/auth/admin/AdminManage";
-import StudentProfile from "./pages/auth/admin/StudentProfile";
-import Students from "./pages/auth/admin/Students";
-import Settings from "./pages/auth/Settings";
-import Notifications from "./pages/auth/Notifications";
-import InstructorClassRecords from "./pages/auth/instructor/InstructorClassRecords";
-import InstructorRequests from "./pages/auth/instructor/InstructorRequests";
-import { ProgramHeadDashboard as ProgramHeadWorkspace } from "./pages/auth/programHead/ProgramHeadDashboard";
-import { ProgramHeadInstructors, ProgramHeadInstructorDetail } from "./pages/auth/programHead/ProgramHeadInstructors";
-import { ProgramHeadReports } from "./pages/auth/programHead/ProgramHeadReports";
-import ProgramHeadPageLayout from "./pages/auth/programHead/ProgramHeadPageLayout";
-import ProgramHeadActivityLog from "./pages/auth/programHead/ProgramHeadActivityLog";
-import StudentRecords from "./pages/auth/student/StudentRecords";
-import StudentNotificationsPage from "./pages/auth/student/StudentNotificationsPage";
-import StudentRequestForm from "./pages/auth/student/StudentRequestForm";
 import AppErrorBoundary from "./components/AppErrorBoundary";
-import HttpErrorPage from "./pages/HttpErrorPage";
 import "./App.css";
+
+const Login = lazy(() => import("./pages/login"));
+const Home = lazy(() => import("./pages/Home"));
+const SignedOut = lazy(() => import("./pages/auth/SignedOut"));
+const AuthCallback = lazy(() => import("./pages/AuthCallback").then(module => ({ default: module.AuthCallback })));
+const Dashboard = lazy(() => import("./pages/Dashboard").then(module => ({ default: module.Dashboard })));
+const OtpVerification = lazy(() => import("./pages/OtpVerification"));
+const ProfileSetup = lazy(() => import("./pages/ProfileSetup"));
+const AddInstructor = lazy(() => import("./pages/auth/admin/AddInstructor"));
+const AddStudent = lazy(() => import("./pages/auth/admin/AddStudent"));
+const Instructors = lazy(() => import("./pages/auth/admin/Instructors"));
+const AdminPageLayout = lazy(() => import("./pages/auth/admin/AdminPageLayout"));
+const AdminWorkspace = lazy(() => import("./pages/auth/admin/AdminDashboard").then(module => ({ default: module.AdminDashboard })));
+const AdminUserManagement = lazy(() => import("./pages/auth/admin/AdminUserManagement"));
+const AdminProgramOverview = lazy(() => import("./pages/auth/admin/AdminProgramOverview"));
+const AdminActivityLog = lazy(() => import("./pages/auth/admin/AdminActivityLog"));
+const AdminManage = lazy(() => import("./pages/auth/admin/AdminManage"));
+const StudentProfile = lazy(() => import("./pages/auth/admin/StudentProfile"));
+const Students = lazy(() => import("./pages/auth/admin/Students"));
+const Settings = lazy(() => import("./pages/auth/Settings"));
+const Notifications = lazy(() => import("./pages/auth/Notifications"));
+const InstructorClassRecords = lazy(() => import("./pages/auth/instructor/InstructorClassRecords"));
+const InstructorRequests = lazy(() => import("./pages/auth/instructor/InstructorRequests"));
+const ProgramHeadWorkspace = lazy(() => import("./pages/auth/programHead/ProgramHeadDashboard").then(module => ({ default: module.ProgramHeadDashboard })));
+const ProgramHeadInstructors = lazy(() => import("./pages/auth/programHead/ProgramHeadInstructors").then(module => ({ default: module.ProgramHeadInstructors })));
+const ProgramHeadInstructorDetail = lazy(() => import("./pages/auth/programHead/ProgramHeadInstructors").then(module => ({ default: module.ProgramHeadInstructorDetail })));
+const ProgramHeadReports = lazy(() => import("./pages/auth/programHead/ProgramHeadReports").then(module => ({ default: module.ProgramHeadReports })));
+const ProgramHeadPageLayout = lazy(() => import("./pages/auth/programHead/ProgramHeadPageLayout"));
+const ProgramHeadActivityLog = lazy(() => import("./pages/auth/programHead/ProgramHeadActivityLog"));
+const StudentRecords = lazy(() => import("./pages/auth/student/StudentRecords"));
+const StudentNotificationsPage = lazy(() => import("./pages/auth/student/StudentNotificationsPage"));
+const StudentRequestForm = lazy(() => import("./pages/auth/student/StudentRequestForm"));
+const HttpErrorPage = lazy(() => import("./pages/HttpErrorPage"));
+
+function RouteFallback() {
+  return <div role="status" aria-label="Loading page" className="min-h-screen bg-white p-6 dark:bg-slate-950"><div className="h-8 w-44 animate-pulse rounded bg-slate-200 dark:bg-slate-800" /></div>;
+}
 
 function App() {
   return (
     <BrowserRouter>
         <AuthProvider>
-          <AppErrorBoundary>
+          <AppErrorBoundary><Suspense fallback={<RouteFallback />}>
             <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/signed-out" element={<SignedOut />} />
@@ -168,7 +175,7 @@ function App() {
               <Route path="/503" element={<HttpErrorPage status={503} />} />
               <Route path="*" element={<HttpErrorPage status={404} />} />
             </Routes>
-          </AppErrorBoundary>
+          </Suspense></AppErrorBoundary>
         </AuthProvider>
     </BrowserRouter>
   );

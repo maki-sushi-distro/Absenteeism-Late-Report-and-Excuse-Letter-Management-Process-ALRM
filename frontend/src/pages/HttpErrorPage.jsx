@@ -11,7 +11,7 @@ import {
   WifiOff,
 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
-import LVLogo from "@/assets/LV_Logo.png";
+import LVLogo from "@/assets/lv-logo-auth.webp";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/context/AuthContext";
 
@@ -114,6 +114,8 @@ function HttpErrorPage({ status = 404, description, onRetry }) {
           <div className="flex min-w-0 items-center gap-3">
             <img
               src={LVLogo}
+              width="384"
+              height="384"
               alt="La Verdad Christian College logo"
               className="size-10 shrink-0 object-contain"
             />

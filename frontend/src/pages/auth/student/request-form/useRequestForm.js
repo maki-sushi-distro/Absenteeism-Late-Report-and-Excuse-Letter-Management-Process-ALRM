@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react"; 
 import { createStudentRequest, getStudentClasses, uploadEvidence } from "@/api/studentRequests";
+import { invalidateResourceCache, requestCachedResource } from "@/api/resourceCache";
 import { useAuth } from "@/context/AuthContext";
 import { getStoredProfileSetup } from "@/lib/profileSetup";
 import { buildRequestPayload, proofTypeError } from "./buildPayload";
@@ -28,12 +29,13 @@ export default function useRequestForm() {
   );
 
   const uploadedRef = useRef(null);
+  const classesCacheKey = `student:classes:${user?.id || "unknown"}`;
 
   useEffect(() => {
     const defaults = profileDefaults(user, storedProfile);
 
     // Keep identity tied to the saved profile, including after a refresh.
-    setForm((current) => {
+    queueMicrotask(() => setForm((current) => {
       return {
         ...current,
         studentName: defaults.studentName,
@@ -42,7 +44,7 @@ export default function useRequestForm() {
         guardianName: current.guardianName || defaults.guardianName,
         contactNumber: current.contactNumber || defaults.contactNumber,
       };
-    });
+    }));
   }, [storedProfile, user]);
 
   useEffect(() => {
@@ -53,7 +55,7 @@ export default function useRequestForm() {
       setClassesError("");
 
       try {
-        const data = await getStudentClasses();
+        const data = await requestCachedResource(classesCacheKey, () => getStudentClasses());
         if (alive) setClasses(data);
       } catch (loadError) {
         if (alive) {
@@ -70,7 +72,7 @@ export default function useRequestForm() {
     return () => {
       alive = false;
     };
-  }, []);
+  }, [classesCacheKey]);
 
   function updateField(name, value) {
     if (name === "evidenceFile" && step === LAST_STEP) return;
@@ -202,12 +204,13 @@ export default function useRequestForm() {
     try {
       const evidence = await resolveEvidence();
       await createStudentRequest(buildRequestPayload(form, classes, evidence));
+      invalidateResourceCache((key) => key.startsWith("student:records:") || key.startsWith("student:requests:") || key.startsWith("student:dashboard:"));
       setSubmitted(true);
       refreshUser({ silent: true }).catch(() => {});
     } catch (submitError) {
       if (submitError?.status === 409) {
         try {
-          const refreshedClasses = await getStudentClasses();
+          const refreshedClasses = await requestCachedResource(classesCacheKey, () => getStudentClasses(), { force: true });
           setClasses(refreshedClasses);
           setForm((current) => ({ ...current, classId: "", classText: "", declaration: false }));
           setReviewEditing(true);

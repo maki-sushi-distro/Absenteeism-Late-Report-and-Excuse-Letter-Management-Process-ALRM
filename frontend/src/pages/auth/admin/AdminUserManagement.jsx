@@ -2,9 +2,11 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { ChevronLeft, ChevronRight, Search, UserPlus } from "lucide-react";
 import { changeManagedUser, getUserManagementPrograms, getUserManagementUsers } from "@/api/adminUserManagement";
+import { getResourceCacheEntry, requestCachedResource, updateResourceCache } from "@/api/resourceCache";
 import { useAuth } from "@/context/AuthContext";
 import { EmptyState } from "@/components/common/EmptyState";
 import { ErrorState } from "@/components/common/ErrorState";
+import ResourceRefresh from "@/components/common/ResourceRefresh";
 import LoadingSkeleton from "@/components/loading/LoadingSkeleton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,13 +17,25 @@ import AddUserDialog from "./AddUserDialog";
 import { filterUsers, paginateUsers, studentYearSection, userDepartment, userDisplayId, userErrorMessage, userStatus } from "./userManagementData.js";
 
 const initialFilters = { tab: "approved", status: "approved", role: "", program: "", year: "", search: "" };
+const usersCacheKey = "admin:user-management:users";
+const programsCacheKey = "admin:user-management:programs";
+
+function initialData() {
+  const users = getResourceCacheEntry(usersCacheKey);
+  const programs = getResourceCacheEntry(programsCacheKey);
+  return {
+    users: users?.data || [], programs: programs?.data || [],
+    loading: !users || !programs, error: "", programError: "",
+    updatedAt: Math.max(users?.updatedAt || 0, programs?.updatedAt || 0) || null,
+  };
+}
 
 export default function AdminUserManagement() {
   const { user: currentUser } = useAuth();
   const [params] = useSearchParams();
   const [filters, setFilters] = useState(() => ({ ...initialFilters, tab: params.get("tab") === "waiting" ? "waiting" : "approved" }));
   const [page, setPage] = useState(1);
-  const [data, setData] = useState({ users: [], programs: [], loading: true, error: "", programError: "" });
+  const [data, setData] = useState(initialData);
   const [reload, setReload] = useState(0);
   const [selectedId, setSelectedId] = useState(() => params.get("user") || null);
   const [working, setWorking] = useState(false);
@@ -37,21 +51,24 @@ export default function AdminUserManagement() {
   }, []);
 
   useEffect(() => {
-    const controller = new AbortController();
+    let active = true;
+    const force = reload > 0;
     Promise.allSettled([
-      getUserManagementUsers({ signal: controller.signal }),
-      getUserManagementPrograms({ signal: controller.signal }),
+      requestCachedResource(usersCacheKey, (signal) => getUserManagementUsers({ signal }), { force }),
+      requestCachedResource(programsCacheKey, (signal) => getUserManagementPrograms({ signal }), { force }),
     ]).then(([users, programs]) => {
-      if (controller.signal.aborted) return;
+      if (!active) return;
+      const updatedAt = Math.max(getResourceCacheEntry(usersCacheKey)?.updatedAt || 0, getResourceCacheEntry(programsCacheKey)?.updatedAt || 0) || null;
       setData({
         users: users.status === "fulfilled" ? users.value : [],
         programs: programs.status === "fulfilled" ? programs.value : [],
         loading: false,
         error: users.status === "rejected" ? userErrorMessage(users.reason) : "",
         programError: programs.status === "rejected" ? userErrorMessage(programs.reason) : "",
+        updatedAt,
       });
     });
-    return () => controller.abort();
+    return () => { active = false; };
   }, [reload]);
 
   const filtered = useMemo(() => filterUsers(data.users, filters, data.programs), [data.users, data.programs, filters]);
@@ -90,6 +107,7 @@ export default function AdminUserManagement() {
     try {
       const updated = await changeManagedUser(selected, currentUser?.id, field, value);
       if (!mounted.current) return;
+      updateResourceCache(usersCacheKey, (users) => users.map((item) => item.id === updated.id ? { ...item, ...updated } : item));
       setData((current) => ({ ...current, users: current.users.map((item) => item.id === updated.id ? { ...item, ...updated } : item) }));
       const result = value === "deactivated" ? "account deactivated" : userStatus(selected) === "pending" ? "account approved" : "account reactivated";
       setNotice(`${updated.name || selected.name || "User"}: ${result}.`);
@@ -122,7 +140,7 @@ export default function AdminUserManagement() {
           <Input type="search" aria-label="Search users" placeholder="Search Name, ID, Email..." value={filters.search} disabled={working} onChange={(event) => changeFilter("search", event.target.value)} className="h-10 rounded-[8px] border-slate-300 pr-9! shadow-sm" />
           <Search aria-hidden="true" className="pointer-events-none absolute right-3 top-1/2 z-10 size-4 -translate-y-1/2 text-slate-400" />
         </div>
-        <Button variant="ghost" disabled={working || data.loading} onClick={refresh}>Refresh</Button>
+        <ResourceRefresh updatedAt={data.updatedAt} loading={data.loading} onRefresh={refresh} />
         </div>
         <UserManagementFilters filters={filters} programs={data.programs} loading={data.loading} programError={data.programError} disabled={working} onChange={changeFilter} />
       </div>
@@ -171,7 +189,7 @@ export default function AdminUserManagement() {
           working={working} actionError={actionError}
           onChange={changeAccount} onClose={closeAccount} />
       )}
-      {addingUser && <AddUserDialog onClose={() => setAddingUser(false)} onCreated={() => setReload((current) => current + 1)} />}
+      {addingUser && <AddUserDialog onClose={() => setAddingUser(false)} onCreated={refresh} />}
     </div>
   );
 }

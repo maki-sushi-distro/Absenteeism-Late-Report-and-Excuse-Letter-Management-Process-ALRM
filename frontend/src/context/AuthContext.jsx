@@ -3,6 +3,9 @@ import { getSessionVersion, purgeLegacyCredentials, subscribeToSessionChanges } 
 import { logout as logoutRequest } from '../api/auth';
 import { clearPendingOtp } from '../api/otp';
 import { getSessionUser } from '../api/session';
+import { clearSessionUserCache } from '../api/session';
+import { clearResourceCache } from '../api/resourceCache';
+import { clearPageViewState } from '../hooks/usePageViewState';
 
 const AuthContext = createContext(null);
 
@@ -33,6 +36,9 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     purgeLegacyCredentials();
     const unsubscribe = subscribeToSessionChanges(event => {
+      clearSessionUserCache();
+      clearResourceCache();
+      clearPageViewState();
       if (event.expired) {
         requestVersion.current += 1;
         setSession({ version: getSessionVersion(), user: null, error: '', loading: false });
@@ -64,6 +70,9 @@ export function AuthProvider({ children }) {
       const version = await logoutRequest();
       if (version !== getSessionVersion()) return;
       requestVersion.current += 1;
+      clearSessionUserCache();
+      clearResourceCache();
+      clearPageViewState();
       clearPendingOtp();
       setLogoutDestination(redirectToSignedOut ? '/signed-out' : null);
       setSession({ version, user: null, error: '', loading: false });

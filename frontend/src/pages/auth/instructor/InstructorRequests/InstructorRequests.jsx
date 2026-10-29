@@ -22,8 +22,8 @@ import { exportRequests } from "./requestCsv";
 export default function InstructorRequests() {
   const { user } = useAuth();
   const { classId } = useParams();
-  const resource = useApiResource(loadRequests, user?.id || "");
-  const programResource = useApiResource(getProfileSetupPrograms, user?.id || "");
+  const resource = useApiResource(loadRequests, user?.id || "", { cacheKey: `instructor:requests:${user?.id || "unknown"}` });
+  const programResource = useApiResource(getProfileSetupPrograms, user?.id || "", { cacheKey: "shared:profile-programs" });
   const [params, setParams] = useSearchParams();
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);

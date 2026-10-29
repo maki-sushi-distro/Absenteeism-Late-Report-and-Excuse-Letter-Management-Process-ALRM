@@ -10,7 +10,8 @@ import {
   updateClass,
   updateStaffRole,
 } from "@/api/admin";
-import { getUserManagementUsers } from "@/api/adminUserManagement";
+import { getPendingUserPreview, getUserManagementUsers } from "@/api/adminUserManagement";
+import { getResourceCacheEntry, requestCachedResource } from "@/api/resourceCache";
 import AdminOverview from "./dashboard/AdminOverview";
 import AdminReports from "./reports/AdminReports";
 import PageBreadcrumbs from "@/components/navigation/PageBreadcrumbs";
@@ -25,15 +26,24 @@ import { isGeneralEducationProgram } from "@/lib/programs";
 import ClassForm from "./classes/ClassForm";
 
 const emptyProgramForm = { program_name: "", program_head_id: "" };
-const endpoints = { dashboard: getAdminDashboard, users: getUserManagementUsers, programs: getPrograms, classes: getClasses };
-const pendingResources = { dashboard: true, users: true, programs: true, classes: true };
-const viewResources = { dashboard: Object.keys(endpoints), users: ["users"], programs: ["programs", "users"], classes: ["classes", "programs", "users"], reports: ["programs"] };
+const endpoints = { dashboard: getAdminDashboard, users: getUserManagementUsers, pendingUsers: getPendingUserPreview, programs: getPrograms, classes: getClasses };
+const resourceDefaults = { dashboard: false, users: false, pendingUsers: false, programs: false, classes: false };
+const viewResources = { dashboard: ["dashboard", "pendingUsers"], users: ["users"], programs: ["programs", "users"], classes: ["classes", "programs"], reports: ["programs"] };
+
+function initialResources(view) {
+  const cached = Object.fromEntries(Object.keys(endpoints).map((key) => [key, getResourceCacheEntry(`admin:${key}`)]));
+  const requested = viewResources[view] || [];
+  return {
+    dashboard: cached.dashboard?.data || null,
+    users: cached.users?.data || [], pendingUsers: cached.pendingUsers?.data || [],
+    programs: cached.programs?.data || [], classes: cached.classes?.data || [],
+    loading: { ...resourceDefaults, ...Object.fromEntries(requested.map((key) => [key, !cached[key]])) }, errors: {},
+    ready: Object.fromEntries(Object.entries(cached).map(([key, entry]) => [key, Boolean(entry)])),
+  };
+}
 
 export function AdminDashboard({ view = "dashboard" }) {
-  const [resources, setResources] = useState({
-    dashboard: null, users: [], programs: [], classes: [],
-    loading: pendingResources, errors: {}, ready: {},
-  });
+  const [resources, setResources] = useState(() => initialResources(view));
   const { users, programs, classes, loading: resourceLoading, errors, ready } = resources;
   const visiblePrograms = programs.filter(program => !isGeneralEducationProgram(program));
   const generalEducationIds = new Set(programs.filter(isGeneralEducationProgram).map(program => program.id));
@@ -47,14 +57,16 @@ export function AdminDashboard({ view = "dashboard" }) {
   const [notice, setNotice] = useState("");
   const [classEditor, setClassEditor] = useState(null);
 
-  const loadData = useCallback(async () => {
+  const loadData = useCallback(async ({ force = false } = {}) => {
     if (!mounted.current) return;
     const request = ++generation.current;
-    setResources((previous) => ({ ...previous, loading: pendingResources, errors: {} }));
+    const requested = viewResources[view] || [];
+    setResources((previous) => ({ ...previous, loading: { ...resourceDefaults, ...Object.fromEntries(requested.map(key => [key, force || !getResourceCacheEntry(`admin:${key}`)])) }, errors: {} }));
     // Await completion for mutation callers; each resource publishes as it settles.
-    await Promise.allSettled(Object.entries(endpoints).map(async ([key, fetchData]) => {
+    await Promise.allSettled(requested.map(async (key) => {
+      const fetchData = endpoints[key];
       try {
-        const data = await fetchData();
+        const data = await requestCachedResource(`admin:${key}`, () => fetchData(), { force });
         if (request !== generation.current) return;
         const valid = key === "dashboard" ? data && typeof data === "object" && !Array.isArray(data) : Array.isArray(data);
         if (!valid) throw new Error(`Unexpected ${key} response.`);
@@ -73,7 +85,7 @@ export function AdminDashboard({ view = "dashboard" }) {
         }));
       }
     }));
-  }, []);
+  }, [view]);
 
   useEffect(() => {
     const requests = generation;
@@ -95,7 +107,7 @@ export function AdminDashboard({ view = "dashboard" }) {
       await action();
       if (!mounted.current) return false;
       setNotice(successMessage);
-      await loadData();
+      await loadData({ force: true });
       return mounted.current;
     } catch (requestError) {
       if (mounted.current) setError(requestError.message);
@@ -128,7 +140,7 @@ export function AdminDashboard({ view = "dashboard" }) {
       if (!mounted.current) return;
       setNotice(classEditor?.item ? "Class updated." : "Class created.");
       setClassEditor(null);
-      await loadData();
+      await loadData({ force: true });
     } finally {
       if (mounted.current) setWorking("");
     }
@@ -147,7 +159,7 @@ export function AdminDashboard({ view = "dashboard" }) {
   const staffUsers = users.filter((user) => ["instructor", "program_head", "administrator"].includes(user.role));
   const programHeads = users.filter((user) => ["instructor", "program_head"].includes(user.role));
 
-  if (view === "dashboard") return <AdminOverview resources={resources} onRetry={loadData} />;
+  if (view === "dashboard") return <AdminOverview resources={resources} onRetry={() => loadData({ force: true })} />;
 
   return (
     <div className="space-y-6" data-slot={view === "dashboard" && loading ? "dashboard-skeleton" : undefined} data-variant={view === "dashboard" ? "admin" : undefined}>

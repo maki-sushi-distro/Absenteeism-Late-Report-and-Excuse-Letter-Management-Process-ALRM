@@ -33,7 +33,7 @@ import {
   setPendingOtpSession,
   verifyOtp,
 } from "@/api/otp";
-import lvLogo from "@/assets/LV_Logo.png";
+import lvLogo from "@/assets/lv-logo-auth.webp";
 
 const INITIAL_RESEND_WAIT_SECONDS = 5 * 60;
 
@@ -307,6 +307,8 @@ function OtpVerificationForm() {
           <CardHeader className="items-center text-center">
             <img
               src={lvLogo}
+              width="384"
+              height="384"
               alt="ALRM System logo"
               className="mx-auto mb-2 size-20 object-contain"
             />
@@ -337,6 +339,8 @@ function OtpVerificationForm() {
         <CardHeader className="items-center gap-3 text-center">
           <img
             src={lvLogo}
+            width="384"
+            height="384"
             alt="ALRM System logo"
             className="mx-auto size-20 object-contain"
           />

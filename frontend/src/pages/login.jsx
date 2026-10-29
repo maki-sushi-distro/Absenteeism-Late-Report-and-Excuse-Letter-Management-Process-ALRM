@@ -12,7 +12,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { googleLoginUrl } from "../api/client";
-import lvLogo from "../assets/LV_Logo.png";
+import lvLogo from "../assets/lv-logo-auth.webp";
 import lvPicture from "../assets/LV_Picture.jpg";
 
 function GoogleIcon() {
@@ -42,6 +42,9 @@ function SchoolSeal() {
   return (
     <img
       src={lvLogo}
+      width="384"
+      height="384"
+      fetchPriority="high"
       alt="La Verdad Christian College logo"
       className="size-[clamp(5rem,10vw,9rem)] object-contain drop-shadow-2xl"
     />

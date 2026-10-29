@@ -1,11 +1,16 @@
 import { updateStaffRole } from "./admin.js";
-import { getCollection } from "./collections.js";
+import { getCollection, getCollectionPage } from "./collections.js";
 import { updateAdminUserStatus } from "./dashboardData.js";
 import { STAFF_ROLES, userPermissions, userStatus } from "../pages/auth/admin/userManagementData.js";
 
 export function getUserManagementUsers(options) {
   // apiRequest/getAdminUsers unwrap data, losing the bounded collection metadata.
   return getCollection("/api/admin/users", options);
+}
+
+export async function getPendingUserPreview(options) {
+  const page = await getCollectionPage("/api/admin/users?status=pending", { ...options, page: 1, perPage: 4 });
+  return page.data;
 }
 
 export function getUserManagementPrograms(options) {

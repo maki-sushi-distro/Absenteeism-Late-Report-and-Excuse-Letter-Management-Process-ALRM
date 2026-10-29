@@ -29,8 +29,8 @@ function loadClasses() {
 }
 
 export default function useStudentDashboardResources(userId) {
-  const requests = useApiResource(loadRequests, userId);
-  const threshold = useApiResource(loadThreshold, userId);
-  const classes = useApiResource(loadClasses, userId);
+  const requests = useApiResource(loadRequests, userId, { cacheKey: `student:requests:${userId}` });
+  const threshold = useApiResource(loadThreshold, userId, { cacheKey: `student:dashboard:${userId}` });
+  const classes = useApiResource(loadClasses, userId, { cacheKey: `student:classes:${userId}` });
   return { requests, threshold, classes };
 }

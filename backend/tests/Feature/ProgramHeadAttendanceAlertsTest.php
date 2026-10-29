@@ -155,7 +155,7 @@ class ProgramHeadAttendanceAlertsTest extends SecurityTestCase
         Mail::assertQueued(ProgramHeadAttendanceAlertMail::class, 1);
     }
 
-    public function test_alert_email_matches_the_existing_branding_and_escapes_student_content(): void
+    public function test_alert_email_uses_alrm_branding_and_escapes_student_content(): void
     {
         foreach (['warning', 'critical', 'IR'] as $status) {
             $mail = new ProgramHeadAttendanceAlertMail(
@@ -163,7 +163,8 @@ class ProgramHeadAttendanceAlertsTest extends SecurityTestCase
                 $status, 'Student needs follow-up.', 12, 10,
             );
             $html = $mail->render();
-            $this->assertStringContainsString('La Verdad Christian College, Inc.', $html);
+            $this->assertStringContainsString('ALRM System Notification', $html);
+            $this->assertStringNotContainsString('La Verdad', $html);
             $this->assertStringContainsString('&lt;script&gt;', $html);
             $this->assertStringNotContainsString('<script>', $html);
             $this->assertStringContainsString('12 of 10 allowable units', $html);

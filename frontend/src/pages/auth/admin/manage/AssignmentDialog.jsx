@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import { LoaderCircle, X } from "lucide-react";
 import { assignClassInstructor } from "@/api/adminAssignments";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { assignmentSelection, changeAssignmentSelection, selectedAssignmentClass, validateAssignment } from "./assignments.js";
 
@@ -31,12 +30,6 @@ export default function AssignmentDialog({ row, data, onClose, onAssigned }) {
 
   function change(field, value) {
     setSelection(previous => changeAssignmentSelection(previous, field, value));
-    setError("");
-  }
-
-  function changeInstructor(value) {
-    const exact = data.instructors.find(instructor => instructor.name.trim().toLowerCase() === value.trim().toLowerCase());
-    setSelection(previous => ({ ...previous, instructorName: value, instructorId: exact?.id || "" }));
     setError("");
   }
 
@@ -73,7 +66,10 @@ export default function AssignmentDialog({ row, data, onClose, onAssigned }) {
       <fieldset disabled={busy} className="grid gap-4">
         <div>
           <Label htmlFor="assignment-instructor" className="text-xs leading-[14px]">Instructor</Label>
-          <Input id="assignment-instructor" required autoComplete="off" value={selection.instructorName} disabled={!data.instructors.length} onChange={event => changeInstructor(event.target.value)} placeholder="Type instructor name" className={selectStyle} />
+          <select id="assignment-instructor" required value={selection.instructorId} disabled={!data.instructors.length} onChange={event => change("instructorId", event.target.value)} className={selectStyle}>
+            <option value="">Select Instructor</option>
+            {data.instructors.map(instructor => <option key={instructor.id} value={instructor.id}>{instructor.name}{data.instructors.filter(other => other.name === instructor.name).length > 1 ? ` (${instructor.email || instructor.id})` : ""}</option>)}
+          </select>
         </div>
         <div>
           <Label htmlFor="assignment-program" className="text-xs leading-[14px]">Program</Label>

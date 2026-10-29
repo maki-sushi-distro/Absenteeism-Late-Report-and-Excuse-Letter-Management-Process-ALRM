@@ -3,7 +3,6 @@ export function assignmentSelection(row, instructors = []) {
   return {
     classId: row?.id || "",
     instructorId: instructor?.id || "",
-    instructorName: instructor?.name || "",
     programId: row?.program_id || "",
     yearLevel: row?.year_level || "",
     semester: row?.semester || "",

@@ -19,7 +19,7 @@ class UserResource extends JsonResource
 
     public function toArray(Request $request): array
     {
-        $fields = ['id', 'name', 'email', 'role', 'program_id', 'school_student_id',
+        $fields = ['id', 'name', 'email', 'role', 'program_id', 'school_id_number',
             'status', 'year_level'];
         if ($this->authenticatedExchange || $request->user()?->id === $this->id || $request->user()?->role === 'administrator') {
             $fields = [...$fields, 'guardian_name', 'contact_number'];

@@ -63,7 +63,7 @@ class ProfileController extends Controller
         $user = $request->user();
         $isStudent = $user->role === 'student';
 
-        if ($isStudent && $user->program_id !== null && $user->school_student_id !== null) {
+        if ($isStudent && $user->program_id !== null && $user->school_id_number !== null) {
             return response()->json([
                 'success' => false,
                 'message' => 'Your profile is already complete. Please contact an administrator to change your program or year level.',
@@ -73,12 +73,12 @@ class ProfileController extends Controller
 
         $validated = $request->validate([
             'program_id' => ['required', 'string', 'uuid', 'exists:programs,id'],
-            'school_student_id' => [
+            'school_id_number' => [
                 Rule::requiredIf($isStudent),
                 'nullable',
                 'string',
                 'max:50',
-                Rule::unique('users', 'school_student_id')->ignore($user->id),
+                Rule::unique('users', 'school_id_number')->ignore($user->id),
             ],
             'year_level' => [
                 Rule::requiredIf($isStudent),
@@ -93,7 +93,7 @@ class ProfileController extends Controller
             DB::transaction(function () use ($user, $validated) {
                 $user->forceFill([
                     'program_id' => $validated['program_id'],
-                    'school_student_id' => $validated['school_student_id'],
+                    'school_id_number' => $validated['school_id_number'],
                     'year_level' => $validated['year_level'],
                 ])->save();
 
@@ -104,8 +104,12 @@ class ProfileController extends Controller
                 );
             });
         } else {
-            // instructor / program_head / administrator — many-to-many
-            $user->programs()->syncWithoutDetaching([$validated['program_id']]);
+            DB::transaction(function () use ($user, $validated) {
+                if (array_key_exists('school_id_number', $validated)) {
+                    $user->forceFill(['school_id_number' => $validated['school_id_number']])->save();
+                }
+                $user->programs()->syncWithoutDetaching([$validated['program_id']]);
+            });
         }
 
         return response()->json([

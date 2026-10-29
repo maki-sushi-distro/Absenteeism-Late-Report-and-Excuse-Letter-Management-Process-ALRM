@@ -24,7 +24,7 @@ use Laravel\Sanctum\HasApiTokens;
     'password',
     'role',
     'program_id',
-    'school_student_id',
+    'school_id_number',
     'status',
     'deactivated_at',
     'year_level',
@@ -32,7 +32,7 @@ use Laravel\Sanctum\HasApiTokens;
     'contact_number',
 ])]
 #[Hidden(['password', 'remember_token'])]
-#[Visible(['id', 'name', 'email', 'role', 'program_id', 'school_student_id',
+#[Visible(['id', 'name', 'email', 'role', 'program_id', 'school_id_number',
     'status', 'year_level', 'program', 'programs', 'heads_program', 'headed_program_exists'])]
 class User extends Authenticatable
 {

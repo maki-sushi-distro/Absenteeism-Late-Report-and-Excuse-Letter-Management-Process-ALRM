@@ -151,13 +151,13 @@
                 <mxCell id="users.program_id.1" connectable="0" parent="users.program_id" style="text;html=1;whiteSpace=wrap;overflow=hidden;verticalAlign=middle;spacingLeft=7;fontFamily=Helvetica;fillColor=#f1f5f9;fontColor=#1e293b;shape=partialRectangle;left=1;right=0;top=0;bottom=0;strokeColor=#6F0000;strokeWidth=1;align=left;fontSize=12;" value="program_id" vertex="1">
                     <mxGeometry height="25" width="240" x="40" as="geometry"/>
                 </mxCell>
-                <mxCell id="users.school_student_id" parent="users" style="group;connectable=1;" tooltip="users.school_student_id: varchar(255); NULL allowed; " value="" vertex="1">
+                <mxCell id="users.school_id_number" parent="users" style="group;connectable=1;" tooltip="users.school_id_number: varchar(255); NULL allowed; " value="" vertex="1">
                     <mxGeometry height="25" width="280" y="248" as="geometry"/>
                 </mxCell>
-                <mxCell id="users.school_student_id.0" connectable="0" parent="users.school_student_id" style="text;html=1;whiteSpace=wrap;overflow=hidden;verticalAlign=middle;spacingLeft=7;fontFamily=Helvetica;fillColor=#ffffff;fontColor=#1e293b;fontStyle=1;shape=partialRectangle;left=0;right=0;top=0;bottom=0;strokeColor=#6F0000;strokeWidth=1;align=center;fontSize=12;" value="UK" vertex="1">
+                <mxCell id="users.school_id_number.0" connectable="0" parent="users.school_id_number" style="text;html=1;whiteSpace=wrap;overflow=hidden;verticalAlign=middle;spacingLeft=7;fontFamily=Helvetica;fillColor=#ffffff;fontColor=#1e293b;fontStyle=1;shape=partialRectangle;left=0;right=0;top=0;bottom=0;strokeColor=#6F0000;strokeWidth=1;align=center;fontSize=12;" value="UK" vertex="1">
                     <mxGeometry height="25" width="40" as="geometry"/>
                 </mxCell>
-                <mxCell id="users.school_student_id.1" connectable="0" parent="users.school_student_id" style="text;html=1;whiteSpace=wrap;overflow=hidden;verticalAlign=middle;spacingLeft=7;fontFamily=Helvetica;fillColor=#ffffff;fontColor=#1e293b;shape=partialRectangle;left=1;right=0;top=0;bottom=0;strokeColor=#6F0000;strokeWidth=1;align=left;fontSize=12;" value="school_student_id" vertex="1">
+                <mxCell id="users.school_id_number.1" connectable="0" parent="users.school_id_number" style="text;html=1;whiteSpace=wrap;overflow=hidden;verticalAlign=middle;spacingLeft=7;fontFamily=Helvetica;fillColor=#ffffff;fontColor=#1e293b;shape=partialRectangle;left=1;right=0;top=0;bottom=0;strokeColor=#6F0000;strokeWidth=1;align=left;fontSize=12;" value="school_id_number" vertex="1">
                     <mxGeometry height="25" width="240" x="40" as="geometry"/>
                 </mxCell>
                 <mxCell id="users.status" parent="users" style="group;connectable=1;" tooltip="users.status: enum; NOT NULL; Values: approved, pending, deactivated; Default: pending" value="" vertex="1">
@@ -772,13 +772,13 @@
                 <mxCell id="users.program_id.1" connectable="0" parent="users.program_id" style="text;html=1;whiteSpace=wrap;overflow=hidden;verticalAlign=middle;spacingLeft=7;fontFamily=Helvetica;fillColor=#f1f5f9;fontColor=#1e293b;shape=partialRectangle;left=1;right=0;top=0;bottom=0;strokeColor=#6F0000;strokeWidth=1;align=left;fontSize=12;" value="program_id" vertex="1">
                     <mxGeometry height="25" width="240" x="40" as="geometry"/>
                 </mxCell>
-                <mxCell id="users.school_student_id" parent="users" style="group;connectable=1;" tooltip="users.school_student_id: varchar(255); NULL allowed; " value="" vertex="1">
+                <mxCell id="users.school_id_number" parent="users" style="group;connectable=1;" tooltip="users.school_id_number: varchar(255); NULL allowed; " value="" vertex="1">
                     <mxGeometry height="25" width="280" y="272" as="geometry"/>
                 </mxCell>
-                <mxCell id="users.school_student_id.0" connectable="0" parent="users.school_student_id" style="text;html=1;whiteSpace=wrap;overflow=hidden;verticalAlign=middle;spacingLeft=7;fontFamily=Helvetica;fillColor=#ffffff;fontColor=#1e293b;fontStyle=1;shape=partialRectangle;left=0;right=0;top=0;bottom=0;strokeColor=#6F0000;strokeWidth=1;align=center;fontSize=12;" value="UK" vertex="1">
+                <mxCell id="users.school_id_number.0" connectable="0" parent="users.school_id_number" style="text;html=1;whiteSpace=wrap;overflow=hidden;verticalAlign=middle;spacingLeft=7;fontFamily=Helvetica;fillColor=#ffffff;fontColor=#1e293b;fontStyle=1;shape=partialRectangle;left=0;right=0;top=0;bottom=0;strokeColor=#6F0000;strokeWidth=1;align=center;fontSize=12;" value="UK" vertex="1">
                     <mxGeometry height="25" width="40" as="geometry"/>
                 </mxCell>
-                <mxCell id="users.school_student_id.1" connectable="0" parent="users.school_student_id" style="text;html=1;whiteSpace=wrap;overflow=hidden;verticalAlign=middle;spacingLeft=7;fontFamily=Helvetica;fillColor=#ffffff;fontColor=#1e293b;shape=partialRectangle;left=1;right=0;top=0;bottom=0;strokeColor=#6F0000;strokeWidth=1;align=left;fontSize=12;" value="school_student_id" vertex="1">
+                <mxCell id="users.school_id_number.1" connectable="0" parent="users.school_id_number" style="text;html=1;whiteSpace=wrap;overflow=hidden;verticalAlign=middle;spacingLeft=7;fontFamily=Helvetica;fillColor=#ffffff;fontColor=#1e293b;shape=partialRectangle;left=1;right=0;top=0;bottom=0;strokeColor=#6F0000;strokeWidth=1;align=left;fontSize=12;" value="school_id_number" vertex="1">
                     <mxGeometry height="25" width="240" x="40" as="geometry"/>
                 </mxCell>
                 <mxCell id="users.status" parent="users" style="group;connectable=1;" tooltip="users.status: enum; NOT NULL; Values: approved, pending, deactivated; Default: pending" value="" vertex="1">
@@ -1450,13 +1450,13 @@
                 <mxCell id="users.program_id.1" connectable="0" parent="users.program_id" style="text;html=1;whiteSpace=wrap;overflow=hidden;verticalAlign=middle;spacingLeft=7;fontFamily=Helvetica;fillColor=#f1f5f9;fontColor=#1e293b;shape=partialRectangle;left=1;right=0;top=0;bottom=0;strokeColor=#6F0000;strokeWidth=1;align=left;fontSize=12;" value="program_id" vertex="1">
                     <mxGeometry height="25" width="240" x="40" as="geometry"/>
                 </mxCell>
-                <mxCell id="users.school_student_id" parent="users" style="group;connectable=1;" tooltip="users.school_student_id: varchar(255); NULL allowed; " value="" vertex="1">
+                <mxCell id="users.school_id_number" parent="users" style="group;connectable=1;" tooltip="users.school_id_number: varchar(255); NULL allowed; " value="" vertex="1">
                     <mxGeometry height="25" width="280" y="224" as="geometry"/>
                 </mxCell>
-                <mxCell id="users.school_student_id.0" connectable="0" parent="users.school_student_id" style="text;html=1;whiteSpace=wrap;overflow=hidden;verticalAlign=middle;spacingLeft=7;fontFamily=Helvetica;fillColor=#ffffff;fontColor=#1e293b;fontStyle=1;shape=partialRectangle;left=0;right=0;top=0;bottom=0;strokeColor=#6F0000;strokeWidth=1;align=center;fontSize=12;" value="UK" vertex="1">
+                <mxCell id="users.school_id_number.0" connectable="0" parent="users.school_id_number" style="text;html=1;whiteSpace=wrap;overflow=hidden;verticalAlign=middle;spacingLeft=7;fontFamily=Helvetica;fillColor=#ffffff;fontColor=#1e293b;fontStyle=1;shape=partialRectangle;left=0;right=0;top=0;bottom=0;strokeColor=#6F0000;strokeWidth=1;align=center;fontSize=12;" value="UK" vertex="1">
                     <mxGeometry height="25" width="40" as="geometry"/>
                 </mxCell>
-                <mxCell id="users.school_student_id.1" connectable="0" parent="users.school_student_id" style="text;html=1;whiteSpace=wrap;overflow=hidden;verticalAlign=middle;spacingLeft=7;fontFamily=Helvetica;fillColor=#ffffff;fontColor=#1e293b;shape=partialRectangle;left=1;right=0;top=0;bottom=0;strokeColor=#6F0000;strokeWidth=1;align=left;fontSize=12;" value="school_student_id" vertex="1">
+                <mxCell id="users.school_id_number.1" connectable="0" parent="users.school_id_number" style="text;html=1;whiteSpace=wrap;overflow=hidden;verticalAlign=middle;spacingLeft=7;fontFamily=Helvetica;fillColor=#ffffff;fontColor=#1e293b;shape=partialRectangle;left=1;right=0;top=0;bottom=0;strokeColor=#6F0000;strokeWidth=1;align=left;fontSize=12;" value="school_id_number" vertex="1">
                     <mxGeometry height="25" width="240" x="40" as="geometry"/>
                 </mxCell>
                 <mxCell id="users.status" parent="users" style="group;connectable=1;" tooltip="users.status: enum; NOT NULL; Values: approved, pending, deactivated; Default: pending" value="" vertex="1">

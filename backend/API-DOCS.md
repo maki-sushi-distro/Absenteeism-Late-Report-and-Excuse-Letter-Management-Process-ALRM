@@ -203,11 +203,24 @@ Role access is not hierarchical: administrators do not automatically pass instru
 | Field | Rules |
 |---|---|
 | `program_id` | Required existing program UUID for every role |
-| `school_student_id` | Required for students; otherwise nullable; string ≤50; unique except current user |
+| `school_id_number` | Required for students; otherwise nullable; string ≤50; unique except current user |
 | `year_level` | Required for students; otherwise nullable; `1st`, `2nd`, `3rd`, `4th` |
 | `role`, `status` | Prohibited |
 
-Students receive profile fields and automatic enrollment into matching program/year classes for the current semester and school year. A student with both `program_id` and `school_student_id` already set receives `409` on resubmission. Staff link the supplied program through the many-to-many relation without detaching existing programs. Success returns a user resource.
+Students receive profile fields and automatic enrollment into matching program/year classes for the current semester and school year. A student with both `program_id` and `school_id_number` already set receives `409` on resubmission. Staff save `school_id_number` when supplied and link the supplied program through the many-to-many relation without detaching existing programs. Omitting the staff ID preserves its existing value. Success returns a user resource.
+
+`school_id_number` is the shared institutional ID for students, instructors, program heads, and administrators. Keep it as a string to preserve leading zeros and hyphens; it is unique across all users. The internal UUID `id` remains the relationship key. Staff IDs remain optional while staff onboarding is being built; student IDs remain required.
+
+Staff pre-dashboard forms can submit to the same endpoint:
+
+```json
+{
+  "program_id": "<program UUID>",
+  "school_id_number": "EMP-00123"
+}
+```
+
+Use `data.school_id_number` in the completion response and `/me` response. `year_level` is required only for students. Run `php artisan migrate` when deploying this change: the new migration renames the existing ID column in place and preserves data and uniqueness. API clients must use the new field name.
 
 `GET /complete-profile/programs` returns `data: [{id, program_name}]`, ordered by name, excluding `General Education`.
 
@@ -397,7 +410,7 @@ Items contain `id`, `action`, human-readable `description`, ISO-8601 `timestamp`
 
 | Object | Fields and notes |
 |---|---|
-| User resource | `id`, `name`, `email`, `role`, `program_id`, `school_student_id`, `status`, `year_level`, `heads_program`, `headed_program_exists`; `program`/`programs` only when loaded |
+| User resource | `id`, `name`, `email`, `role`, `program_id`, `school_id_number`, `status`, `year_level`, `heads_program`, `headed_program_exists`; `program`/`programs` only when loaded |
 | Private user fields | `guardian_name`, `contact_number` in self, authenticated-exchange, or explicit admin resource context; `email_notifications_enabled` only for self/exchange. Resource rules do not imply that every nested user model has the same shape |
 | Request model | UUID `id`, `enrollment_id`, `type`, `subjects_missed`, `minutes_late`, occurrence dates, `reason`, nullable evidence fields, `proof_types`, status, submission/review timestamps, `reviewed_by`, normal model timestamps; relations depend on endpoint |
 | Follow-up flag | `id`, `request_id`, `flagged_date`, `escalated_to`, `status`; related request/student/class when loaded |

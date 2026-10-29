@@ -8,6 +8,7 @@ import PendingRequestsList from "./PendingRequestsList";
 import { activeTeachingAssignment, assignedInstructor, assignmentRevision, assignmentSelection, changeAssignmentSelection, classLabel, editOperations, pendingRequestCount } from "./assignments.js";
 
 const selectStyle = "h-10 w-full rounded-lg border border-[#172f6b]/60 bg-white px-4 text-sm text-slate-950 outline-none focus-visible:ring-2 focus-visible:ring-[#284fac] disabled:bg-slate-100 disabled:opacity-70";
+const assignReason = "Instructor assigned by administrator.";
 
 export default function AssignmentDialog({ row, data, onClose, onConflict, onSaved }) {
   const dialog = useRef(null);
@@ -51,7 +52,7 @@ export default function AssignmentDialog({ row, data, onClose, onConflict, onSav
   const targetPending = pendingState(targetClass);
   const blocked = sourcePending.count > 0 || targetPending.count > 0 || sourcePending.loading || targetPending.loading || Boolean(pendingErrors[sourceClass?.id] || pendingErrors[targetClass?.id]);
   const currentInstructorId = String(sourceInstructor?.id || activeTeachingAssignment(sourceClass)?.instructor_id || "");
-  const validSelection = Boolean(sourceClass && assignmentRevision(sourceClass) !== null && selection.reason.trim())
+  const validSelection = Boolean(sourceClass && assignmentRevision(sourceClass) !== null && (operation === "assign" || selection.reason.trim()))
     && (["assign", "change_instructor"].includes(operation)
       ? Boolean(selection.instructorId) && (operation !== "change_instructor" || selection.instructorId !== currentInstructorId)
       : Boolean(targetClass && assignmentRevision(targetClass) !== null));
@@ -88,7 +89,7 @@ export default function AssignmentDialog({ row, data, onClose, onConflict, onSav
   }
 
   function payload() {
-    const base = { action: operation, expected_revision: assignmentRevision(sourceClass), reason: selection.reason };
+    const base = { action: operation, expected_revision: assignmentRevision(sourceClass), reason: operation === "assign" ? assignReason : selection.reason };
     if (["assign", "change_instructor"].includes(operation)) return { ...base, instructor_id: selection.instructorId };
     return { ...base, target_class_id: targetClass.id, target_expected_revision: assignmentRevision(targetClass) };
   }
@@ -143,7 +144,7 @@ export default function AssignmentDialog({ row, data, onClose, onConflict, onSav
 
       {(selectingSource || needsTarget) && <fieldset disabled={busy} className="grid gap-5"><legend className="text-sm font-semibold">Destination class filters</legend><div className="grid gap-1.5"><Label htmlFor="assignment-program">Program</Label><select id="assignment-program" value={selection.programId} onChange={event => change("programId", event.target.value)} className={selectStyle}><option value="">Select Program</option>{programs.map(program => <option key={program.id} value={program.id}>{program.program_name || program.name}</option>)}</select></div><div className="grid gap-4 min-[480px]:grid-cols-2"><div className="grid gap-1.5"><Label htmlFor="assignment-year">Year Level</Label><select id="assignment-year" value={selection.yearLevel} disabled={!selection.programId} onChange={event => change("yearLevel", event.target.value)} className={selectStyle}><option value="">Select Year Level</option>{yearLevels.map(year => <option key={year} value={year}>{year} Year</option>)}</select></div><div className="grid gap-1.5"><Label htmlFor="assignment-semester">Semester</Label><select id="assignment-semester" value={selection.semester} disabled={!selection.yearLevel} onChange={event => change("semester", event.target.value)} className={selectStyle}><option value="">Select Semester</option>{semesters.map(semester => <option key={semester} value={semester}>{semester} Semester</option>)}</select></div></div><div className="grid gap-1.5"><Label htmlFor="assignment-class">Available Class</Label><select id="assignment-class" value={selection.targetClassId} disabled={!selection.semester} onChange={event => change("targetClassId", event.target.value)} className={selectStyle}><option value="">Select Available Class</option>{availableClasses.map(item => <option key={item.id} value={item.id}>{classLabel(item)}</option>)}</select></div></fieldset>}
 
-      <div className="grid gap-1.5"><Label htmlFor="assignment-reason">Reason</Label><textarea id="assignment-reason" required rows={3} value={selection.reason} disabled={busy} onChange={event => change("reason", event.target.value)} className="w-full rounded-lg border border-slate-300 p-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-[#284fac]" /></div>
+      {operation !== "assign" && <div className="grid gap-1.5"><Label htmlFor="assignment-reason">Reason</Label><textarea id="assignment-reason" required rows={3} value={selection.reason} disabled={busy} onChange={event => change("reason", event.target.value)} className="w-full rounded-lg border border-slate-300 p-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-[#284fac]" /></div>}
       <PendingRequestsList classRow={sourceClass} count={sourcePending.count} requests={sourcePending.requests} loading={sourcePending.loading} error={pendingErrors[sourceClass?.id]} />
       <PendingRequestsList classRow={targetClass} count={targetPending.count} requests={targetPending.requests} loading={targetPending.loading} error={pendingErrors[targetClass?.id]} />
       {reviewing && <section className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm"><h3 className="font-semibold text-[#172f6b]">Before / After preview</h3><ul className="mt-2 space-y-1">{preview.map(line => <li key={line}>{line}</li>)}</ul></section>}

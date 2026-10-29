@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import { ChevronLeft, ChevronRight, Search, UserPlus } from "lucide-react";
 import { changeManagedUser, getUserManagementPrograms, getUserManagementUsers } from "@/api/adminUserManagement";
 import { useAuth } from "@/context/AuthContext";
@@ -11,12 +11,12 @@ import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import UserManagementFilters from "./UserManagementFilters";
 import ManagedAccountDialog from "./ManagedAccountDialog";
+import AddUserDialog from "./AddUserDialog";
 import { filterUsers, paginateUsers, studentYearSection, userDepartment, userDisplayId, userErrorMessage, userStatus } from "./userManagementData.js";
 
 const initialFilters = { tab: "approved", status: "approved", role: "", program: "", year: "", search: "" };
 
 export default function AdminUserManagement() {
-  const navigate = useNavigate();
   const { user: currentUser } = useAuth();
   const [params] = useSearchParams();
   const [filters, setFilters] = useState(() => ({ ...initialFilters, tab: params.get("tab") === "waiting" ? "waiting" : "approved" }));
@@ -27,6 +27,7 @@ export default function AdminUserManagement() {
   const [working, setWorking] = useState(false);
   const [actionError, setActionError] = useState("");
   const [notice, setNotice] = useState("");
+  const [addingUser, setAddingUser] = useState(false);
   const actionLock = useRef(false);
   const mounted = useRef(false);
 
@@ -105,7 +106,7 @@ export default function AdminUserManagement() {
     <div className="min-w-0 w-full space-y-5 text-slate-950">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-bold">User Management</h1>
-        <Button type="button" onClick={() => navigate("/users/add")} className="h-10 bg-[#172f6b] px-4 text-white hover:bg-[#203f8a]"><UserPlus className="size-4" />Add User</Button>
+        <Button type="button" aria-haspopup="dialog" aria-expanded={addingUser} aria-controls={addingUser ? "add-user-dialog" : undefined} onClick={() => setAddingUser(true)} className="h-10 bg-[#172f6b] px-4 text-white hover:bg-[#203f8a]"><UserPlus className="size-4" />Add User</Button>
       </div>
       <nav aria-label="User approval views" className="flex flex-wrap gap-1 border-b border-slate-200">
         {[["approved", "Approved Users"], ["waiting", "Waiting for Approval"]].map(([value, label]) => (
@@ -170,6 +171,7 @@ export default function AdminUserManagement() {
           working={working} actionError={actionError}
           onChange={changeAccount} onClose={closeAccount} />
       )}
+      {addingUser && <AddUserDialog onClose={() => setAddingUser(false)} onCreated={() => setReload((current) => current + 1)} />}
     </div>
   );
 }

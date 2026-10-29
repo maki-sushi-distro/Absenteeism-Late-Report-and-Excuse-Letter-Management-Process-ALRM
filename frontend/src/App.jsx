@@ -10,7 +10,6 @@ import OtpVerification from "./pages/OtpVerification";
 import ProfileSetup from "./pages/ProfileSetup";
 import AddInstructor from "./pages/auth/admin/AddInstructor";
 import AddStudent from "./pages/auth/admin/AddStudent";
-import AddUser from "./pages/auth/admin/AddUser";
 import Instructors from "./pages/auth/admin/Instructors";
 import AdminPageLayout from "./pages/auth/admin/AdminPageLayout";
 import { AdminDashboard as AdminWorkspace } from "./pages/auth/admin/AdminDashboard";
@@ -73,7 +72,6 @@ function App() {
             }
           />
           <Route path="/user-management" element={<ProtectedRoute allowedRoles={["admin"]}><AdminPageLayout><AdminUserManagement /></AdminPageLayout></ProtectedRoute>} />
-          <Route path="/users/add" element={<ProtectedRoute allowedRoles={["admin"]}><AddUser /></ProtectedRoute>} />
           <Route path="/program-overview" element={<ProtectedRoute allowedRoles={["admin"]}><AdminPageLayout><AdminProgramOverview /></AdminPageLayout></ProtectedRoute>} />
           <Route path="/activity-log" element={<ProtectedRoute allowedRoles={["admin"]}><AdminPageLayout><AdminActivityLog /></AdminPageLayout></ProtectedRoute>} />
           <Route path="/manage" element={<ProtectedRoute allowedRoles={["admin"]}><AdminPageLayout><AdminManage /></AdminPageLayout></ProtectedRoute>} />

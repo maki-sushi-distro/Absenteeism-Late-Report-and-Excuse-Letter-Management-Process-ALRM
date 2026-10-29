@@ -57,8 +57,11 @@ function SelectField({ children, disabled = false, error, label, loading = false
 
 export default function AdminUserForm({
   cancelPath = "/user-management",
+  embedded = false,
   initialRole = "student",
   lockRole = false,
+  onCancel,
+  onCreated,
   parentLabel = "User Management",
   sectionTitle = "Account Information",
   submitLabel = "Add User",
@@ -124,6 +127,7 @@ export default function AdminUserForm({
       const result = await createAdminUser(values);
       setSuccess(result?.message || "User pre-registered. The account remains pending until its first institutional Google sign-in.");
       setValues(initialForm(initialRole));
+      onCreated?.(result);
     } catch (error) {
       const fieldErrors = error.fieldErrors || error.errors || error.body?.errors;
       if (fieldErrors) setErrors(Object.fromEntries(Object.entries(fieldErrors).map(([key, messages]) => [key, firstError(messages)])));
@@ -133,10 +137,9 @@ export default function AdminUserForm({
     }
   }
 
-  return <AdminPageLayout>
-    <PageBreadcrumbs className="mb-5" items={[{ label: parentLabel, to: cancelPath }, { label: title }]} />
-    <div className="mb-6"><h1 className="text-2xl font-black tracking-normal text-slate-950">{title}</h1><p className="mt-1 text-sm font-medium text-slate-600">{subtitle}</p></div>
-    <div className="w-full max-w-[960px] rounded-[5px] border border-slate-300 bg-white px-5 py-7 shadow-none sm:px-8">
+  const formContent = <>
+    <div className="mb-6"><h1 id={embedded ? "add-user-dialog-title" : undefined} className="text-2xl font-black tracking-normal text-slate-950">{title}</h1><p className="mt-1 text-sm font-medium text-slate-600">{subtitle}</p></div>
+    <div className="w-full rounded-[5px] border border-slate-300 bg-white px-5 py-7 shadow-none sm:px-8">
       <form onSubmit={handleSubmit} noValidate>
         <FieldSet>
           <FieldLegend className="text-base font-bold text-slate-950">{sectionTitle}</FieldLegend>
@@ -153,11 +156,18 @@ export default function AdminUserForm({
             <TextField name="school_id_number" label="User ID" value={values.school_id_number} onChange={handleChange} placeholder="Enter school ID number" icon={IdCard} error={errors.school_id_number} />
           </FieldGroup>
           <div className="flex flex-col-reverse gap-3 pt-10 sm:flex-row sm:justify-end">
-            <Button type="button" variant="outline" onClick={() => navigate(cancelPath)} disabled={submitting} className="h-9 rounded-[5px] border-slate-300 px-6 font-bold text-[#0b2f70]">Cancel</Button>
+            <Button type="button" variant="outline" onClick={onCancel || (() => navigate(cancelPath))} disabled={submitting} className="h-9 rounded-[5px] border-slate-300 px-6 font-bold text-[#0b2f70]">Cancel</Button>
             <Button type="submit" disabled={submitting || (needsProgram && (loadingPrograms || Boolean(programError)))} className="h-9 rounded-[5px] bg-[#0b4bd3] px-6 font-bold text-white hover:bg-[#083da9]">{submitting && <Spinner className="mr-2" />}{submitting ? "Saving..." : submitLabel}</Button>
           </div>
         </FieldSet>
       </form>
     </div>
+  </>;
+
+  if (embedded) return formContent;
+
+  return <AdminPageLayout>
+    <PageBreadcrumbs className="mb-5" items={[{ label: parentLabel, to: cancelPath }, { label: title }]} />
+    <div className="max-w-[960px]">{formContent}</div>
   </AdminPageLayout>;
 }

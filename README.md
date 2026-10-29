@@ -41,9 +41,11 @@ A web-based Absence/Tardiness Monitoring and Approval System for **La Verdad Chr
 | User type | Domain | Role |
 |---|---|---|
 | Student | `@student.laverdad.edu.ph` | `student` |
-| Faculty / Staff | `@laverdad.edu.ph` | `instructor` / `program_head` / `administrator` (assigned by Admin on approval) |
+| Faculty / Staff | `@laverdad.edu.ph` | `instructor` by default; Admin can assign `program_head` / `administrator` |
 
-Login is via Google SSO, not a registration form; any email outside these two domains is rejected at the OAuth callback. **Students are auto-approved on first login** — no Admin step at all, since Google Workspace membership already is the identity check. Staff accounts land as `pending` and the Administrator assigns the specific role during login, since the staff domain alone doesn't distinguish Instructor from Program Head from Admin — this is role *assignment*, not a legitimacy approval.
+Login uses Google SSO. Verified accounts in either official institutional domain are automatically `approved`, including returning institutional accounts still marked `pending`. New students receive the `student` role and new staff receive `instructor`; pre-registered roles are preserved, and Admin can reassign staff roles. Deactivated accounts stay blocked.
+
+Verified Google accounts outside both exact domains enter as `pending` with the default `student` role. They can complete OTP verification, but role routes remain blocked until an Administrator reviews and approves them. Admin can assign the appropriate role while the external account is pending. Google OAuth audience settings must allow external users for this flow to reach ALRM; an Internal-only Google app blocks them before the callback.
 
 ---
 

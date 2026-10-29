@@ -166,7 +166,8 @@ Role access is not hierarchical: administrators do not automatically pass instru
 | GET | `/program-head/dashboard` | Summary of headed programs |
 | GET | `/program-head/students` | Students in headed programs; **Paged** |
 | GET | `/program-head/instructors` | Instructors linked to or teaching in headed programs; **Paged** |
-| GET | `/program-head/students/flagged` | Flags escalated to user OR belonging to headed programs; **Paged** |
+| GET | `/program-head/students/flagged` | Flags escalated to user OR belonging to headed programs; adds attendance `threshold` and `percentage`; **Paged** |
+| PATCH | `/program-head/followup-flags/{followupFlag}/resolve` | Resolve an authorized flag and audit the action; 409 if already resolved |
 | GET | `/program-head/requests` | Requests in headed programs; **Paged** |
 
 ### Administrator endpoints
@@ -386,7 +387,7 @@ All exports are capped at 5,000 rows and throttled to 3/minute per user. A succe
 
 Head/admin date windows permit at most 730 days and include the end date. With no dates, they default to the preceding 365 days through today. With only `date_to`, start defaults to 365 days before it; with only `date_from`, end defaults to today. Instructor export has no 730-day date constraint. Narrow filters when exports exceed the row cap (`422`).
 
-Head activity CSV columns: `Student`, `Class`, `Submitted`, `Type`. Risk CSV columns: `Student`, `Class`, `Flagged date`, `Status`. Risk export is restricted to headed programs even for flags escalated to the user from elsewhere.
+Head activity CSV columns: `Student`, `Class`, `Submitted`, `Type`. Risk CSV columns: `Student`, `Class`, `Flagged date`, `Threshold`, `Percentage`. Threshold and percentage come from the current enrollment attendance tracker using the backend semester-hours calculation, not a historical snapshot. Missing trackers produce blank values; zero semester hours produce a blank percentage. Risk export is restricted to headed programs even for flags escalated to the user from elsewhere. See [PROGRAM-HEAD-EXPORT.md](PROGRAM-HEAD-EXPORT.md) for API fields and Resolve integration.
 
 Admin preview returns `data.row_count`, `exceeds_limit`, `max_export_rows`, `date_from`, `date_to`, and `used_default_range`. Preview can report a count above 5,000; export rejects that count. Preview is useful before requesting a download but is not a server-enforced prerequisite.
 

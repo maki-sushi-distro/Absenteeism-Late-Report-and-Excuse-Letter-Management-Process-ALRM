@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\ProgramHead;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\ProgramHeadFlagResource;
 use App\Http\Resources\UserResource;
 use App\Models\AttendanceTracker;
 use App\Models\ExcuseRequest;
@@ -63,7 +64,7 @@ class ProgramHeadDashboardController extends Controller
     }
 
     /**
-     * Students escalated to this Program Head via FollowupFlag (IR crossings).
+     * Students escalated to this Program Head via FollowupFlag.
      * Supports ?status=open|resolved filter; defaults to all.
      */
     public function flaggedStudents(Request $request)
@@ -72,6 +73,7 @@ class ProgramHeadDashboardController extends Controller
             ->with([
                 'request.enrollment.student',
                 'request.enrollment.class',
+                'request.enrollment.attendanceTracker',
                 'request.reviewer',
             ]);
 
@@ -84,7 +86,7 @@ class ProgramHeadDashboardController extends Controller
 
         $flags = $query->latest('flagged_date');
 
-        return BoundedCollection::respond($flags);
+        return BoundedCollection::respond($flags, ProgramHeadFlagResource::class);
     }
 
     /**

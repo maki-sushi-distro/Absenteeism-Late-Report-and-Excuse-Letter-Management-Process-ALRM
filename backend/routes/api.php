@@ -15,6 +15,7 @@ use App\Http\Controllers\Instructor\InstructorRequestController;
 use App\Http\Controllers\Instructor\InstructorRequestExportController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\ProgramHead\ProgramHeadDashboardController;
+use App\Http\Controllers\ProgramHead\FollowupFlagController;
 use App\Http\Controllers\ProgramHead\ProgramHeadReportController;
 use App\Http\Controllers\Student\AttendanceController;
 use App\Http\Controllers\Student\ClassController;
@@ -120,6 +121,7 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
         Route::get('/students', [ProgramHeadDashboardController::class, 'students']);
         Route::get('/instructors', [ProgramHeadDashboardController::class, 'instructors']);
         Route::get('/students/flagged', [ProgramHeadDashboardController::class, 'flaggedStudents']);
+        Route::patch('/followup-flags/{followupFlag}/resolve', [FollowupFlagController::class, 'resolve']);
         Route::get('/requests', [ProgramHeadDashboardController::class, 'requests']);
     });
 

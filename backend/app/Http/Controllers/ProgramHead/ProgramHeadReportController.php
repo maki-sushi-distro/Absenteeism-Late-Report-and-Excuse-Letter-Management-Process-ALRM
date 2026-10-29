@@ -54,10 +54,11 @@ class ProgramHeadReportController extends Controller
         $relations = [
             $prefix.'enrollment:id,student_id,class_id',
             $prefix.'enrollment.student:id,name',
-            $prefix.'enrollment.class:id,subject_name',
+            $prefix.'enrollment.class:id,subject_name,schedule,weekly_hours,meetings_per_week',
         ];
         if ($risk) {
             $relations[] = 'request:id,enrollment_id';
+            $relations[] = 'request.enrollment.attendanceTracker';
         }
         $rows = $query->with($relations)->orderByRaw($dateColumn.' DESC')->orderBy('id')->limit(self::MAX_ROWS + 1)->get();
         abort_if($rows->count() > self::MAX_ROWS, 422, 'Export exceeds the 5000-row limit. Narrow the program or date range.');
@@ -65,16 +66,20 @@ class ProgramHeadReportController extends Controller
         return response()->streamDownload(function () use ($rows, $risk) {
             $output = fopen('php://output', 'wb');
             fwrite($output, "\xEF\xBB\xBF");
-            $this->writeRow($output, ['Student', 'Class', $risk ? 'Flagged date' : 'Submitted', $risk ? 'Status' : 'Type']);
+            $this->writeRow($output, $risk
+                ? ['Student', 'Class', 'Flagged date', 'Threshold', 'Percentage']
+                : ['Student', 'Class', 'Submitted', 'Type']);
             foreach ($rows as $row) {
                 $record = $risk ? $row->request : $row;
                 $date = $risk ? $row->flagged_date : ($row->date_submitted ?? $row->created_at);
-                $this->writeRow($output, [
+                $values = [
                     $record?->enrollment?->student?->name ?? '',
                     $record?->enrollment?->class?->subject_name ?? '',
                     $date?->toDateString() ?? '',
-                    $risk ? $row->status : $row->type,
-                ]);
+                ];
+                $this->writeRow($output, $risk
+                    ? [...$values, ...array_values($row->attendanceRisk())]
+                    : [...$values, $row->type]);
             }
             fclose($output);
         }, 'program-'.($risk ? 'risk' : 'activity').'-report-'.now()->format('Y-m-d_His').'.csv', [

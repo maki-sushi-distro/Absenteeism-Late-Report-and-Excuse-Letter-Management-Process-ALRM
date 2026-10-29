@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Mail\Transport\BrevoDiagnosticTransport;
 use App\Models\AttendanceTracker;
 use App\Models\ClassModel;
 use App\Models\ExcuseRequest;
@@ -74,7 +75,7 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(UserNotification::class, UserNotificationPolicy::class);
 
         Mail::extend('brevo', function () {
-            return (new BrevoTransportFactory(client: HttpClient::create([
+            $transport = (new BrevoTransportFactory(client: HttpClient::create([
                 'timeout' => 10, 'max_duration' => 15, 'max_redirects' => 0,
             ])))->create(
                 new Dsn(
@@ -82,6 +83,12 @@ class AppServiceProvider extends ServiceProvider
                     'default',
                     config('services.brevo.key')
                 )
+            );
+
+            return new BrevoDiagnosticTransport(
+                $transport,
+                app('log'),
+                (string) config('services.brevo.key'),
             );
         });
 

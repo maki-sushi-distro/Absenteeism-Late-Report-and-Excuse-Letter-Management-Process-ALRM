@@ -27,7 +27,11 @@ class ProgramHeadAttendanceAlertsTest extends SecurityTestCase
     protected function setUp(): void
     {
         parent::setUp();
-        config(['mail.program_head_test_recipient' => null, 'mail.test_recipient' => null]);
+        config([
+            'mail.program_head_test_recipient' => null, 'mail.test_recipient' => null,
+            'mail.student_test_recipient' => null, 'mail.instructor_test_recipient' => null,
+            'mail.instructor_notify_allowlist' => [],
+        ]);
     }
 
     public function test_program_head_alerts_only_email_the_configured_tester_without_changing_in_app_owners(): void
@@ -48,12 +52,13 @@ class ProgramHeadAttendanceAlertsTest extends SecurityTestCase
         $tracker->update(['status' => 'IR', 'total_absences' => 4, 'converted_absences' => 4]);
         app(AttendanceThresholdNotifier::class)->notify($tracker);
 
-        Mail::assertQueued(ProgramHeadAttendanceAlertMail::class, 2);
+        Mail::assertQueued(ProgramHeadAttendanceAlertMail::class, 4);
         foreach (['warning', 'IR'] as $status) {
             Mail::assertQueued(ProgramHeadAttendanceAlertMail::class, fn ($mail) => $mail->alertStatus === $status && $mail->hasTo('marwin.mandocdoc@student.laverdad.edu.ph')
                 && ! $mail->hasTo($first->email) && ! $mail->hasTo($second->email)
                 && ! $mail->hasTo('global-tester@example.com')
             );
+            Mail::assertQueued(ProgramHeadAttendanceAlertMail::class, fn ($mail) => $mail->alertStatus === $status && $mail->hasTo('global-tester@example.com'));
         }
         $this->assertSame(2, UserNotification::where('user_id', $first->id)->count());
         $this->assertSame(2, UserNotification::where('user_id', $second->id)->count());
@@ -108,11 +113,17 @@ class ProgramHeadAttendanceAlertsTest extends SecurityTestCase
             Mail::assertQueued(ProgramHeadAttendanceAlertMail::class, fn ($mail) => $mail->hasTo($head->email) && $mail->alertStatus === 'critical');
             $this->bearer($head)->getJson('/api/notifications')->assertOk()->assertJsonCount(4, 'data');
         }
-        foreach ([$class->instructor, $inactive, $outsider] as $nonRecipient) {
+        foreach ([$inactive, $outsider] as $nonRecipient) {
             $this->assertSame(0, UserNotification::where('user_id', $nonRecipient->id)->count());
             Mail::assertNotQueued(ProgramHeadAttendanceAlertMail::class, fn ($mail) => $mail->hasTo($nonRecipient->email));
         }
-        Mail::assertQueued(ProgramHeadAttendanceAlertMail::class, 6);
+        foreach ([$student, $class->instructor] as $recipient) {
+            foreach (['threshold_warning', 'threshold_critical'] as $type) {
+                $this->assertSame(1, UserNotification::where('user_id', $recipient->id)->where('type', $type)->count());
+            }
+            Mail::assertQueued(ProgramHeadAttendanceAlertMail::class, fn ($mail) => $mail->hasTo($recipient->email) && $mail->alertStatus === 'critical');
+        }
+        Mail::assertQueued(ProgramHeadAttendanceAlertMail::class, 10);
     }
 
     public function test_automation_delivers_the_same_english_alerts_once_per_stage(): void
@@ -134,13 +145,19 @@ class ProgramHeadAttendanceAlertsTest extends SecurityTestCase
         $this->artisan('alrm:process-automation')->assertSuccessful();
         $this->artisan('alrm:process-automation')->assertSuccessful();
         $this->assertSame(3, UserNotification::where('user_id', $head->id)->count());
-        Mail::assertQueued(ProgramHeadAttendanceAlertMail::class, 3);
+        foreach ([$request->enrollment->student, $request->enrollment->class->instructor] as $recipient) {
+            $this->assertSame(3, UserNotification::where('user_id', $recipient->id)->count());
+            foreach (['warning', 'critical', 'IR'] as $status) {
+                Mail::assertQueued(ProgramHeadAttendanceAlertMail::class, fn ($mail) => $mail->hasTo($recipient->email) && $mail->alertStatus === $status);
+            }
+        }
+        Mail::assertQueued(ProgramHeadAttendanceAlertMail::class, 9);
         $this->assertNotNull($tracker->fresh()->warning_notified_at);
         $this->assertNotNull($tracker->fresh()->critical_notified_at);
         $this->assertNotNull($tracker->fresh()->ir_notified_at);
     }
 
-    public function test_missing_heads_do_not_prevent_decisions_and_can_receive_a_later_automation_alert(): void
+    public function test_missing_heads_do_not_block_student_and_instructor_alerts_or_assign_consultations_to_them(): void
     {
         $request = $this->requestFor($this->user('student'));
         $tracker = AttendanceTracker::create([
@@ -148,11 +165,14 @@ class ProgramHeadAttendanceAlertsTest extends SecurityTestCase
             'total_lates' => 0, 'converted_absences' => 3, 'status' => 'warning',
         ]);
         $this->bearer($request->enrollment->class->instructor)->patchJson('/api/instructor/requests/'.$request->id.'/decision', ['status' => 'invalid'])->assertOk();
-        $this->assertNull($tracker->fresh()->ir_notified_at);
-        Mail::assertNotQueued(ProgramHeadAttendanceAlertMail::class);
-        $this->user('program_head', ['program_id' => $request->enrollment->class->program_id]);
+        $this->assertNotNull($tracker->fresh()->ir_notified_at);
+        $this->assertDatabaseCount('followup_flags', 0);
+        foreach ([$request->enrollment->student, $request->enrollment->class->instructor] as $recipient) {
+            $this->assertDatabaseHas('notifications', ['user_id' => $recipient->id, 'type' => 'ir_escalation']);
+            Mail::assertQueued(ProgramHeadAttendanceAlertMail::class, fn ($mail) => $mail->hasTo($recipient->email));
+        }
         $this->artisan('alrm:process-automation')->assertSuccessful();
-        Mail::assertQueued(ProgramHeadAttendanceAlertMail::class, 1);
+        Mail::assertQueued(ProgramHeadAttendanceAlertMail::class, 2);
     }
 
     public function test_alert_email_uses_alrm_branding_and_escapes_student_content(): void
@@ -175,6 +195,60 @@ class ProgramHeadAttendanceAlertsTest extends SecurityTestCase
                 'IR' => 'Attendance IR Drop Limit', 'critical' => 'Critical Attendance Consultation', default => 'Preventive Attendance Warning',
             }, $mail->envelope()->subject);
         }
+    }
+
+    public function test_instructor_who_is_also_a_program_head_receives_only_one_alert(): void
+    {
+        $student = $this->user('student');
+        $instructor = $this->user('instructor');
+        $request = $this->requestFor($student, $instructor);
+        $request->enrollment->class->program->update(['program_head_id' => $instructor->id]);
+        $tracker = AttendanceTracker::create([
+            'enrollment_id' => $request->enrollment_id, 'total_absences' => 2,
+            'total_lates' => 0, 'converted_absences' => 2, 'status' => 'critical',
+        ]);
+
+        app(AttendanceThresholdNotifier::class)->notify($tracker);
+        app(AttendanceThresholdNotifier::class)->notify($tracker);
+
+        $this->assertSame(1, UserNotification::where('user_id', $instructor->id)->where('type', 'threshold_critical')->count());
+        Mail::assertQueued(ProgramHeadAttendanceAlertMail::class, 2);
+    }
+
+    public function test_student_and_instructor_email_preferences_and_redirects_are_respected(): void
+    {
+        $student = $this->user('student');
+        $instructor = $this->user('instructor');
+        $request = $this->requestFor($student, $instructor);
+        $tracker = AttendanceTracker::create([
+            'enrollment_id' => $request->enrollment_id, 'total_absences' => 1,
+            'total_lates' => 0, 'converted_absences' => 1, 'status' => 'warning',
+        ]);
+        $student->forceFill(['email_notifications_enabled' => false])->save();
+        $instructor->forceFill(['google_id' => null])->save();
+        app(AttendanceThresholdNotifier::class)->notify($tracker);
+        Mail::assertNotQueued(ProgramHeadAttendanceAlertMail::class);
+        $this->assertDatabaseCount('notifications', 2);
+
+        $student->forceFill(['email_notifications_enabled' => true])->save();
+        $instructor->forceFill(['google_id' => 'linked'])->save();
+        config([
+            'mail.student_test_recipient' => 'student-tester@example.com',
+            'mail.instructor_test_recipient' => 'instructor-tester@example.com',
+            'mail.program_head_test_recipient' => 'head-tester@example.com',
+        ]);
+        $tracker->update(['status' => 'critical']);
+        app(AttendanceThresholdNotifier::class)->notify($tracker);
+        Mail::assertQueued(ProgramHeadAttendanceAlertMail::class, 2);
+        foreach (['student-tester@example.com', 'instructor-tester@example.com'] as $email) {
+            Mail::assertQueued(ProgramHeadAttendanceAlertMail::class, fn ($mail) => $mail->hasTo($email));
+        }
+
+        config(['mail.instructor_notify_allowlist' => ['other@example.com']]);
+        $tracker->update(['status' => 'IR']);
+        app(AttendanceThresholdNotifier::class)->notify($tracker);
+        Mail::assertQueued(ProgramHeadAttendanceAlertMail::class, 3);
+        $this->assertDatabaseHas('notifications', ['user_id' => $instructor->id, 'type' => 'ir_escalation']);
     }
 
     public function test_email_jobs_are_dispatched_only_after_commit_and_discarded_on_rollback(): void
@@ -200,8 +274,8 @@ class ProgramHeadAttendanceAlertsTest extends SecurityTestCase
         app(AttendanceThresholdNotifier::class)->notify($tracker);
         $this->assertDatabaseCount('jobs', 0);
         DB::commit();
-        $this->assertDatabaseCount('jobs', 1);
-        $this->assertDatabaseCount('notifications', 1);
+        $this->assertDatabaseCount('jobs', 3);
+        $this->assertDatabaseCount('notifications', 3);
         $this->assertNotNull($tracker->fresh()->warning_notified_at);
     }
 }

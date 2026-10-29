@@ -35,9 +35,12 @@ class AttendanceThresholdNotifier
                 return false;
             }
 
-            $recipients = $program->notificationHeads();
+            $heads = $program->notificationHeads();
+            $recipients = $heads->concat([$student, $class->instructor])
+                ->filter(fn ($user) => $user && $user->status === 'approved')
+                ->unique('id');
             if ($recipients->isEmpty()) {
-                return false; // Leave the stage available for a later run after assignment.
+                return false;
             }
 
             $used = $tracker->unitsUsed();
@@ -58,8 +61,8 @@ class AttendanceThresholdNotifier
             if (in_array($tracker->status, ['critical', 'IR'], true)) {
                 $flagRequest = $request ?? ExcuseRequest::where('enrollment_id', $tracker->enrollment_id)
                     ->where('status', 'invalid')->latest('date_reviewed')->first();
-                if ($flagRequest) {
-                    $head = $recipients->firstWhere('id', $program->program_head_id) ?? $recipients->first();
+                if ($flagRequest && $heads->isNotEmpty()) {
+                    $head = $heads->firstWhere('id', $program->program_head_id) ?? $heads->first();
                     FollowupFlag::firstOrCreate(['request_id' => $flagRequest->id], [
                         'flagged_date' => now(),
                         'escalated_to' => $head->id,
@@ -68,10 +71,6 @@ class AttendanceThresholdNotifier
                 }
             }
 
-            $testRecipient = trim((string) config('mail.program_head_test_recipient', ''));
-            if ($testRecipient === '') {
-                $testRecipient = trim((string) config('mail.test_recipient', ''));
-            }
             $emailTargets = [];
 
             foreach ($recipients as $recipient) {
@@ -89,12 +88,24 @@ class AttendanceThresholdNotifier
                     'is_read' => false,
                 ]);
 
+                $audience = $heads->contains('id', $recipient->id) ? 'program_head'
+                    : ($recipient->id === $student->id ? 'student' : 'instructor');
+                if ($audience === 'instructor') {
+                    $allowlist = array_map(fn ($email) => strtolower(trim($email)), config('mail.instructor_notify_allowlist', []));
+                    if ($allowlist !== [] && ! in_array(strtolower(trim($recipient->email)), $allowlist, true)) {
+                        continue;
+                    }
+                }
+                $testRecipient = trim((string) config("mail.{$audience}_test_recipient", ''));
+                if ($testRecipient === '') {
+                    $testRecipient = trim((string) config('mail.test_recipient', ''));
+                }
                 $email = $testRecipient !== '' ? $testRecipient : $recipient->email;
                 if ($recipient->canReceiveEmailNotifications() && ! isset($emailTargets[strtolower($email)])) {
                     $emailTargets[strtolower($email)] = true;
                     Mail::to($email, $testRecipient !== '' ? null : $recipient->name)->queue(
                         (new ProgramHeadAttendanceAlertMail(
-                            $testRecipient !== '' ? 'Program Head' : $recipient->name,
+                            $recipient->name,
                             $student->name, $class->subject_name,
                             $program->program_name, $tracker->status, $message, $used, $limit,
                         ))->afterCommit(),

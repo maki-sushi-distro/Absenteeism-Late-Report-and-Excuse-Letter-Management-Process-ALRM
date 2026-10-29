@@ -96,7 +96,7 @@ class RunAttendanceAutomation extends Command
     }
 
     /**
-     * Notify program heads for warning/critical/IR trackers using the same stage
+     * Notify students, class instructors, and program heads using the same stage
      * timestamps as request decisions so the two paths do not double-send.
      */
     private function fireThresholdNotifications(): int

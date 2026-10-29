@@ -94,7 +94,8 @@ class ProgramHeadAttendanceAlertsTest extends SecurityTestCase
         $this->artisan('alrm:process-automation')->assertSuccessful();
 
         foreach ([$primary, $coHead, $automaticHead] as $head) {
-            $this->assertSame(2, UserNotification::where('user_id', $head->id)->count());
+            // Two threshold alerts and two Activity Log decision notifications.
+            $this->assertSame(4, UserNotification::where('user_id', $head->id)->count());
             $this->assertDatabaseHas('notifications', [
                 'user_id' => $head->id, 'channel' => 'in_app', 'type' => 'threshold_warning',
                 'message' => $student->name.' reached the preventive absence threshold in Security (6.25% of semester class hours; 3 of 10 allowable units; 14.58% of semester hours remaining before the IR limit).',
@@ -105,7 +106,7 @@ class ProgramHeadAttendanceAlertsTest extends SecurityTestCase
             ]);
             Mail::assertQueued(ProgramHeadAttendanceAlertMail::class, fn ($mail) => $mail->hasTo($head->email) && $mail->alertStatus === 'warning');
             Mail::assertQueued(ProgramHeadAttendanceAlertMail::class, fn ($mail) => $mail->hasTo($head->email) && $mail->alertStatus === 'critical');
-            $this->bearer($head)->getJson('/api/notifications')->assertOk()->assertJsonCount(2, 'data');
+            $this->bearer($head)->getJson('/api/notifications')->assertOk()->assertJsonCount(4, 'data');
         }
         foreach ([$class->instructor, $inactive, $outsider] as $nonRecipient) {
             $this->assertSame(0, UserNotification::where('user_id', $nonRecipient->id)->count());

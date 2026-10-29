@@ -46,6 +46,14 @@ Submission, edit, and cancellation entries are written in the same transaction a
 
 Existing matching entries are readable immediately. Previously unlogged submissions/edits/cancellations cannot be reconstructed; those actions are recorded going forward. The existing schema links actors and requests rather than storing immutable snapshots: displayed names, roles, and program ownership reflect current records, and deletion/cascade behavior remains unchanged.
 
+## In-app activity notifications
+
+New entries written through `AuditLoggerService` for the actions and actor roles above also create bell notifications in the same transaction. Approved administrators receive all such activity; approved primary heads, co-heads, and heads assigned to the request's class program receive that program's activity. Overlapping assignments are deduplicated per recipient. Existing entries are not backfilled.
+
+Notifications use `type: activity_<action>`, `channel: in_app`, the request ID, and the activity timestamp. The message names the actor, action, student, request type, and subject without private reason or attachment content. They are available through the existing `/api/notifications` and unread-count/read endpoints, with a separate read state for each recipient. No email is dispatched by this activity notification path. Existing student/instructor notifications and attendance threshold alerts retain their own behavior.
+
 ## Verification
 
 Run `php vendor/bin/phpunit tests/Feature/AuditLogTest.php` from `backend/`. The tests use an isolated in-memory SQLite database through `SecurityTestCase`.
+
+`ActivityNotificationTest` verifies all recorded actions, recipient scope, overlapping assignments, independent read status, rollback, no email, and the submission/follow-up/decision endpoints.

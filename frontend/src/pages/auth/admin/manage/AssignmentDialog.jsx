@@ -4,7 +4,7 @@ import { assignClassInstructor } from "@/api/adminAssignments";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { assignmentSelection, changeAssignmentSelection, instructorInputValue, selectedAssignmentClass, validateAssignment } from "./assignments.js";
+import { assignmentSelection, changeAssignmentSelection, selectedAssignmentClass, validateAssignment } from "./assignments.js";
 
 const selectStyle = "mt-[5px] h-10 w-full rounded-lg border border-[#172f6b]/60 bg-white px-5 text-base text-slate-950 outline-none focus-visible:ring-2 focus-visible:ring-[#284fac] disabled:opacity-50";
 
@@ -35,7 +35,7 @@ export default function AssignmentDialog({ row, data, onClose, onAssigned }) {
   }
 
   function changeInstructor(value) {
-    const exact = data.instructors.find(instructor => instructorInputValue(instructor, data.instructors).toLowerCase() === value.trim().toLowerCase());
+    const exact = data.instructors.find(instructor => instructor.name.trim().toLowerCase() === value.trim().toLowerCase());
     setSelection(previous => ({ ...previous, instructorName: value, instructorId: exact?.id || "" }));
     setError("");
   }
@@ -73,10 +73,7 @@ export default function AssignmentDialog({ row, data, onClose, onAssigned }) {
       <fieldset disabled={busy} className="grid gap-4">
         <div>
           <Label htmlFor="assignment-instructor" className="text-xs leading-[14px]">Instructor</Label>
-          <Input id="assignment-instructor" list="approved-instructors" required autoComplete="off" value={selection.instructorName} disabled={!data.instructors.length} onChange={event => changeInstructor(event.target.value)} placeholder="Type instructor name" className={selectStyle} />
-          <datalist id="approved-instructors">
-            {data.instructors.map(instructor => <option key={instructor.id} value={instructorInputValue(instructor, data.instructors)}>{instructor.email || undefined}</option>)}
-          </datalist>
+          <Input id="assignment-instructor" required autoComplete="off" value={selection.instructorName} disabled={!data.instructors.length} onChange={event => changeInstructor(event.target.value)} placeholder="Type instructor name" className={selectStyle} />
         </div>
         <div>
           <Label htmlFor="assignment-program" className="text-xs leading-[14px]">Program</Label>

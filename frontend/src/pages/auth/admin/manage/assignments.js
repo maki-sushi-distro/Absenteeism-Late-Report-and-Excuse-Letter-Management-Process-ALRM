@@ -1,15 +1,9 @@
-export function instructorInputValue(instructor, instructors = []) {
-  if (!instructor) return "";
-  const duplicate = instructors.some(other => other.id !== instructor.id && other.name === instructor.name);
-  return duplicate ? `${instructor.name} (${instructor.email || instructor.id})` : instructor.name;
-}
-
 export function assignmentSelection(row, instructors = []) {
   const instructor = instructors.find(user => user.id === row?.instructor_id && user.role === "instructor" && user.status === "approved");
   return {
     classId: row?.id || "",
     instructorId: instructor?.id || "",
-    instructorName: instructorInputValue(instructor, instructors),
+    instructorName: instructor?.name || "",
     programId: row?.program_id || "",
     yearLevel: row?.year_level || "",
     semester: row?.semester || "",

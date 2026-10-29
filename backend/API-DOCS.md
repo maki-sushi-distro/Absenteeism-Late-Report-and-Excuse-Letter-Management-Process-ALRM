@@ -125,6 +125,7 @@ Role access is not hierarchical: administrators do not automatically pass instru
 | GET | `/complete-profile/programs` | Shared | Program choices excluding General Education |
 | POST | `/complete-profile` | Shared | Complete student profile or link staff program |
 | GET | `/notifications` | Shared | Own in-app notifications; **Paged** |
+| GET | `/notifications/preview` | Shared | Latest 5 own in-app notifications and full inbox unread count |
 | GET | `/notifications/unread-count` | Shared | Own unread in-app count |
 | PATCH | `/notifications/read-all` | Shared | Mark own in-app notifications read |
 | PATCH | `/notifications/{notification}/read` | Shared | Mark owned notification read |
@@ -231,6 +232,8 @@ Use `data.school_id_number` in the completion response and `/me` response. `year
 ### Notification operations
 
 `GET /notifications?unread=1&page=1&per_page=50` lists the caller's in-app notifications newest by `date_sent`. The boolean `unread` filter is optional. Count success is `data: {"unread_count":3}`.
+
+`GET /notifications/preview` is the bounded bell endpoint. It returns `data: {"notifications":[...],"unread_count":3}`: at most 5 own in-app notifications, newest by `date_sent` then descending `id` for ties, and the unread count across all own in-app notifications (including those outside the preview). An empty inbox returns `notifications: []` and `unread_count: 0`. It does not mark notifications read, load requests, or paginate/count the full list. The existing list and unread-count endpoints retain their contracts. Frontend callers must explicitly switch to this endpoint to use the preview.
 
 Both read endpoints take no body. Marking an already-read notification read succeeds. A single-record operation checks ownership; read-all is scoped to the caller's unread in-app records and returns `data: null` with a count in `message`.
 

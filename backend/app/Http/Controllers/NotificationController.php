@@ -15,6 +15,31 @@ use Illuminate\Support\Facades\Auth;
 class NotificationController extends Controller
 {
     /**
+     * GET /api/notifications/preview
+     * Fixed-size bell preview plus the unread count for the entire inbox.
+     */
+    public function preview(): JsonResponse
+    {
+        $query = UserNotification::inApp()->where('user_id', Auth::id());
+
+        $notifications = (clone $query)
+            ->latest('date_sent')
+            ->orderByDesc('id')
+            ->limit(5)
+            ->get();
+        $unreadCount = (clone $query)->where('is_read', false)->count();
+
+        return response()->json([
+            'success' => true,
+            'message' => null,
+            'data' => [
+                'notifications' => $notifications,
+                'unread_count' => $unreadCount,
+            ],
+        ]);
+    }
+
+    /**
      * List the authenticated user's notifications, most recent first.
      *
      * GET /api/notifications

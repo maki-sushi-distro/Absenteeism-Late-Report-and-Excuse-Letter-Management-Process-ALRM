@@ -19,10 +19,10 @@ class OtpEmailContentTest extends TestCase
         $this->travel(121)->seconds();
 
         $user->notifyNow($notification);
-        $email = Mail::mailer()->getSymfonyTransport()->messages()->sole()->getOriginalMessage();
+        $email = $this->arrayMailTransport()->messages()->sole()->getOriginalMessage();
         $html = $email->getHtmlBody();
         $text = $email->getTextBody();
-        $this->assertSame('Your ALRM verification code', $email->getSubject());
+        $this->assertSame('[ALRM] Your verification code', $email->getSubject());
         $this->assertStringContainsString('multipart/alternative', $email->toString());
         $this->assertStringContainsString('<meta name="color-scheme" content="light">', $html);
         $this->assertStringContainsString('<title>Your ALRM verification code</title>', $html);

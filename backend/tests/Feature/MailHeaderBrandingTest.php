@@ -38,7 +38,7 @@ class MailHeaderBrandingTest extends TestCase
         }
         $student->notifyNow(new SendOtpCode('123456'));
 
-        $messages = Mail::mailer()->getSymfonyTransport()->messages();
+        $messages = $this->arrayMailTransport()->messages();
         $this->assertCount(5, $messages);
         foreach ($messages as $sent) {
             $email = $sent->getOriginalMessage();

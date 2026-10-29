@@ -58,11 +58,11 @@ class InstructorMailRedirectTest extends TestCase
         $user = new User(['name' => 'OTP User', 'email' => 'otp-user@example.com']);
         $user->notifyNow(new SendOtpCode('123456'));
 
-        $messages = Mail::mailer()->getSymfonyTransport()->messages();
+        $messages = $this->arrayMailTransport()->messages();
         $this->assertCount(1, $messages);
         $this->assertSame('otp-user@example.com', $messages->first()->getOriginalMessage()->getTo()[0]->getAddress());
         $email = $messages->first()->getOriginalMessage();
-        $this->assertSame('Your ALRM verification code', $email->getSubject());
+        $this->assertSame('[ALRM] Your verification code', $email->getSubject());
         $this->assertStringContainsString('Your ALRM verification code:', $email->getHtmlBody());
         $this->assertStringContainsString('LA VERDAD CHRISTIAN COLLEGE, INC.', $email->getHtmlBody());
         $this->assertStringContainsString('src="https://backend.example.com/images/mail/lv-logo.png"', $email->getHtmlBody());
@@ -94,7 +94,7 @@ class InstructorMailRedirectTest extends TestCase
             $user = new User(['name' => 'OTP User', 'role' => $role, 'email' => $role.'@example.com']);
             $user->notifyNow(new SendOtpCode('123456'));
         }
-        $messages = Mail::mailer()->getSymfonyTransport()->messages();
+        $messages = $this->arrayMailTransport()->messages();
         $this->assertCount(2, $messages);
         $addresses = $messages->map(fn ($message) => $message->getOriginalMessage()->getTo()[0]->getAddress())->all();
         $this->assertEqualsCanonicalizing(['student@example.com', 'instructor@example.com'], $addresses);

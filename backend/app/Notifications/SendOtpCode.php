@@ -86,7 +86,7 @@ class SendOtpCode extends Notification implements ShouldBeEncrypted, ShouldQueue
         ));
 
         return (new MailMessage)
-            ->subject('Your ALRM verification code')
+            ->subject('[ALRM] Your verification code')
             ->view(['html' => 'emails.otp-code', 'text' => 'emails.otp-code-text'], [
                 'name' => $notifiable->name,
                 'code' => $this->code,

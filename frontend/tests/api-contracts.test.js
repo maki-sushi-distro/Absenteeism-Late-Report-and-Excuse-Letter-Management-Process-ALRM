@@ -66,7 +66,7 @@ test("student requests post all fields required by the backend", async () => {
     type: "late",
     subjects_missed: "Information Management",
     minutes_late: 15,
-    start_date_of_absence: null,
+    start_date_of_absence: "2026-10-20",
     end_date_of_absence: null,
     guardian_name: "Alex Parent",
     contact_number: "09123456789",

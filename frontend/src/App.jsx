@@ -133,6 +133,7 @@ function App() {
               </ProtectedRoute>
             }
           />
+          <Route path="/instructor/class-requests/:classId" element={<ProtectedRoute allowedRoles={["instructor"]}><InstructorRequests /></ProtectedRoute>} />
           <Route
             path="/student/records"
             element={

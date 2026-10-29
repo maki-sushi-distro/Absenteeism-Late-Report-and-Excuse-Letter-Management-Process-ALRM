@@ -21,6 +21,7 @@ export default function RequestReviewEditor({ form, user, classes, classesLoadin
       { name: "startDateOfAbsence", label: "Start date of absence", type: "date" },
       { name: "endDateOfAbsence", label: "End date of absence", type: "date", min: form.startDateOfAbsence || undefined },
     ] : [
+      { name: "startDateOfAbsence", label: "Date of tardiness", type: "date" },
       { name: "minutesLate", label: "Minutes late", type: "number", min: 1, max: 999, step: 1 },
       { name: "reason", label: "Reason for being late", multiline: true, wide: true, maxLength: LIMITS.reason },
     ]),

@@ -45,3 +45,12 @@ test("dashboard skeleton matches four cards and independently loading chart and 
   assert.match(html, /data-slot="approval-placeholder"/);
   assert.doesNotMatch(html, />110<|Ana Student/);
 });
+
+test("admin total programs excludes General Education when program data has loaded", () => {
+  const html = render({ resources: {
+    ...resources,
+    programs: [{ id: "ge", program_name: "General Education" }, { id: "bsis", program_name: "BS in Information Systems" }],
+    ready: { programs: true },
+  } });
+  assert.match(html, /Total Programs<\/p><p[^>]*>1<\/p>/);
+});

@@ -13,7 +13,7 @@ export function createDecisionGate() {
     if (busy) throw new Error("A decision is already in progress.");
     if (reviewed.has(String(request.id))) throw new Error("This request has already been reviewed.");
     if (request.status !== "pending") throw new Error("Only pending requests can be reviewed.");
-    if (!["approved", "noted", "invalid"].includes(status)) throw new Error("Unsupported decision.");
+    if (!["approved", "invalid"].includes(status)) throw new Error("Unsupported decision.");
     busy = true;
     try {
       const fresh = await decideRequest(encodeURIComponent(request.id), status);

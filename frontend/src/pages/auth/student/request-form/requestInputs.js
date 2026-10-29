@@ -10,8 +10,8 @@ export function prepareRequestInput(data, partial = false) {
       if (!Object.hasOwn(data, key)) errors[key] = `${label} is required.`;
     }
     if (data.type === 'late' && data.minutes_late == null) errors.minutes_late = 'Enter minutes late.';
-    if (data.type === 'absence' && !data.start_date_of_absence) errors.start_date_of_absence = 'Choose the start date of absence.';
   }
+  if ((!partial || Object.hasOwn(data, 'type')) && !data.start_date_of_absence) errors.start_date_of_absence = data.type === 'late' ? 'Choose the date of tardiness.' : 'Choose the start date of absence.';
   for (const [key, label, max, multiline] of [['reason', 'Reason', data.type === 'absence' ? 600 : 100, true], ['subjects_missed', 'Subject', 255, false], ['guardian_name', "Parent or guardian's name", 50, false]]) {
     if (!Object.hasOwn(data, key)) continue;
     payload[key] = sanitizeText(data[key], { multiline });

@@ -17,7 +17,7 @@ const classes = [
 ];
 const instructors = [
   { id: "i1", role: "instructor", status: "approved", name: "Ada" },
-  { id: "i2", role: "instructor", status: "approved", name: "Grace" },
+  { id: "i2", role: "instructor", status: "approved", name: "Grace", program_id: "general-education" },
   { id: "pending", role: "instructor", status: "pending" },
   { id: "inactive", role: "instructor", status: "deactivated" },
   { id: "head", role: "program_head", status: "approved" },
@@ -39,30 +39,29 @@ afterEach(() => {
 
 test("Edit starts from the actual class and its approved instructor", () => {
   assert.deepEqual(assignmentSelection(classes[1], instructors), {
-    programId: "p1", subject: "Data Structures", classId: "c2", instructorId: "i1",
+    subject: "Data Structures", classId: "c2", instructorId: "i1",
   });
   assert.equal(assignmentSelection({ ...classes[0], instructor_id: "pending" }, instructors).instructorId, "");
 });
 
-test("changing program clears all dependent choices and stale class IDs", () => {
-  const next = changeAssignmentSelection(assignmentSelection(classes[0], instructors), "programId", "p2");
-  assert.deepEqual(next, { programId: "p2", subject: "", classId: "", instructorId: "" });
-  assert.equal(selectedAssignmentClass(classes, next), undefined);
+test("changing instructor retains the selected subject and class", () => {
+  const next = changeAssignmentSelection(assignmentSelection(classes[0], instructors), "instructorId", "i2");
+  assert.deepEqual(next, { subject: "Data Structures", classId: "c1", instructorId: "i2" });
 });
 
-test("changing subject and section clears dependent selections", () => {
+test("changing subject clears only the destination class", () => {
   const initial = assignmentSelection(classes[0], instructors);
   assert.deepEqual(changeAssignmentSelection(initial, "subject", "Programming"), {
-    ...initial, subject: "Programming", classId: "", instructorId: "",
+    ...initial, subject: "Programming", classId: "",
   });
   assert.deepEqual(changeAssignmentSelection(initial, "classId", "c2"), {
-    ...initial, classId: "c2", instructorId: "",
+    ...initial, classId: "c2",
   });
 });
 
-test("class selection cannot cross a selected program or subject", () => {
+test("class selection is validated against the chosen subject", () => {
   const initial = assignmentSelection(classes[0], instructors);
-  assert.equal(selectedAssignmentClass(classes, { ...initial, programId: "p2" }), undefined);
+  assert.equal(selectedAssignmentClass(classes, { ...initial, classId: "c3" })?.id, "c3");
   assert.equal(selectedAssignmentClass(classes, { ...initial, subject: "Other subject" }), undefined);
   assert.throws(() => validateAssignment(classes, instructors, { ...initial, classId: "missing" }), /existing class/i);
 });
@@ -75,6 +74,11 @@ test("assignment validates instructor role and approval before sending", () => {
   assert.deepEqual(validateAssignment(classes, instructors, { ...initial, instructorId: "i2" }), {
     classId: "c1", instructorId: "i2",
   });
+});
+
+test("General Education instructors can be assigned to another program's class", () => {
+  const selection = { subject: "Data Structures", classId: "c1", instructorId: "i2" };
+  assert.deepEqual(validateAssignment(classes, instructors, selection), { classId: "c1", instructorId: "i2" });
 });
 
 test("the same section in a different class or term resolves by actual class ID", () => {
@@ -162,7 +166,11 @@ test("collection failures reject loading without supplying fake assignments", as
 });
 
 test("assignment dialog has 20px corners and class removal is enabled with destructive styling", async () => {
-  const data = { classes, instructors: instructors.slice(0, 2), programs: [{ id: "p1", program_name: "BSIS" }] };
+  const data = {
+    classes: [{ ...classes[0], year_level: "3rd" }, ...classes.slice(1), { id: "ge-class", program_id: "ge", subject_name: "General Education Subject", section: "1A" }],
+    instructors: instructors.slice(0, 2),
+    programs: [{ id: "p1", program_name: "BSIS" }, { id: "p2", program_name: "BSA" }, { id: "ge", program_name: "General Education" }],
+  };
   const server = await createServer({ server: { middlewareMode: true, ws: false }, appType: "custom", plugins: [{
     name: "loaded-assignments", enforce: "pre", transform(code, id) {
       if (id.replaceAll("\\", "/").endsWith("/src/pages/auth/admin/AdminManage.jsx")) {
@@ -174,9 +182,16 @@ test("assignment dialog has 20px corners and class removal is enabled with destr
     const AssignmentDialog = (await server.ssrLoadModule("/src/pages/auth/admin/manage/AssignmentDialog.jsx")).default;
     const dialog = renderToStaticMarkup(React.createElement(AssignmentDialog, { row: classes[0], data }));
     assert.match(dialog, /<dialog\b[^>]*rounded-\[20px\]/);
+    const createDialog = renderToStaticMarkup(React.createElement(AssignmentDialog, { row: null, data: { ...data, classes } }));
+    assert.ok(createDialog.indexOf('id="assignment-instructor"') < createDialog.indexOf('id="assignment-subject"'));
+    assert.ok(createDialog.indexOf('id="assignment-subject"') < createDialog.indexOf('id="assignment-class"'));
+    assert.doesNotMatch(createDialog, /id="assignment-program"/);
+    assert.match(createDialog, /Grace/);
+    assert.match(dialog, /BSIS · 3rd year · Section 3A/);
     const AdminManage = (await server.ssrLoadModule("/src/pages/auth/admin/AdminManage.jsx")).default;
     const { Button } = await server.ssrLoadModule("/src/components/ui/button.jsx");
     const html = renderToStaticMarkup(React.createElement(MemoryRouter, null, React.createElement(AdminManage)));
+    assert.doesNotMatch(html, /General Education/);
     const removeButtons = [...html.matchAll(/<button\b[^>]*>Remove<\/button>/g)];
     const deleteButton = renderToStaticMarkup(React.createElement(Button, { size: "sm", variant: "destructive" }, "Delete"));
     assert.equal(removeButtons.length, classes.length);
@@ -185,6 +200,27 @@ test("assignment dialog has 20px corners and class removal is enabled with destr
       assert.doesNotMatch(remove, /\sdisabled=""/);
     }
     assert.doesNotMatch(html, /unassignment-explanation|cannot be removed without a replacement/);
+  } finally {
+    await server.close();
+  }
+});
+
+test("edit assignment allows changing the subject and destination class", async () => {
+  const server = await createServer({ server: { middlewareMode: true, ws: false }, appType: "custom" });
+  try {
+    const AssignmentDialog = (await server.ssrLoadModule("/src/pages/auth/admin/manage/AssignmentDialog.jsx")).default;
+    const data = {
+      classes: [...classes, { id: "c4", program_id: "p2", subject_name: "Programming", section: "2A" }],
+      instructors: instructors.slice(0, 2),
+      programs: [{ id: "p1", program_name: "BSIS" }, { id: "p2", program_name: "BSA" }],
+    };
+    const dialog = renderToStaticMarkup(React.createElement(AssignmentDialog, { row: classes[0], data }));
+    const subject = dialog.match(/<select\b[^>]*id="assignment-subject"[^>]*>/)?.[0] || "";
+    const destination = dialog.match(/<select\b[^>]*id="assignment-class"[^>]*>/)?.[0] || "";
+    assert.ok(subject, "Subject dropdown must render");
+    assert.ok(destination, "Program, year and section dropdown must render");
+    assert.doesNotMatch(subject, /\sdisabled(?:=|\s|$)/);
+    assert.doesNotMatch(destination, /\sdisabled(?:=|\s|$)/);
   } finally {
     await server.close();
   }

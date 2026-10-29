@@ -9,6 +9,8 @@ let server, Context, Overview, AdminLog, ProgramLog, ProgramAccess;
 const request = { id: "r1", type: "absence", status: "pending", date_submitted: "2026-10-01T10:00:00Z", enrollment: { student: { name: "Test Student" }, class: { id: "c1", subject_name: "Test Class", instructor: { name: "Test Instructor" } } } };
 const data = {
   getAdminDashboard: { total_programs: 1, total_students: 12, warning_count: 1, ir_count: 1, pending_requests: 1, programs_summary: [{ id: "p1", program_name: "BSIS", student_count: 12 }], recent_flags: [{ id: "f1", flagged_date: "2026-10-01", request }] },
+  getAdminAuditLogs: [{ id: "audit-one", action: "decided_request_approved", description: "Approved a request", timestamp: "2026-10-02T10:00:00Z", actor: { id: "i1", name: "Audit Instructor", role: "instructor" }, request: { id: "r1", type: "absence", student: { id: "s1", name: "Audit Student" }, class: { id: "c1", subject_name: "Audit Class", program_id: "p1", instructor_id: "i1" } } }],
+  getProgramHeadAuditLogs: [{ id: "program-audit-one", action: "followed_up_request", description: "Followed up a request", timestamp: "2026-10-03T10:00:00Z", actor: { id: "s2", name: "Program Audit Actor", role: "student" }, request: { id: "r2", type: "late", student: { id: "s2", name: "Program Audit Student" }, class: { id: "c2", subject_name: "Program Audit Class", program_id: "p1", instructor_id: "i1" } } }],
   loadClasses: [{ id: "c1", program_id: "p1", instructor_id: "i1", instructor: { name: "Test Instructor" } }],
   loadRequests: [request], loadFlags: [{ id: "f1", flagged_date: "2026-10-01", request: { ...request, enrollment: { ...request.enrollment, class: { id: "c1", subject_name: "Test Class" } } } }],
 };
@@ -41,26 +43,22 @@ test("overview renders actual student counts with an empty-state label for missi
 test("administrator activity renders real recent flags without the informational notice", () => {
   const html = render(AdminLog);
   assert.doesNotMatch(html, /up to ten recent escalations|Full submission, follow-up, and decision audit history|bg-blue-50|border-blue-200/);
-  assert.match(html, /Test Student/);
-  assert.match(html, /Test Instructor/);
-  assert.match(html, />Flagged</);
+  assert.match(html, /Audit Student/);
+  assert.match(html, /Audit Instructor/);
+  assert.match(html, />Approved</);
+  assert.match(html, />Actor</);
   assert.match(html, /aria-label="Search activity"/);
   assert.match(html, /aria-label="Filter activity"/);
   assert.match(html, />Clear filters<\/button>/);
   assert.doesNotMatch(html, /<select|>Refresh<\/button>/);
 });
-test("program head activity switches between submitted and flagged designs", () => {
-  const submitted = render(ProgramLog, "/program-head/activity-log");
-  assert.match(submitted, />Submitted</);
-  assert.match(submitted, /Test Instructor/);
-  assert.match(submitted, /Students<\/th><th[^>]*>Date<\/th><th[^>]*>Requests/);
-  assert.doesNotMatch(submitted, /<select|reconstructed from/);
-  const flagged = render(ProgramLog, "/program-head/activity-log?tab=flagged");
-  assert.match(flagged, /id="activity-tab-flagged" aria-selected="true"/);
-  assert.match(flagged, /Flagged by/);
-  assert.match(flagged, /Test Instructor/);
-  assert.doesNotMatch(flagged, /Attendance Status|Incident Report|<select/);
-  assert.match(flagged, /Test Class/);
+test("program head activity renders its scoped audit log", () => {
+  const html = render(ProgramLog, "/program-head/activity-log");
+  assert.match(html, /Program Audit Student/);
+  assert.match(html, /Program Audit Actor/);
+  assert.match(html, />Followed up</);
+  assert.match(html, />Actor</);
+  assert.doesNotMatch(html, /role="tab"|Flagged by|<select/);
 });
 test("activity loading replaces filters and rows with skeletons", () => {
   const html = render(AdminLog, "/activity-log", true);

@@ -26,8 +26,9 @@ test("student details reject numeric guardian names and invalid phone prefixes",
 });
 
 test("late and absence details require enrolled classes", () => {
-  const late = { ...initialForm, requestType: "late", minutesLate: "15", classId: "class-one", reason: "Traffic" };
+  const late = { ...initialForm, requestType: "late", minutesLate: "15", startDateOfAbsence: "2026-10-13", classId: "class-one", reason: "Traffic" };
   assert.deepEqual(check(late, 4, [enrolledClass]), {});
+  assert.match(check({ ...late, startDateOfAbsence: "" }, 4, [enrolledClass]).startDateOfAbsence, /date of tardiness/i);
   const absence = { ...initialForm, requestType: "absence", startDateOfAbsence: "2026-10-13",
     endDateOfAbsence: "2026-10-14", classId: "class-one",
     absenceReasons: ["Illness / Medical Condition"] };
@@ -68,12 +69,12 @@ test("inline review reports errors across student and request fields without req
   const form = { ...initialForm, requestType: "late", consent: "agree",
     studentName: "Alex Student", program: "BS in Information Systems", level: "1st year",
     guardianName: "Parent 123", contactNumber: "08123456789", dateSubmitted: "2026-10-20",
-    minutesLate: "0", classId: "unknown", reason: "x", declaration: false };
+    minutesLate: "0", startDateOfAbsence: "", classId: "unknown", reason: "x", declaration: false };
   const errors = validateReview(form, [enrolledClass]);
-  for (const name of ["guardianName", "contactNumber", "minutesLate", "classId", "reason"]) assert.ok(errors[name], name);
+  for (const name of ["guardianName", "contactNumber", "minutesLate", "startDateOfAbsence", "classId", "reason"]) assert.ok(errors[name], name);
   assert.equal(errors.declaration, undefined);
   assert.deepEqual(validateReview({ ...form, guardianName: "Alex Parent", contactNumber: "09123456789",
-    minutesLate: "15", classId: "class-one", reason: "Traffic delay", evidenceFile }, [enrolledClass]), {});
+    minutesLate: "15", startDateOfAbsence: "2026-10-20", classId: "class-one", reason: "Traffic delay", evidenceFile }, [enrolledClass]), {});
 });
 
 test("inline absence review validates dates and reason selection on the final page", () => {
@@ -91,7 +92,7 @@ test("submission validation identifies a missing guardian name", () => {
   const form = { ...initialForm, requestType: "late", consent: "agree",
     studentName: "Alex Student", program: "BS in Information Systems", level: "1st year",
     guardianName: "Alex Parent", contactNumber: "09123456789", dateSubmitted: "2026-10-13",
-    minutesLate: "15", classId: "class-one", reason: "Traffic", declaration: true, evidenceFile };
+    minutesLate: "15", startDateOfAbsence: "2026-10-13", classId: "class-one", reason: "Traffic", declaration: true, evidenceFile };
   assert.equal(firstInvalidRequestStep(form, [enrolledClass]), null);
   assert.deepEqual(firstInvalidRequestStep({ ...form, guardianName: "" }, [enrolledClass]), {
     step: 3, errors: { guardianName: "Enter a valid parent or guardian's name." },

@@ -20,7 +20,7 @@ export function buildRequestPayload(form, classes, evidence = null) {
     type: form.requestType,
     subjects_missed: matchedClass?.subject_name || "",
     minutes_late: isAbsence ? null : Number(form.minutesLate),
-    start_date_of_absence: isAbsence ? form.startDateOfAbsence : null,
+    start_date_of_absence: form.startDateOfAbsence,
     end_date_of_absence: isAbsence ? form.endDateOfAbsence : null,
     reason: buildReason(form, isAbsence),
     proof_types: isAbsence ? [...(form.proof_types || [])] : [],
@@ -67,7 +67,7 @@ export function buildRequestUpdatePayload(form) {
     subjects_missed: form.subjects_missed,
     reason: sanitizeText(form.reason, { multiline: true }),
     minutes_late: isAbsence ? null : Number(form.minutes_late),
-    start_date_of_absence: isAbsence ? form.start_date_of_absence : null,
+    start_date_of_absence: form.start_date_of_absence,
     end_date_of_absence: isAbsence ? form.end_date_of_absence || null : null,
     proof_types: isAbsence ? [...(form.proof_types || [])] : [],
   };

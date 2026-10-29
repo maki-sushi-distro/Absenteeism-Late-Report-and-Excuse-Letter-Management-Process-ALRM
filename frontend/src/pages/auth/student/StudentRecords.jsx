@@ -120,10 +120,15 @@ function RequestEditForm({ record, onSaved, onCancel }) {
             </label>)}
             {proofError && <p id="edit-proof-errors" role="alert" className="text-sm text-red-600">{proofError}</p>}
           </fieldset>
-        </> : <label className="grid gap-2 text-sm">Minutes late
+        </> : <>
+        <label className="grid gap-2 text-sm">Date of tardiness
+          <input type="date" required value={form.start_date_of_absence} onChange={(event) => change("start_date_of_absence", event.target.value)} aria-invalid={Boolean(errors.start_date_of_absence)} className={control} />
+          {fieldError("start_date_of_absence") && <span role="alert" className="text-red-600">{fieldError("start_date_of_absence")}</span>}
+        </label>
+        <label className="grid gap-2 text-sm">Minutes late
           <input type="number" required min={1} max={999} value={form.minutes_late} onChange={(event) => change("minutes_late", event.target.value)} aria-invalid={Boolean(errors.minutes_late)} className={control} />
           {fieldError("minutes_late") && <span role="alert" className="text-red-600">{fieldError("minutes_late")}</span>}
-        </label>}
+        </label></>}
         {form.type !== "absence" && proofError && <p role="alert" className="text-sm text-red-600">{proofError}</p>}
         <p className="text-xs text-slate-500">The existing attachment is kept when you save these changes.</p>
       </>}
@@ -275,7 +280,7 @@ export default function StudentRecords() {
                   <td className="break-words px-4 py-4">{subjectOf(record)}</td>
                   <td className="whitespace-nowrap px-4 py-4">{formatDate(recordDate(record))}</td>
                   <td className="px-4 py-4"><StatusBadge value={record.status} /></td>
-                  <td className="px-4 py-4 text-right"><RecordActions record={record} onView={viewRecord} description={`${subjectOf(record)}, ${formatDate(recordDate(record))}`} onFollowUp={followUp} followingUpId={followingUpId} /></td>
+                  <td className="px-4 py-4"><RecordActions record={record} onView={viewRecord} description={`${subjectOf(record)}, ${formatDate(recordDate(record))}`} onFollowUp={followUp} followingUpId={followingUpId} /></td>
                 </tr>
               ))}
             </tbody>
@@ -329,7 +334,10 @@ export default function StudentRecords() {
             <dt className="text-slate-500">Date submitted</dt><dd>{formatDate(selected.date_submitted || selected.created_at)}</dd>
             {selected.type === "absence" ? <>
               <dt className="text-slate-500">Absence dates</dt><dd>{formatDate(selected.start_date_of_absence)}{selected.end_date_of_absence && selected.end_date_of_absence !== selected.start_date_of_absence ? ` – ${formatDate(selected.end_date_of_absence)}` : ""}</dd>
-            </> : <><dt className="text-slate-500">Minutes late</dt><dd>{selected.minutes_late ?? "—"}</dd></>}
+            </> : <>
+              <dt className="text-slate-500">Date of tardiness</dt><dd>{formatDate(selected.start_date_of_absence)}</dd>
+              <dt className="text-slate-500">Minutes late</dt><dd>{selected.minutes_late ?? "—"}</dd>
+            </>}
           </dl>
           <div><h3 className="mb-2 text-sm font-semibold">{selected.type === "absence" ? "Reason of absence" : "Reason"}</h3><p className="whitespace-pre-wrap break-words rounded-lg bg-slate-50 p-4 text-sm leading-relaxed dark:bg-slate-800">{reasonOf(selected)}</p></div>
           <div><h3 className="mb-2 text-sm font-semibold">Supporting documents / Proof types</h3>

@@ -1,5 +1,8 @@
+import { isGeneralEducationProgram } from "../../../lib/programs.js";
+
 function eventDate(value) { return value && Number.isFinite(Date.parse(value)) ? value : null; }
 function newest(rows) { return rows.filter(row => eventDate(row.date)).sort((a, b) => Date.parse(b.date) - Date.parse(a.date)); }
+const auditActions = { submitted_request: "Submitted", updated_request: "Updated", cancelled_request: "Cancelled", followed_up_request: "Followed up", decided_request_approved: "Approved", decided_request_noted: "Noted", decided_request_invalid: "Denied", resolved_followup_flag: "Resolved" };
 function requestInfo(request) {
   const course = request.enrollment?.class;
   const student = request.enrollment?.student;
@@ -27,6 +30,13 @@ export function flagActivity(flags = [], classes = []) {
     return { ...info, id: flag.id, date: flag.flagged_date || flag.created_at, action: "Flagged", instructor, flaggedBy: instructor };
   }));
 }
+export function auditActivity(logs = []) {
+  return newest(logs.map(log => {
+    const request = log.request || {};
+    const course = request.class || {};
+    return { id: log.id, requestId: request.id || "", date: log.timestamp, student: request.student?.name || "Unavailable", studentId: "", email: "", subject: course.subject_name || "Unavailable", classId: course.id || "", type: request.type === "absence" ? "Absent" : request.type === "late" ? "Late" : "Unavailable", action: auditActions[log.action] || log.description || "Unavailable", instructor: log.actor?.name || "Unavailable", actor: log.actor?.name || "Unavailable", description: log.description || auditActions[log.action] || "Activity recorded" };
+  }));
+}
 export function filterActivity(rows, { search = "", action = "", subject = "", date = "" } = {}) {
   const query = search.trim().toLowerCase();
   return rows.filter(row => (!query || [row.student, row.studentId, row.email, row.subject, row.instructor, row.type, row.action].some(value => String(value || "").toLowerCase().includes(query))) && (!action || row.action === action) && (!subject || row.classId === subject) && (!date || (() => {
@@ -36,7 +46,7 @@ export function filterActivity(rows, { search = "", action = "", subject = "", d
   })()));
 }
 export function programOverviewRows(dashboard, classes = []) {
-  return (dashboard?.programs_summary || []).map(program => ({
+  return (dashboard?.programs_summary || []).filter(program => !isGeneralEducationProgram(program)).map(program => ({
     id: program.id, name: program.program_name, students: program.student_count ?? null,
     instructors: new Set(classes.filter(course => course.program_id === program.id).map(course => course.instructor_id).filter(Boolean)).size,
     atRisk: program.at_risk_count ?? null, pending: program.pending_requests ?? null,

@@ -1,16 +1,12 @@
-import { getAdminDashboard } from "@/api/admin";
-import { getCollection } from "@/api/collections";
+import { getAdminAuditLogs } from "@/api/admin";
 import { useApiResource } from "@/hooks/useApiResource";
 import ActivityTable from "@/components/common/ActivityTable";
-import { flagActivity } from "./overviewData";
+import { auditActivity } from "./overviewData";
 
-const loadClasses = () => getCollection("/admin/classes");
 export default function AdminActivityLog() {
-  const dashboard = useApiResource(getAdminDashboard);
-  const classes = useApiResource(loadClasses);
+  const logs = useApiResource(getAdminAuditLogs);
   return <div className="space-y-6">
-    <header><h1 className="text-2xl font-bold">Activity Log</h1><p className="mt-2 text-sm text-slate-500">Recent escalated request activity across programs.</p></header>
-    {classes.error && <p role="status" className="text-sm text-slate-500">Instructor details could not be loaded. <button type="button" onClick={classes.reload} className="text-blue-800 underline">Retry instructor details</button></p>}
-    <ActivityTable rows={flagActivity(dashboard.data?.recent_flags, classes.data || [])} loading={dashboard.loading || classes.loading} error={dashboard.error} onRetry={dashboard.reload} />
+    <header><h1 className="text-2xl font-bold">Activity Log</h1><p className="mt-2 text-sm text-slate-500">Request activity across programs.</p></header>
+    <ActivityTable rows={auditActivity(logs.data || [])} loading={logs.loading} error={logs.error} onRetry={logs.reload} auditLog />
   </div>;
 }

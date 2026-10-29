@@ -20,7 +20,7 @@ function capture() {
 }
 
 const course = { subject_name: 'Data Structures', section: 'BSIS 3', schedule: 'Monday 9 AM', instructor_id: 'instructor-one', program_id: 'program-one', year_level: '3rd', semester: '1st', school_year: '2026-2027' };
-const request = { class_id: 'class-one', type: 'late', subjects_missed: 'Data Structures', reason: 'Traffic delay', minutes_late: 5, guardian_name: 'Alex Parent', contact_number: '+639123456789' };
+const request = { class_id: 'class-one', type: 'late', subjects_missed: 'Data Structures', reason: 'Traffic delay', minutes_late: 5, start_date_of_absence: '2026-10-20', guardian_name: 'Alex Parent', contact_number: '+639123456789' };
 
 test('account submission normalizes Unicode and control characters while preserving real names', async () => {
   const fetch = capture();
@@ -73,7 +73,7 @@ test('request validation rejects impossible calendar dates and tampered checkbox
 
 test('request APIs reject malformed numbers, dates and proof selections before sending', async () => {
   const fetch = capture();
-  for (const changes of [{ minutes_late: '1e2' }, { minutes_late: -1 }, { minutes_late: 1000 }, { contact_number: '+638123456789' }, { proof_types: ['not a proof'] }]) {
+  for (const changes of [{ minutes_late: '1e2' }, { minutes_late: -1 }, { minutes_late: 1000 }, { start_date_of_absence: null }, { contact_number: '+638123456789' }, { proof_types: ['not a proof'] }]) {
     await assert.rejects(() => createStudentRequest({ ...request, ...changes }), error => error.status === 422);
   }
   await assert.rejects(() => updateStudentRequest('one', { type: 'absence', reason: 'Illness', start_date_of_absence: '2026-02-30', end_date_of_absence: '2026-03-01' }), error => error.status === 422);

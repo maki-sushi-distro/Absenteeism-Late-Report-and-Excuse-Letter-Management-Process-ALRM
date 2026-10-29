@@ -56,8 +56,10 @@ function validateDetails(form, classes, classesError) {
     // NEW
     errors.minutesLate = "Enter a valid number of minutes (max 999).";
   }
-  if (form.requestType === "absence" && !isValidDate(form.startDateOfAbsence)) {
-    errors.startDateOfAbsence = "Choose a valid start date of absence.";
+  if (["absence", "late"].includes(form.requestType) && !isValidDate(form.startDateOfAbsence)) {
+    errors.startDateOfAbsence = form.requestType === "late"
+      ? "Choose a valid date of tardiness."
+      : "Choose a valid start date of absence.";
   }
   if (form.requestType === "absence" && !isValidDate(form.endDateOfAbsence)) {
     errors.endDateOfAbsence = "Choose a valid end date of absence.";

@@ -2,17 +2,20 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useApiResource } from "@/hooks/useApiResource";
 import useNotificationPreferences from "@/hooks/useNotificationPreferences";
 import useNotificationReadState from "@/pages/auth/student/notifications/useNotificationReadState";
-import { mergeRequestActivity, notificationActivity } from "./notificationData";
+import { normalizeRole } from "@/lib/roles";
+import { mergeAdminAuditActivity, mergeProgramAuditActivity, mergeRequestActivity, notificationActivity } from "./notificationData";
 import { loadNotificationFeed, markFeedRead } from "./notificationFeed";
 
 const changedEvent = "alrm:notifications-updated";
 
 export default function useServerNotifications(user) {
   const { id, role } = user;
-  const load = useCallback(() => loadNotificationFeed(role), [role]);
+  const load = useCallback(() => loadNotificationFeed(role, id), [id, role]);
   const resource = useApiResource(load, id);
   const { preferences } = useNotificationPreferences(user.id, user.role);
-  const { readIds: localReadIds } = useNotificationReadState(`instructor:${id}`);
+  const normalizedRole = normalizeRole(role);
+  const localReadKey = normalizedRole === "admin" ? `admin-activity:${id}` : normalizedRole === "program" ? `program-activity:${id}` : `instructor:${id}`;
+  const { readIds: localReadIds } = useNotificationReadState(localReadKey);
   const [readError, setReadError] = useState("");
   const [working, setWorking] = useState(false);
   const busy = useRef(false);
@@ -41,9 +44,14 @@ export default function useServerNotifications(user) {
   }
 
   const serverActivity = notificationActivity(resource.data?.notifications || [], role, preferences, id);
-  const activity = mergeRequestActivity(serverActivity, preferences.requestUpdates ? resource.data?.requests || [] : [], user, localReadIds);
+  const fallbackReadIds = new Set([...localReadIds, ...(resource.data?.auditReadIds || [])]);
+  const activity = normalizedRole === "admin"
+    ? mergeAdminAuditActivity(serverActivity, preferences.requestUpdates ? resource.data?.auditLogs || [] : [], user, fallbackReadIds)
+    : normalizedRole === "program"
+      ? mergeProgramAuditActivity(serverActivity, preferences.requestUpdates ? resource.data?.auditLogs || [] : [], user, fallbackReadIds)
+    : mergeRequestActivity(serverActivity, preferences.requestUpdates ? resource.data?.requests || [] : [], user, localReadIds);
   const readIds = new Set(activity.filter(item => item.isRead).map(item => item.id));
-  const readStatusTitle = activity.some(item => item.source === "request") ? "Notification reads are saved to your account; request activity reads are saved on this browser." : "Saved to your account";
+  const readStatusTitle = activity.some(item => item.source) ? "Notification reads are saved to your account; activity log reads are saved on this browser." : "Saved to your account";
   return { activity, readIds, loading: resource.loading, error: resource.error, warning: resource.data?.warning, reload: resource.reload, readError, working, readStatusTitle,
     canMarkAll: !working && !resource.loading && !resource.error && activity.some(item => !item.isRead),
     markRead: ids => saveRead(activity.filter(item => ids.includes(item.id) && !item.isRead)),

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { afterEach, mock, test } from "node:test";
 import { getCollection } from "../src/api/collections.js";
-import { flagActivity, requestActivity, filterActivity, programOverviewRows } from "../src/pages/auth/admin/overviewData.js";
+import { auditActivity, flagActivity, requestActivity, filterActivity, programOverviewRows } from "../src/pages/auth/admin/overviewData.js";
 
 const storage = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
 afterEach(() => { mock.restoreAll(); if (storage) Object.defineProperty(globalThis, "localStorage", storage); else delete globalThis.localStorage; });
@@ -36,6 +36,16 @@ test("request activity uses real event dates and never invents an unrecorded dec
   assert.equal(events[0].date, request.date_reviewed);
   assert.equal(filterActivity(events, { action: "Approved", subject: "c1", date: "2026-10-02" }).length, 1);
 });
+test("admin audit activity uses the backend actor, request and action fields", () => {
+  const rows = auditActivity([
+    { id: "audit-old", action: "submitted_request", description: "Submitted a request", timestamp: "2026-10-28T08:00:00+08:00", actor: { id: "student-one", name: "Alex Student", role: "student" }, request: { id: "request-one", type: "absence", student: { id: "student-one", name: "Alex Student" }, class: { id: "class-one", subject_name: "Information Management" } } },
+    { id: "audit-new", action: "decided_request_approved", description: "Approved a request", timestamp: "2026-10-29T09:00:00+08:00", actor: { id: "instructor-one", name: "Jamie Instructor", role: "instructor" }, request: { id: "request-one", type: "absence", student: { id: "student-one", name: "Alex Student" }, class: { id: "class-one", subject_name: "Information Management" } } },
+  ]);
+  assert.deepEqual(rows.map(row => row.id), ["audit-new", "audit-old"]);
+  assert.deepEqual(rows[0], {
+    id: "audit-new", requestId: "request-one", date: "2026-10-29T09:00:00+08:00", student: "Alex Student", studentId: "", email: "", subject: "Information Management", classId: "class-one", type: "Absent", action: "Approved", instructor: "Jamie Instructor", actor: "Jamie Instructor", description: "Approved a request",
+  });
+});
 test("historical decisions retain the recorded reviewer after a class is reassigned", () => {
   const [decision] = requestActivity([{ id: "r1", type: "absence", status: "approved", date_submitted: "2026-10-01", date_reviewed: "2026-10-02", reviewer: { name: "Original Reviewer" }, enrollment: { class: { instructor: { name: "New Instructor" } } } }]);
   assert.equal(decision.instructor, "Original Reviewer");
@@ -60,6 +70,14 @@ test("program overview uses real per-program counts and leaves absent risk and r
   assert.equal(rows[0].instructors, 1);
   assert.equal(rows[0].atRisk, null);
   assert.equal(rows[0].pending, null);
+});
+
+test("admin program overview excludes the General Education program", () => {
+  const rows = programOverviewRows({ programs_summary: [
+    { id: "ge", program_name: "General Education", student_count: 0 },
+    { id: "p1", program_name: "Bachelor of Science in Information System", student_count: 12 },
+  ] });
+  assert.deepEqual(rows.map(row => row.id), ["p1"]);
 });
 test("a flag with no assigned instructor remains unavailable", () => {
   const [row] = flagActivity([{ id: "f1", flagged_date: "2026-10-01", request: { id: "r1" } }]);

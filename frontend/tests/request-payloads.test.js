@@ -25,8 +25,15 @@ test("late create sends an empty proof array and a plain explanation", () => {
   const payload = buildRequestPayload({ ...form, requestType: "late", reason: " may sakit po e ", minutesLate: "23", proof_types: ["Others"] }, classes);
   assert.equal(payload.reason, "may sakit po e");
   assert.equal(payload.minutes_late, 23);
+  assert.equal(payload.start_date_of_absence, "2026-10-12");
+  assert.equal(payload.end_date_of_absence, null);
   assert.deepEqual(payload.proof_types, []);
   assert.equal(payload.evidence_type, null);
+});
+
+test("late edit preserves its occurrence date", () => {
+  const edit = buildRequestEditForm({ type: "late", subjects_missed: "Math", minutes_late: 23, reason: "Traffic", start_date_of_absence: "2026-10-12T00:00:00.000000Z" });
+  assert.equal(buildRequestUpdatePayload(edit).start_date_of_absence, "2026-10-12");
 });
 
 test("edit hydrates API proof selections and sends an explicit empty array when cleared", () => {

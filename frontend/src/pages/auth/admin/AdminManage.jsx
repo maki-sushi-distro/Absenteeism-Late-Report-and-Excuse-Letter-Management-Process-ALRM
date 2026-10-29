@@ -11,6 +11,7 @@ import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescript
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import AssignmentDialog from "./manage/AssignmentDialog";
+import { isGeneralEducationProgram } from "@/lib/programs";
 
 export default function AdminManage() {
   const [data, setData] = useState(null);
@@ -44,7 +45,10 @@ export default function AdminManage() {
     return () => { mounted.current = false; controller.abort(); };
   }, [load]);
 
-  const rows = (data?.classes || []).filter(row => !programId || row.program_id === programId);
+  const visiblePrograms = (data?.programs || []).filter(program => !isGeneralEducationProgram(program));
+  const generalEducationIds = new Set((data?.programs || []).filter(isGeneralEducationProgram).map(program => program.id));
+  const assignableClasses = (data?.classes || []).filter(row => !generalEducationIds.has(row.program_id) && !isGeneralEducationProgram(row.program));
+  const rows = assignableClasses.filter(row => !programId || row.program_id === programId);
 
   function reload() {
     setLoading(true);
@@ -90,11 +94,11 @@ export default function AdminManage() {
     <div className="flex flex-wrap items-center justify-between gap-4">
       <select aria-label="Filter by program" value={programId} disabled={loading || !data || removing} onChange={event => setProgramId(event.target.value)} className="h-10 w-[260px] rounded-lg border border-[#172f6b]/60 bg-white px-5 text-base text-slate-950 outline-none focus-visible:ring-2 focus-visible:ring-[#284fac] disabled:opacity-50">
         <option value="">Program</option>
-        {(data?.programs || []).map(program => <option key={program.id} value={program.id}>{program.program_name}</option>)}
+        {visiblePrograms.map(program => <option key={program.id} value={program.id}>{program.program_name}</option>)}
       </select>
       <div className="flex flex-wrap items-center gap-3">
       <Link to="/classes" className="inline-flex h-10 items-center rounded-lg border border-[#172f6b]/60 px-3 text-[13px] font-medium text-[#172f6b] outline-none hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-[#284fac] dark:text-blue-200">Manage classes</Link>
-      <Button type="button" disabled={removing || !data || !data.classes.length} onClick={() => { setNotice(""); setDialog({ row: null }); }} className="h-10 w-[170px] rounded-lg bg-[#172f6b] text-[13px] text-white hover:bg-[#203f8a]">
+      <Button type="button" disabled={removing || !assignableClasses.length} onClick={() => { setNotice(""); setDialog({ row: null }); }} className="h-10 w-[170px] rounded-lg bg-[#172f6b] text-[13px] text-white hover:bg-[#203f8a]">
         <UserRoundArrowLeft className="size-[18px]" aria-hidden="true" />Assign Instructor
       </Button>
       </div>
@@ -122,7 +126,7 @@ export default function AdminManage() {
             </Table>
           </div>}
     </>}
-    {dialog && data && <AssignmentDialog row={dialog.row} programId={programId} data={data} onClose={() => setDialog(null)} onAssigned={assigned} />}
+    {dialog && data && <AssignmentDialog row={dialog.row} data={{ ...data, classes: assignableClasses }} onClose={() => setDialog(null)} onAssigned={assigned} />}
     <AlertDialog open={Boolean(removingClass)} onOpenChange={open => { if (!open && !removalLock.current) setRemovingClass(null); }}>
       <AlertDialogContent aria-busy={removing} className="rounded-[20px] bg-white">
         <AlertDialogTitle>Remove class?</AlertDialogTitle>

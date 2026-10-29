@@ -33,6 +33,12 @@ test("radio choices expose roles, actual programs, student years and account sta
   assert.doesNotMatch(renderOptions({ role: "instructor", tab: "waiting" }), /user-filter-year|user-filter-status/);
 });
 
+test("General Education is absent from admin program filters", () => {
+  const html = renderOptions({}, { programs: [...props.programs, { id: "ge", program_name: "General Education" }] });
+  assert.doesNotMatch(html, /General Education/);
+  assert.match(html, /Information Systems/);
+});
+
 test("unavailable programs remain labeled and all-program reset stays usable", () => {
   const html = renderOptions({}, { programError: "Unavailable" });
   assert.match(html, /Programs could not be loaded/);

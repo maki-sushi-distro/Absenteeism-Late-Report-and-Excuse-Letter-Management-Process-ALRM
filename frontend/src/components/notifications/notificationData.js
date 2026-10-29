@@ -1,4 +1,5 @@
 import { normalizeRole } from "../../lib/roles.js";
+import { auditActivity } from "../../pages/auth/admin/overviewData.js";
 
 const recipients = {
   request_decision: ["student"],
@@ -65,7 +66,7 @@ export function mergeRequestActivity(activity, requests, user, readIds = new Set
     if (!Number.isFinite(Date.parse(request.date_submitted))) continue;
     seen.add(String(request.id));
     const id = `request-submitted:${request.id}`;
-    combined.push({ id, type: "new_request", source: "request", requestId: request.id,
+    combined.push({ id, type: "new_request", source: "request", readKey: `instructor:${user.id}`, requestId: request.id,
       message: `${student.name} submitted a new ${request.type} request for ${course.subject_name}.`,
       date: request.date_submitted, isRead: readIds.has(id), href: destination(user.role, request.id),
       readStatusTitle: "Request activity: read status is saved on this browser.",
@@ -73,4 +74,27 @@ export function mergeRequestActivity(activity, requests, user, readIds = new Set
     });
   }
   return combined.sort((a, b) => Date.parse(b.date) - Date.parse(a.date));
+}
+
+function mergeAuditActivity(activity, logs, user, readIds, localKey, href) {
+  const combined = [...activity];
+  for (const row of auditActivity(logs)) {
+    const id = `audit-log:${row.id}`;
+    const detail = row.subject === "Unavailable" ? "" : ` in ${row.subject}`;
+    combined.push({ id, type: "audit_log", source: "audit", readKey: localKey, requestId: row.requestId,
+      message: `${row.actor} ${row.description.charAt(0).toLowerCase()}${row.description.slice(1)} for ${row.student}${detail}.`,
+      date: row.date, isRead: readIds.has(id), href,
+      readStatusTitle: "Activity log notification: read status is saved on this browser.",
+      unreadTitle: "Unread admin activity on this browser",
+    });
+  }
+  return combined.sort((a, b) => Date.parse(b.date) - Date.parse(a.date));
+}
+
+export function mergeAdminAuditActivity(activity, logs, user, readIds = new Set()) {
+  return normalizeRole(user.role) === "admin" ? mergeAuditActivity(activity, logs, user, readIds, `admin-activity:${user.id}`, "/activity-log") : activity;
+}
+
+export function mergeProgramAuditActivity(activity, logs, user, readIds = new Set()) {
+  return normalizeRole(user.role) === "program" ? mergeAuditActivity(activity, logs, user, readIds, `program-activity:${user.id}`, "/program-head/activity-log") : activity;
 }

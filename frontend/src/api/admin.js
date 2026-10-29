@@ -1,9 +1,14 @@
 import { apiDownload, apiRequest, buildQuery } from "./client.js";
+import { getCollection } from "./collections.js";
 import { prepareClassInput, prepareProgramInput, prepareReportFilters } from "../lib/formInputs.js";
 import { assertValidInputs } from "../lib/inputValidation.js";
 
 export function getAdminDashboard() {
   return apiRequest("/admin/dashboard");
+}
+
+export function getAdminAuditLogs() {
+  return getCollection("/admin/audit-logs");
 }
 
 export function getAdminUsers() {

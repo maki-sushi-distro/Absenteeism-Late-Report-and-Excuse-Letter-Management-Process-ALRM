@@ -323,6 +323,24 @@ test("admin superseded responses cannot overwrite a newer reload", async () => {
   } finally { page.unmount(); }
 });
 
+test("Manage Classes shows existing classes without a create form", async () => {
+  const { AdminDashboard } = await server.ssrLoadModule(adminPath);
+  const api = network();
+  const page = mount(() => AdminDashboard({ view: "classes" }));
+  try {
+    await page.flush();
+    api.reply("admin/dashboard", adminData);
+    api.reply("admin/users", users);
+    api.reply("admin/programs", programs);
+    api.reply("admin/classes", classes);
+    await page.flush();
+    const html = page.html();
+    assert.match(html, /Existing Classes/);
+    assert.match(html, /Test Subject/);
+    assert.doesNotMatch(html, /Create Class|Create class|name="subject_name"/);
+  } finally { page.unmount(); }
+});
+
 test("admin program failure leaves classes visible and report options recover without dashboard data", async () => {
   const { AdminDashboard } = await server.ssrLoadModule(adminPath);
   const api = network();
@@ -336,7 +354,7 @@ test("admin program failure leaves classes visible and report options recover wi
     const html = page.html();
     assert.match(html, /Test Subject/);
     assert.match(html, /Programs offline/);
-    assert.equal(button(page, "Create class").props.disabled, true);
+    assert.doesNotMatch(html, /Create Class|Create class/);
     assert.doesNotMatch(html, /role="status"/);
   } finally { page.unmount(); }
 
@@ -353,11 +371,10 @@ test("admin program failure leaves classes visible and report options recover wi
   } finally { report.unmount(); }
 });
 
-test("administrator create and delete mutations retain their payloads and await all reload resources", async () => {
+test("administrator program creation and deletion retain their payloads and await all reload resources", async () => {
   const { AdminDashboard } = await server.ssrLoadModule(adminPath);
-  for (const view of ["programs", "classes"]) {
   const api = network();
-  const page = mount(() => AdminDashboard({ view }));
+  const page = mount(() => AdminDashboard({ view: "programs" }));
   const settle = async () => {
     api.reply("admin/dashboard", adminData);
     api.reply("admin/users", users);
@@ -372,8 +389,7 @@ test("administrator create and delete mutations retain their payloads and await 
   try {
     await page.flush();
     await settle();
-    const payload = view === "programs" ? { program_name: "New Program", program_head_id: "instructor-one" }
-      : { subject_name: "New Subject", section: "A", schedule: "Monday", instructor_id: "instructor-one", program_id: "program-one", year_level: "3rd", semester: "1st", school_year: "2026-2027" };
+    const payload = { program_name: "New Program", program_head_id: "instructor-one" };
     for (const [name, value] of Object.entries(payload)) fill(name, value);
     await page.flush();
     const form = elements(page.value, node => node.type === "form")[0];
@@ -381,42 +397,55 @@ test("administrator create and delete mutations retain their payloads and await 
     await page.flush();
     const create = api.calls.find(call => call.options.method === "POST");
     assert.deepEqual(JSON.parse(create.options.body), payload);
-    api.reply(`admin/${view}`, view === "programs" ? programs[0] : classes[0]);
+    api.reply("admin/programs", programs[0]);
     await page.flush();
-    const actionLabel = view === "programs" ? "Create" : "Create class";
-    assert.equal(button(page, actionLabel).props.disabled, true);
+    assert.equal(button(page, "Create").props.disabled, true);
     api.reply("admin/users", users);
     await page.flush();
     // Working state survives partial reload completion.
-    assert.equal(button(page, actionLabel).props.disabled, true);
+    assert.equal(button(page, "Create").props.disabled, true);
     api.reply("admin/dashboard", adminData);
     api.reply("admin/programs", programs);
     api.reply("admin/classes", classes);
     await action;
     await page.flush();
-    assert.equal(elements(page.value, node => node.props.name === (view === "programs" ? "program_name" : "subject_name"))[0].props.value, "");
-    if (view === "classes") {
-      const html = page.html();
-      assert.match(html, /aria-labelledby="create-class-title"/);
-      assert.match(html, /aria-labelledby="existing-classes-title"/);
-      assert.match(html, /lg:grid-cols-2/);
-      assert.match(button(page, actionLabel).props.className, /justify-self-center/);
-      assert.match(button(page, actionLabel).props.className, /md:w-\[calc\(50%-0\.75rem\)\]/);
-    }
-
-    for (const path of [view === "programs" ? "admin/programs/program-one" : "admin/classes/class-one"]) {
-      const buttons = elements(page.value, node => node.props.children === "Delete");
-      buttons[0].props.onClick();
-      await page.flush();
-      const deletion = api.calls.find(call => call.path === `/api/${path}`);
-      assert.equal(deletion.options.method, "DELETE");
-      api.reply(path, {});
-      await page.flush();
-      await settle();
-    }
-    assert.match(page.html(), view === "programs" ? /Program deleted/ : /Class deleted/);
+    assert.equal(elements(page.value, node => node.props.name === "program_name")[0].props.value, "");
+    const buttons = elements(page.value, node => node.props.children === "Delete");
+    buttons[0].props.onClick();
+    await page.flush();
+    const deletion = api.calls.find(call => call.path === "/api/admin/programs/program-one");
+    assert.equal(deletion.options.method, "DELETE");
+    api.reply("admin/programs/program-one", {});
+    await page.flush();
+    await settle();
+    assert.match(page.html(), /Program deleted/);
   } finally { page.unmount(); }
-  }
+});
+
+test("Manage Classes keeps class deletion after removing creation", async () => {
+  const { AdminDashboard } = await server.ssrLoadModule(adminPath);
+  const api = network();
+  const page = mount(() => AdminDashboard({ view: "classes" }));
+  const settle = async () => {
+    api.reply("admin/dashboard", adminData);
+    api.reply("admin/users", users);
+    api.reply("admin/programs", programs);
+    api.reply("admin/classes", classes);
+    await page.flush();
+  };
+  try {
+    await page.flush();
+    await settle();
+    elements(page.value, node => node.props.children === "Delete")[0].props.onClick();
+    await page.flush();
+    const deletion = api.calls.find(call => call.path === "/api/admin/classes/class-one");
+    assert.equal(deletion.options.method, "DELETE");
+    api.reply("admin/classes/class-one", {});
+    await page.flush();
+    await settle();
+    assert.match(page.html(), /Class deleted/);
+    assert.doesNotMatch(page.html(), /Create Class|Create class/);
+  } finally { page.unmount(); }
 });
 
 test("Manage confirms class deletion, preserves rejected rows, blocks duplicates and reloads after success", async () => {

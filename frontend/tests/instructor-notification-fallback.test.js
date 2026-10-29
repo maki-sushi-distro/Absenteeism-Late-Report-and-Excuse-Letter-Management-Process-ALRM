@@ -99,7 +99,7 @@ test("failed server reads and blocked storage never claim fallback read success"
   await assert.rejects(markFeedRead(user.id, [item]), /Storage blocked/);
 });
 
-test("feed loading fetches only the authenticated instructor's endpoints and preserves partial results", async () => {
+test("feed loading fetches role-appropriate endpoints and preserves partial results", async () => {
   const { loadNotificationFeed } = await feedModule();
   const calls = [];
   const fetch = mockApiFetch(async (url, options) => {
@@ -114,7 +114,7 @@ test("feed loading fetches only the authenticated instructor's endpoints and pre
   assert.deepEqual(calls.sort(), ["/api/instructor/requests", "/api/notifications"]);
   calls.length = 0;
   await loadNotificationFeed("administrator");
-  assert.deepEqual(calls, ["/api/notifications"]);
+  assert.deepEqual(calls.sort(), ["/api/admin/audit-logs?page=1&per_page=100", "/api/notifications"]);
   fetch.mock.mockImplementation(async url => String(url).endsWith("/notifications") ? Response.json({ message: "Notifications unavailable" }, { status: 503 }) : Response.json({ success: true, data: [request] }));
   const partial = await loadNotificationFeed("instructor");
   assert.deepEqual(partial.requests, [request]);

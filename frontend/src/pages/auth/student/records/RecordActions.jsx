@@ -2,7 +2,7 @@ import { Bell, Loader2 } from "lucide-react";
 
 export default function RecordActions({ record, onView, description, onFollowUp, followingUpId = null }) {
   const isSending = followingUpId === record.id;
-  return <div className="flex w-full min-w-0 flex-wrap items-center justify-end gap-x-4 gap-y-2">
+  return <div className="flex w-full min-w-0 flex-wrap items-center justify-start gap-x-4 gap-y-2">
     <button type="button" onClick={() => onView(record)} className="whitespace-nowrap font-medium text-[#0969FF] hover:underline dark:text-blue-400">
       View Record<span className="sr-only"> for {description}</span>
     </button>

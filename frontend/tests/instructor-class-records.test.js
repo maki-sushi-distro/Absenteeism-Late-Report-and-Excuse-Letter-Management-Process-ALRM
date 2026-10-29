@@ -107,11 +107,12 @@ test("malformed and forbidden class records responses stay errors instead of bec
   await assert.rejects(instructorApi.getInstructorClassRecords(), /Forbidden/);
 });
 
-test("courses render the screenshot's columns and real detail links without fabricated counts", async () => {
+test("courses render the remaining columns and real detail links", async () => {
   const { buildClassRecords } = await helpers();
   const Table = (await server.ssrLoadModule("/src/pages/auth/instructor/InstructorClassRecords/CoursesTable.jsx")).default;
   const html = renderToStaticMarkup(React.createElement(MemoryRouter, null, React.createElement(Table, { courses: buildClassRecords([report("one")], programs) })));
-  for (const label of ["Name", "Program", "Number of Students", "Year", "Actions", "Data Structures", "BSIS", "Unavailable"]) assert.ok(html.includes(label), label);
+  for (const label of ["Name", "Program", "Year", "Actions", "Data Structures", "BSIS"]) assert.ok(html.includes(label), label);
+  assert.doesNotMatch(html, /Number of Students|Unavailable/);
   assert.match(html, /href="\/instructor\/class-records\/class-one"/);
   assert.doesNotMatch(html, /<button[^>]*>View/);
 });
@@ -121,20 +122,21 @@ test("courses show Program next to Year and omit the small section subtitle", as
   const row = { id: "class-one", subjectName: "Financial Literacy and Personal Management", program: "BSIS", section: "BSIS 3", year: "3", studentCount: 32 };
   const html = renderToStaticMarkup(React.createElement(MemoryRouter, null, React.createElement(Table, { courses: [row] })));
   const headers = [...html.matchAll(/<th\b[^>]*><span[^>]*>([^<]*)<\/span><\/th>/g)].map(match => match[1]);
-  assert.deepEqual(headers, ["Name", "Program", "Year", "Number of Students", "Actions"]);
-  assert.match(html, /<td[^>]*>BSIS<\/td><td[^>]*>3<\/td><td[^>]*>32<\/td>/);
+  assert.deepEqual(headers, ["Name", "Program", "Year", "Actions"]);
+  assert.match(html, /<td[^>]*>BSIS<\/td><td[^>]*>3<\/td>/);
+  assert.doesNotMatch(html, />32<\/td>/);
   assert.doesNotMatch(html, /<span[^>]*>Section BSIS 3<\/span>/);
   assert.match(html, /aria-label="View records for Financial Literacy and Personal Management, BSIS, Section BSIS 3"/);
 });
 
-test("course totals display the real API count, including zero, rather than the number of report submitters", async () => {
+test("course totals from the API remain in data but are not shown in the table", async () => {
   const { buildClassRecords } = await helpers();
   const Table = (await server.ssrLoadModule("/src/pages/auth/instructor/InstructorClassRecords/CoursesTable.jsx")).default;
   for (const count of [0, 32]) {
     const courses = buildClassRecords([report("one", "late", "pending", { class: { ...course, enrollments_count: count } })], programs);
     const html = renderToStaticMarkup(React.createElement(MemoryRouter, null, React.createElement(Table, { courses })));
     assert.equal(courses[0].studentCount, count);
-    assert.match(html, new RegExp(`<td[^>]*>${count}</td>`));
+    assert.doesNotMatch(html, new RegExp(`<td[^>]*>${count}</td>`));
     assert.doesNotMatch(html, /Unavailable/);
   }
 });

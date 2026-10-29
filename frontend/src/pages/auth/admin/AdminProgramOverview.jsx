@@ -19,7 +19,7 @@ export default function AdminProgramOverview() {
     <header className="flex flex-wrap items-start justify-between gap-4"><div><h1 className="text-2xl font-bold">Program Overview</h1><p className="mt-1 text-sm text-slate-500">Summary of academic programs and student attendance compliance.</p></div><Button className="h-11 bg-[#172f6b] px-6 py-3 text-white hover:bg-[#203f8a]" nativeButton={false} render={<Link to="/programs" />}>Manage programs</Button></header>
     {dashboard.loading ? <LoadingSkeleton variant="dashboard" label="Loading program overview" /> : dashboard.error ? <div className="space-y-3"><ErrorState message={dashboard.error} /><Button variant="outline" onClick={dashboard.reload}>Retry</Button></div> : <>
       <section aria-label="Program summary" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard label="Total Programs" value={counts?.total_programs} />
+        <MetricCard label="Total Programs" value={rows.length} />
         <MetricCard label="Total Students" value={counts?.total_students} />
         <MetricCard label="Attendance Flags" value={Number.isFinite(counts?.warning_count) && Number.isFinite(counts?.ir_count) ? counts.warning_count + counts.ir_count : null} note="Warnings and IR cases by class" />
         <MetricCard label="Pending Requests" value={counts?.pending_requests} />

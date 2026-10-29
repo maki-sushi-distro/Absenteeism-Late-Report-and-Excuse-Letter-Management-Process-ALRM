@@ -40,7 +40,8 @@ test("initial request, course and student record pages replace the whole loading
   globalThis.window = { innerWidth: 1280, localStorage: { getItem: () => null } };
   try {
     const cases = [
-      ["/src/pages/auth/instructor/InstructorRequests/index.js", "/instructor/class-requests", "/instructor/class-requests?type=late", "Class requests", "requests"],
+      ["/src/pages/auth/instructor/InstructorRequests/index.js", "/instructor/class-requests", "/instructor/class-requests?type=late", "Class requests", "courses"],
+      ["/src/pages/auth/instructor/InstructorRequests/index.js", "/instructor/class-requests/:classId", "/instructor/class-requests/one", "Class requests", "requests"],
       ["/src/pages/auth/instructor/InstructorClassRecords/index.js", "/instructor/class-records", "/instructor/class-records", "Class records", "courses"],
       ["/src/pages/auth/instructor/InstructorClassRecords/index.js", "/instructor/class-records/:classId", "/instructor/class-records/one", "Class records", "course-detail"],
       ["/src/pages/auth/student/StudentRecords.jsx", "/student/records", "/student/records", "My Records", "student-records"],

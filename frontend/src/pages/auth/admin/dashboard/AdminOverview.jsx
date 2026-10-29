@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { ErrorState } from "@/components/common/ErrorState";
 import { ActivityChartPlaceholder, MetricPlaceholder, SectionPlaceholder } from "@/components/loading/DashboardSkeleton/StaffDashboardPlaceholder";
 import { Skeleton } from "@/components/ui/skeleton";
-import { programShortName } from "@/lib/programs";
+import { isGeneralEducationProgram, programShortName } from "@/lib/programs";
 import { ROLE_LABELS, userDepartment } from "../userManagementData.js";
 import { academicTermLabel, pendingAccounts } from "./adminOverviewData.js";
 import AdminDepartmentChart from "./AdminDepartmentChart";
@@ -17,7 +17,10 @@ export default function AdminOverview({ resources, onRetry }) {
   const waiting = key => loading[key] && !ready[key];
   const busy = Object.values(loading).some(Boolean);
   const pending = pendingAccounts(users);
-  const metrics = [["Total Students", dashboard?.total_students], ["Total Instructors", dashboard?.total_instructors], ["Total Programs", dashboard?.total_programs], ["Pending for Approval", dashboard?.pending_staff_approvals]];
+  const listedPrograms = dashboard?.programs_summary || programs;
+  const visiblePrograms = listedPrograms.filter(program => !isGeneralEducationProgram(program));
+  const totalPrograms = ready.programs || dashboard?.programs_summary ? visiblePrograms.length : dashboard?.total_programs;
+  const metrics = [["Total Students", dashboard?.total_students], ["Total Instructors", dashboard?.total_instructors], ["Total Programs", totalPrograms], ["Pending for Approval", dashboard?.pending_staff_approvals]];
   const quickAccess = [
     { label: "Manage users", detail: "View and manage user accounts", path: "/user-management", Icon: UsersRound },
     { label: "Export Report", detail: "Download absence and late reports", path: "/reports", Icon: FileDown },
@@ -33,7 +36,7 @@ export default function AdminOverview({ resources, onRetry }) {
       </article>)}
     </section>}
     <div className="grid min-w-0 items-stretch gap-4 xl:grid-cols-[minmax(0,1.75fr)_minmax(280px,1fr)]">
-      {waiting("dashboard") || waiting("programs") ? <ActivityChartPlaceholder /> : <AdminDepartmentChart programs={dashboard?.programs_summary || programs} />}
+      {waiting("dashboard") || waiting("programs") ? <ActivityChartPlaceholder /> : <AdminDepartmentChart programs={visiblePrograms} />}
       <section aria-labelledby="pending-accounts-title" className="min-w-0 rounded-md border border-[#D0D0D0] bg-white p-4 sm:p-5">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2"><h2 id="pending-accounts-title" className="text-base font-semibold">Pending Account Approvals</h2><Link to="/user-management?tab=waiting" className="text-xs text-[#0969FF] underline underline-offset-2">View all{!loading.users && !errors.users ? ` (${pending.length})` : ""}</Link></div>
         {waiting("users") ? <div data-slot="approval-placeholder"><SectionPlaceholder rows={4} /></div> : errors.users ? <ResourceError message={errors.users} onRetry={onRetry} /> : pending.length ? <ul className="divide-y divide-slate-300">

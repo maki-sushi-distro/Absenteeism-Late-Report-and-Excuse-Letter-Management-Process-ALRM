@@ -1,6 +1,7 @@
 import { CalendarDays, GraduationCap, UsersRound } from "lucide-react";
 import FilterMenu, { RadioFilterGroup as FilterGroup } from "@/components/common/FilterMenu";
 import { ROLE_LABELS } from "./userManagementData.js";
+import { isGeneralEducationProgram } from "@/lib/programs";
 
 const yearOptions = [{ value: "", label: "All years" }, { value: "1", label: "1st year" }, { value: "2", label: "2nd year" }, { value: "3", label: "3rd year" }, { value: "4", label: "4th year" }, { value: "unassigned", label: "Unassigned" }];
 
@@ -9,7 +10,7 @@ export function UserFilterOptions({ filters, programs, loading, programError, di
     <FilterGroup name="role" label="Role" value={filters.role} disabled={disabled} onChange={onChange}
       options={[{ value: "", label: "All roles" }, ...Object.entries(ROLE_LABELS).map(([value, label]) => ({ value, label }))]} />
     <FilterGroup name="program" label="Program" value={filters.program} disabled={disabled} onChange={onChange}
-      options={[{ value: "", label: "All programs" }, ...programs.map(program => ({ value: String(program.id), label: program.program_name || program.name || "Unnamed program", disabled: loading || Boolean(programError) }))]} />
+      options={[{ value: "", label: "All programs" }, ...programs.filter(program => !isGeneralEducationProgram(program)).map(program => ({ value: String(program.id), label: program.program_name || program.name || "Unnamed program", disabled: loading || Boolean(programError) }))]} />
     {loading && <p role="status" className="text-xs text-slate-500">Loading programs…</p>}
     {programError && <p role="status" className="text-xs text-red-700">Programs could not be loaded.</p>}
     {filters.role === "student" && <FilterGroup name="year" label="Year" value={filters.year} disabled={disabled} onChange={onChange}

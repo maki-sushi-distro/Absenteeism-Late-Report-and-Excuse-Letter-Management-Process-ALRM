@@ -1,3 +1,7 @@
+export function isGeneralEducationProgram(program) {
+  return String(program?.program_name || program?.name || "").trim().toLowerCase() === "general education";
+}
+
 export function programShortName(name) {
   const normalized = String(name || "").replace(/^Bachelor of Science\s+/i, "BS ")
     .replace(/^Bachelor of Arts\s+/i, "BA ").replace(/^Associate in\s+/i, "A ");

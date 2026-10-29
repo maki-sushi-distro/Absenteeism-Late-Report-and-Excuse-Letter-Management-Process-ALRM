@@ -29,7 +29,10 @@ export default function RequestSummary({ form, user, classes = [], editing, onSt
     ...(isAbsence ? [
       ["Start date of absence", payload.start_date_of_absence],
       ["End date of absence", payload.end_date_of_absence],
-    ] : [["Minutes late", form.minutesLate ? `${payload.minutes_late} ${payload.minutes_late === 1 ? "minute" : "minutes"}` : ""]]),
+    ] : [
+      ["Date of tardiness", payload.start_date_of_absence],
+      ["Minutes late", form.minutesLate ? `${payload.minutes_late} ${payload.minutes_late === 1 ? "minute" : "minutes"}` : ""],
+    ]),
   ];
 
   return <SectionBox className="dark:border-slate-700 dark:bg-slate-900">

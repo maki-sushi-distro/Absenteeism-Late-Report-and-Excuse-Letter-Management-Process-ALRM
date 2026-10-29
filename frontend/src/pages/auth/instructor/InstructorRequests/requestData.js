@@ -43,6 +43,20 @@ export function groupRequests(records) {
   return [...groups.values()];
 }
 
+export function requestCourses(records, programs = []) {
+  return groupRequests(records).filter(group => group.id).map(({ id, course }) => {
+    const program = course.program || programs.find(item => String(item.id) === String(course.program_id));
+    const year = String(course.year_level ?? "").trim();
+    return {
+      id,
+      subjectName: course.subject_name || "Subject unavailable",
+      program: program?.program_code || program?.code || programShortName(program?.program_name) || "Unavailable",
+      year: year.match(/^([1-4])(?:st|nd|rd|th)?(?:\s+year)?$/i)?.[1] || year || "Unavailable",
+      section: course.section || "",
+    };
+  }).sort((a, b) => a.subjectName.localeCompare(b.subjectName) || a.program.localeCompare(b.program) || a.year.localeCompare(b.year) || a.section.localeCompare(b.section) || a.id.localeCompare(b.id));
+}
+
 export function updateRequestParams(params, changes) {
   const next = new URLSearchParams(params);
   for (const [key, value] of Object.entries(changes)) {

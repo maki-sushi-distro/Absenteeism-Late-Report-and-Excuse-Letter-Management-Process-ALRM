@@ -1,9 +1,10 @@
 import { mockApiFetch } from "./helpers/mockApiFetch.js";
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import { after, afterEach, before, beforeEach, mock, test } from "node:test";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { createServer } from "vite";
 
 const root = "/src/pages/auth/instructor/InstructorRequests/";
@@ -42,6 +43,35 @@ test("filters type, actual class ID, name and backend status, then sorts newest 
   assert.equal(groupRequests(rows).length, 2);
   assert.deepEqual(groupRequests(rows).map(group => group.id), ["class-a", "class-b"]);
   assert.equal(rows[0].id, "old");
+});
+
+test("course list keeps the same subject in separate programs and class IDs", async () => {
+  const { requestCourses } = await load("requestData.js");
+  const shared = { ...course, subject_name: "Critical Thinking", year_level: "3rd" };
+  const records = [
+    request("bsa", { enrollment: { student: { id: "s1", name: "Alex" }, class: { ...shared, id: "class-bsa", program_id: "p-bsa" } } }),
+    request("bsis", { enrollment: { student: { id: "s2", name: "Bea" }, class: { ...shared, id: "class-bsis", program_id: "p-bsis" } } }),
+  ];
+  const programs = [{ id: "p-bsa", program_name: "Bachelor of Science in Accountancy" }, { id: "p-bsis", program_name: "Bachelor of Science in Information Systems" }];
+  assert.deepEqual(requestCourses(records, programs).map(({ id, subjectName, program, year }) => ({ id, subjectName, program, year })), [
+    { id: "class-bsa", subjectName: "Critical Thinking", program: "BSA", year: "3" },
+    { id: "class-bsis", subjectName: "Critical Thinking", program: "BSIS", year: "3" },
+  ]);
+});
+
+test("class request courses have separate View links and no student-count column", async () => {
+  const Table = (await load("RequestCoursesTable.jsx")).default;
+  const courses = [
+    { id: "class-bsa", subjectName: "Critical Thinking", program: "BSA", year: "3" },
+    { id: "class-bsis", subjectName: "Critical Thinking", program: "BSIS", year: "3" },
+  ];
+  const html = renderToStaticMarkup(React.createElement(MemoryRouter, null, React.createElement(Table, { courses, search: "?type=late&status=pending" })));
+  assert.match(html, /href="\/instructor\/class-requests\/class-bsa\?type=late&amp;status=pending"/);
+  assert.match(html, /href="\/instructor\/class-requests\/class-bsis\?type=late&amp;status=pending"/);
+  assert.equal((html.match(/>Critical Thinking<\/td>/g) || []).length, 2);
+  assert.doesNotMatch(html, /Number of Students/);
+  const app = await readFile(new URL("../src/App.jsx", import.meta.url), "utf8");
+  assert.match(app, /path="\/instructor\/class-requests\/:classId"/);
 });
 
 test("occurrence dates never invent late dates and submission falls back to creation", async () => {
@@ -83,15 +113,15 @@ test("list and decision use the authenticated API and validate the fresh decisio
   const calls = [];
   mockApiFetch(async (url, options) => {
     calls.push({ url: String(url), options });
-    return Response.json({ success: true, data: options.method === "PATCH" ? request("one", { status: "noted" }) : [request("one")] });
+    return Response.json({ success: true, data: options.method === "PATCH" ? request("one", { status: "approved" }) : [request("one")] });
   });
   assert.equal((await loadRequests()).length, 1);
-  const fresh = await createDecisionGate()(request("one"), "noted");
-  assert.equal(fresh.status, "noted");
+  const fresh = await createDecisionGate()(request("one"), "approved");
+  assert.equal(fresh.status, "approved");
   assert.ok(calls[0].url.endsWith("/api/instructor/requests"));
   assert.ok(calls[1].url.endsWith("/api/instructor/requests/one/decision"));
   assert.equal(calls[1].options.method, "PATCH");
-  assert.deepEqual(JSON.parse(calls[1].options.body), { status: "noted" });
+  assert.deepEqual(JSON.parse(calls[1].options.body), { status: "approved" });
   assert.equal(calls[1].options.headers.get("Authorization"), null);
 });
 
@@ -117,8 +147,9 @@ test("decision gate blocks concurrent, repeated and non-pending reviews without 
   await new Promise(resolve => setTimeout(resolve, 0));
   finish(Response.json({ success: true, data: request("one", { status: "approved" }) }));
   await pending;
-  await assert.rejects(decide(request("one"), "noted"), /reviewed/i);
+  await assert.rejects(decide(request("one"), "approved"), /reviewed/i);
   await assert.rejects(decide(request("two", { status: "invalid" }), "approved"), /pending/i);
+  await assert.rejects(decide(request("two"), "noted"), /decision/i);
   await assert.rejects(decide(request("two"), "denied"), /decision/i);
   assert.equal(fetch.mock.callCount(), 1);
 });
@@ -194,7 +225,8 @@ test("reviewed requests keep disabled decision buttons at the bottom without exp
   assert.match(html, /<dt[^>]*>Date of Due<\/dt><dd[^>]*>Oct 22, 2026<\/dd>/);
   assert.doesNotMatch(html, /https:\/\/private.example/);
   const buttons = [...html.matchAll(/<button\b([^>]*)>[\s\S]*?<\/button>/g)].filter(([button]) => />(Approve|Note|Invalid)<\/button>$/.test(button));
-  assert.equal(buttons.length, 3);
+  assert.equal(buttons.length, 2);
+  assert.doesNotMatch(html, />Note<\/button>/);
   assert.ok(buttons.every(([, attributes]) => attributes.includes('disabled=""')));
   assert.match(html, /already been reviewed/i);
   assert.ok(html.indexOf('View Attachment') < html.indexOf('>Approve</button>'));
@@ -204,7 +236,9 @@ test("pending requests expose enabled approve and invalid decisions in the modal
   const Dialog = (await load("RequestDetailDialog.jsx")).default;
   const html = renderToStaticMarkup(React.createElement(Dialog, { request: request("pending"), onClose() {}, onReload() {} }));
   const buttons = [...html.matchAll(/<button\b([^>]*)>[\s\S]*?<\/button>/g)].filter(([button]) => />(Approve|Note|Invalid)<\/button>$/.test(button));
-  assert.equal(buttons.length, 3);
+  assert.equal(buttons.length, 2);
+  assert.doesNotMatch(html, />Note<\/button>/);
+  assert.match(buttons.find(([button]) => />Approve<\/button>$/.test(button))[1], /bg-green-600/);
   assert.ok(buttons.every(([, attributes]) => !/(?:^|\s)disabled(?:=|\s|$)/.test(attributes)));
   assert.ok(html.indexOf('Attachment unavailable') < html.indexOf('>Approve</button>'));
   assert.doesNotMatch(html, /already been reviewed/i);
@@ -215,7 +249,14 @@ test("default page mounts the instructor shell and full loading placeholder with
   const { AuthProvider } = await server.ssrLoadModule("/src/context/AuthContext.jsx");
   const fetch = mockApiFetch(async () => { throw new Error("SSR must not fetch or decide requests"); });
   const html = renderToStaticMarkup(React.createElement(MemoryRouter, { initialEntries: ["/instructor/class-requests?type=late&request=one&from=notification"] }, React.createElement(AuthProvider, null, React.createElement(Page))));
-  for (const text of [">Request<", "Loading class requests...", 'data-layout="requests"', 'data-slot="skeleton-tabs"', 'data-slot="skeleton-toolbar"']) assert.ok(html.includes(text), text);
+  for (const text of [">Request<", "Loading class requests...", 'data-layout="courses"']) assert.ok(html.includes(text), text);
   assert.doesNotMatch(html, /role="tab"|placeholder="Search Name\.\.\."|Filter Subject|Filter Request/);
   assert.equal(fetch.mock.callCount(), 0);
+});
+
+test("class request detail route renders the request-list loading shape", async () => {
+  const Page = (await load("index.js")).default;
+  const { AuthProvider } = await server.ssrLoadModule("/src/context/AuthContext.jsx");
+  const html = renderToStaticMarkup(React.createElement(MemoryRouter, { initialEntries: ["/instructor/class-requests/class-bsa?type=late"] }, React.createElement(AuthProvider, null, React.createElement(Routes, null, React.createElement(Route, { path: "/instructor/class-requests/:classId", element: React.createElement(Page) })))));
+  assert.match(html, /data-layout="requests"/);
 });

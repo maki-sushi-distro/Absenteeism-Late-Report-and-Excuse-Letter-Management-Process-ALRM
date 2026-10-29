@@ -56,6 +56,7 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     |----------------------------------------------------------------
     */
     Route::get('/notifications', [NotificationController::class, 'index']);
+    Route::get('/notifications/preview', [NotificationController::class, 'preview']);
     Route::get('/notifications/unread-count', [NotificationController::class, 'unreadCount']);
     Route::patch('/notifications/read-all', [NotificationController::class, 'markAllAsRead']);   // dapat nasa unahan
     Route::patch('/notifications/{notification}/read', [NotificationController::class, 'markAsRead']);

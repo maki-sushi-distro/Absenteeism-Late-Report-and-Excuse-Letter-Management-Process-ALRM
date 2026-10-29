@@ -16,6 +16,9 @@ return [
 
     'default' => env('MAIL_MAILER', 'log'),
 
+    // Public image URL: do not embed this as an attachment in Brevo emails.
+    'logo_url' => env('MAIL_LOGO_URL', 'https://absenteeism-late-report-and-excuse.onrender.com/images/mail/lv-logo.png'),
+
     'otp_queue_connection' => env('OTP_QUEUE_CONNECTION', 'database'),
 
     'brevo_timeout' => (float) env('BREVO_TIMEOUT', 20),

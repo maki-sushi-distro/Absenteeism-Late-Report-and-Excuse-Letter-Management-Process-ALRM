@@ -11,11 +11,7 @@
         <td align="center">
             <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px; width:100%; background-color:#ffffff; border-radius:12px; overflow:hidden; box-shadow:0 4px 18px rgba(15,32,67,0.08);">
                 <tr>
-                    <td align="center" style="background-color:#0b2a52; background-image:linear-gradient(135deg,#0b2a52,#164a86); padding:32px 24px;">
-                        <p style="margin:0; font-family:Arial, Helvetica, sans-serif; font-size:13px; letter-spacing:1.5px; text-transform:uppercase; color:#d9c07a; font-weight:bold;">
-                            ALRM
-                        </p>
-                    </td>
+                    @include('mail.partials.header')
                 </tr>
                 <tr>
                     <td style="padding:36px 24px 8px;">

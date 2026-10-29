@@ -184,7 +184,8 @@ class ProgramHeadAttendanceAlertsTest extends SecurityTestCase
             );
             $html = $mail->render();
             $this->assertStringContainsString('ALRM System Notification', $html);
-            $this->assertStringNotContainsString('La Verdad', $html);
+            $this->assertStringContainsString('LA VERDAD CHRISTIAN COLLEGE, INC.', $html);
+            $this->assertStringContainsString('images/mail/lv-logo.png', $html);
             $this->assertStringContainsString('&lt;script&gt;', $html);
             $this->assertStringNotContainsString('<script>', $html);
             $this->assertStringContainsString('12 of 10 allowable units', $html);

@@ -53,7 +53,7 @@ class InstructorMailRedirectTest extends TestCase
         );
         $this->assertSame('teacher-id', UserNotification::sole()->user_id);
 
-        config(['mail.default' => 'array', 'app.url' => 'https://backend.example.com/']);
+        config(['mail.default' => 'array', 'mail.logo_url' => 'https://backend.example.com/images/mail/lv-logo.png']);
         Mail::swap(new MailManager($this->app));
         $user = new User(['name' => 'OTP User', 'email' => 'otp-user@example.com']);
         $user->notifyNow(new SendOtpCode('123456'));

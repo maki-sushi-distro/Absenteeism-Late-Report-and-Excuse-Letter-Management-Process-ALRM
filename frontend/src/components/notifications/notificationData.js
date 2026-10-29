@@ -7,6 +7,7 @@ const recipients = {
   request_followup: ["instructor"],
   followup_flag: ["program"],
   threshold_warning: ["instructor", "program"],
+  threshold_critical: ["instructor", "program"],
   ir_escalation: ["instructor", "program"],
   attendance_warning: ["instructor", "program"],
   attendance_ir: ["instructor", "program"],
@@ -19,6 +20,9 @@ const recipients = {
 
 function destination(role, requestId, type) {
   const normalized = normalizeRole(role);
+  if (["threshold_critical", "ir_escalation", "attendance_ir"].includes(type)) {
+    if (normalized === "program") return "/program-head/activity-log?tab=flagged";
+  }
   if (["account_role_changed", "account_status_changed"].includes(type)) return "/settings";
   if (type === "pending_staff_approval") return "/user-management";
   if (type === "class_assignment") return "/instructor/class-records";
@@ -38,7 +42,7 @@ export function notificationActivity(records, role, preferences, userId) {
     // Preserve generic notices for their recipient; known events follow backend audiences.
     if (Object.hasOwn(recipients, record.type) && !recipients[record.type].includes(normalizedRole)) return [];
     seen.add(record.id);
-    const threshold = ["threshold_warning", "ir_escalation", "attendance_warning", "attendance_ir"].includes(record.type);
+    const threshold = ["threshold_warning", "threshold_critical", "ir_escalation", "attendance_warning", "attendance_ir"].includes(record.type);
     if (!(threshold ? preferences.thresholdAlerts : preferences.requestUpdates)) return [];
     return [{ id: record.id, type: record.type, requestId: record.request_id, message: record.message, date: record.date_sent, isRead: record.is_read === true, href: destination(role, record.request_id, record.type) }];
   }).sort((a, b) => Date.parse(b.date) - Date.parse(a.date));

@@ -131,6 +131,9 @@ test("role-event notifications open the existing page that handles each interact
   assert.equal(activity("instructor", { type: "class_assignment" }).href, "/instructor/class-records");
   assert.equal(activity("program_head", { type: "program_head_assignment" }).href, "/program-head/instructors");
   assert.equal(activity("student", { type: "account_status_changed" }).href, "/settings");
+  assert.equal(activity("program_head", { type: "threshold_critical", request_id: "request/two" }).href, "/program-head/activity-log?tab=flagged");
+  assert.equal(activity("program_head", { type: "ir_escalation", request_id: "request/three" }).href, "/program-head/activity-log?tab=flagged");
+  assert.equal(notificationActivity([{ id: "critical", type: "threshold_critical", user_id: "head", message: "Critical attendance threshold", date_sent: "2026-10-29T08:00:00Z" }], "program_head", { requestUpdates: true, thresholdAlerts: false }, "head").length, 0);
 });
 
 test("instructor feeds exclude personal student results but include the backend's email-channel new-request event", async () => {
@@ -147,13 +150,13 @@ test("instructor feeds exclude personal student results but include the backend'
 
 test("role-specific events and recipients cannot cross into another role's inbox", async () => {
   const { notificationActivity } = await load("components/notifications/notificationData.js");
-  const types = ["request_decision", "request_updated", "new_request", "request_followup", "followup_flag", "threshold_warning", "ir_escalation", "pending_staff_approval", "class_assignment", "program_head_assignment", "account_role_changed", "account_status_changed", "school_notice"];
+  const types = ["request_decision", "request_updated", "new_request", "request_followup", "followup_flag", "threshold_warning", "threshold_critical", "ir_escalation", "pending_staff_approval", "class_assignment", "program_head_assignment", "account_role_changed", "account_status_changed", "school_notice"];
   const rows = types.map(type => ({ id: type, type, user_id: "owner", message: type, date_sent: "2026-10-23", channel: "in_app" }));
   const preferences = { requestUpdates: true, thresholdAlerts: true };
   const visible = role => notificationActivity(rows, role, preferences, "owner").map(item => item.id);
   assert.deepEqual(visible("student"), ["request_decision", "request_updated", "account_role_changed", "account_status_changed", "school_notice"]);
-  assert.deepEqual(visible("instructor"), ["new_request", "request_followup", "threshold_warning", "ir_escalation", "class_assignment", "program_head_assignment", "account_role_changed", "account_status_changed", "school_notice"]);
-  assert.deepEqual(visible("program_head"), ["followup_flag", "threshold_warning", "ir_escalation", "program_head_assignment", "account_role_changed", "account_status_changed", "school_notice"]);
+  assert.deepEqual(visible("instructor"), ["new_request", "request_followup", "threshold_warning", "threshold_critical", "ir_escalation", "class_assignment", "program_head_assignment", "account_role_changed", "account_status_changed", "school_notice"]);
+  assert.deepEqual(visible("program_head"), ["followup_flag", "threshold_warning", "threshold_critical", "ir_escalation", "program_head_assignment", "account_role_changed", "account_status_changed", "school_notice"]);
   assert.deepEqual(visible("administrator"), ["pending_staff_approval", "account_role_changed", "account_status_changed", "school_notice"]);
   assert.equal(notificationActivity(rows, "instructor", preferences, "another-user").length, 0);
 });

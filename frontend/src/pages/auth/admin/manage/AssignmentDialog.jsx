@@ -74,10 +74,12 @@ export default function AssignmentDialog({ row, data, onClose, onConflict, onSav
   const targetPending = pendingState(targetClass);
   const blocked = sourcePending.count > 0 || targetPending.count > 0 || sourcePending.loading || targetPending.loading || Boolean(pendingErrors[sourceClass?.id] || pendingErrors[targetClass?.id]);
   const currentInstructorId = String(sourceInstructor?.id || activeTeachingAssignment(sourceClass)?.instructor_id || "");
-  const validSelection = Boolean(sourceClass && assignmentRevision(sourceClass) !== null && (operation === "assign" || selection.reason.trim()))
+  const revisionsReady = Boolean(sourceClass && assignmentRevision(sourceClass) !== null)
+    && (!targetClass || assignmentRevision(targetClass) !== null);
+  const validSelection = Boolean(sourceClass && (operation === "assign" || selection.reason.trim()))
     && (["assign", "change_instructor"].includes(operation)
       ? Boolean(selection.instructorId) && (operation !== "change_instructor" || selection.instructorId !== currentInstructorId)
-      : Boolean(targetClass && assignmentRevision(targetClass) !== null));
+      : Boolean(targetClass));
 
   useEffect(() => {
     const element = dialog.current;
@@ -127,11 +129,34 @@ export default function AssignmentDialog({ row, data, onClose, onConflict, onSav
   async function submit(event) {
     event.preventDefault();
     if (!validSelection || blocked || lock.current) return;
-    if (!reviewing) { setReviewing(true); return; }
+    const affected = [sourceClass.id, ...(targetClass ? [targetClass.id] : [])];
+    if (!reviewing) {
+      setReviewing(true);
+      if (!revisionsReady) {
+        setBusy(true);
+        setError("");
+        try {
+          const refreshed = await onConflict(affected);
+          const source = refreshed.find(item => String(item.id) === String(sourceClass.id));
+          const target = targetClass && refreshed.find(item => String(item.id) === String(targetClass.id));
+          if (assignmentRevision(source) === null || (targetClass && assignmentRevision(target) === null)) {
+            setError("The latest class data is missing its assignment revision. Refresh the page before confirming this change.");
+          }
+        } catch (failure) {
+          setError(failure.message || "The latest assignment details could not be refreshed.");
+        } finally {
+          setBusy(false);
+        }
+      }
+      return;
+    }
+    if (!revisionsReady) {
+      setError("The latest class data is missing its assignment revision. Refresh the page before confirming this change.");
+      return;
+    }
     lock.current = true;
     setBusy(true);
     setError("");
-    const affected = [sourceClass.id, ...(targetClass ? [targetClass.id] : [])];
     try {
       await submitAssignmentAction(sourceClass.id, payload());
       await onSaved(affected, operation === "assign" ? "Instructor assigned." : "Instructor assignment updated.");

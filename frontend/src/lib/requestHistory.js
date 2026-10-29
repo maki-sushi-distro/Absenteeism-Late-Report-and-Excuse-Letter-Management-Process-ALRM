@@ -4,13 +4,17 @@ export function historicalRequestClass(request) {
   return request?.enrollment?.class || request?.class || null;
 }
 
-export function historicalInstructor(course) {
+export function historicalInstructor(course, instructors = []) {
   if (!course) return null;
-  const instructor = course.instructor || course.assigned_instructor;
+  const assignment = course.active_teaching_assignment || course.teaching_assignment;
+  const instructor = course.instructor || course.assigned_instructor || assignment?.instructor;
   if (typeof instructor === "string") return { name: instructor };
-  return instructor || (course.instructor_name ? { name: course.instructor_name } : null);
+  if (instructor?.name) return instructor;
+  const instructorId = instructor?.id || assignment?.instructor_id || course.instructor_id;
+  return instructors.find(item => String(item.id) === String(instructorId))
+    || (course.instructor_name || assignment?.instructor_name ? { id: instructorId, name: course.instructor_name || assignment.instructor_name } : null);
 }
 
-export function historicalInstructorName(request, fallback = "Unavailable") {
-  return historicalInstructor(historicalRequestClass(request))?.name || fallback;
+export function historicalInstructorName(request, fallback = "Unavailable", instructors = []) {
+  return historicalInstructor(historicalRequestClass(request), instructors)?.name || fallback;
 }

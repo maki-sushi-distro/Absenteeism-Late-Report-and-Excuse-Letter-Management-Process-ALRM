@@ -1,5 +1,5 @@
 import { isGeneralEducationProgram } from "../../../lib/programs.js";
-import { historicalInstructorName, historicalRequestClass } from "../../../lib/requestHistory.js";
+import { historicalInstructor, historicalInstructorName, historicalRequestClass } from "../../../lib/requestHistory.js";
 
 function eventDate(value) { return value && Number.isFinite(Date.parse(value)) ? value : null; }
 function newest(rows) { return rows.filter(row => eventDate(row.date)).sort((a, b) => Date.parse(b.date) - Date.parse(a.date)); }
@@ -7,7 +7,7 @@ const auditActions = { submitted_request: "Submitted", updated_request: "Updated
 function requestInfo(request) {
   const course = historicalRequestClass(request);
   const student = request.enrollment?.student;
-  return { student: student?.name || "Unavailable", studentId: student?.school_id_number || "", email: student?.email || "", subject: course?.subject_name || request.subjects_missed || "Unavailable", classId: course?.id || "", type: request.type === "absence" ? "Absent" : request.type === "late" ? "Late" : "Unavailable", instructor: course?.instructor?.name || "Unavailable" };
+  return { student: student?.name || "Unavailable", studentId: student?.school_id_number || "", email: student?.email || "", subject: course?.subject_name || request.subjects_missed || "Unavailable", classId: course?.id || "", type: request.type === "absence" ? "Absent" : request.type === "late" ? "Late" : "Unavailable", instructor: historicalInstructorName(request) };
 }
 export function requestActivity(requests = []) {
   return newest(requests.flatMap(request => {
@@ -30,11 +30,19 @@ export function flagActivity(flags = []) {
     return { ...info, id: flag.id, date: flag.flagged_date || flag.created_at, action: "Flagged", instructor, flaggedBy: instructor };
   }));
 }
-export function auditActivity(logs = []) {
+export function auditActivity(logs = [], { classes = [], requests = [], instructors = [] } = {}) {
+  const requestsById = new Map(requests.map(item => [String(item.id), item]));
+  const classesById = new Map(classes.map(item => [String(item.id), item]));
   return newest(logs.map(log => {
     const request = log.request || {};
     const course = historicalRequestClass(request) || {};
-    return { id: log.id, requestId: request.id || "", date: log.timestamp, student: request.student?.name || request.enrollment?.student?.name || "Unavailable", studentId: "", email: "", subject: course.subject_name || "Unavailable", classId: course.id || "", type: request.type === "absence" ? "Absent" : request.type === "late" ? "Late" : "Unavailable", action: auditActions[log.action] || log.description || "Unavailable", instructor: historicalInstructorName(request, "—"), actor: log.actor?.name || "Unavailable", description: log.description || auditActions[log.action] || "Activity recorded" };
+    const matchingRequest = requestsById.get(String(request.id));
+    const matchingClass = classesById.get(String(course.id));
+    const instructor = historicalInstructorName(request, "", instructors)
+      || historicalInstructorName(matchingRequest, "", instructors)
+      || historicalInstructor(matchingClass, instructors)?.name
+      || "—";
+    return { id: log.id, requestId: request.id || "", date: log.timestamp, student: request.student?.name || request.enrollment?.student?.name || "Unavailable", studentId: "", email: "", subject: course.subject_name || "Unavailable", classId: course.id || "", type: request.type === "absence" ? "Absent" : request.type === "late" ? "Late" : "Unavailable", action: auditActions[log.action] || log.description || "Unavailable", instructor, actor: log.actor?.name || "Unavailable", description: log.description || auditActions[log.action] || "Activity recorded" };
   }));
 }
 export function filterActivity(rows, { search = "", action = "", subject = "", date = "" } = {}) {

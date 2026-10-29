@@ -1,4 +1,4 @@
-import { lazy, Suspense } from "react";
+import { lazy } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { usePreviewRole } from "@/hooks/usePreviewRole";
 import { normalizeRole } from "@/lib/roles";
@@ -10,10 +10,6 @@ const InstructorPageLayout = lazy(() => import("./auth/instructor/InstructorPage
 const ProgramHeadDashboard = lazy(() => import("./auth/programHead/ProgramHeadDashboard").then(module => ({ default: module.ProgramHeadDashboard })));
 const ProgramHeadPageLayout = lazy(() => import("./auth/programHead/ProgramHeadPageLayout"));
 const StudentDashboard = lazy(() => import("./auth/student/StudentDashboard"));
-
-function DashboardFallback() {
-  return <div role="status" aria-label="Loading dashboard" className="min-h-screen bg-white p-6 dark:bg-slate-950"><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{Array.from({ length: 4 }, (_, index) => <div key={index} className="h-28 animate-pulse rounded-md bg-slate-200 dark:bg-slate-800" />)}</div></div>;
-}
 
 export function Dashboard() {
   const { user } = useAuth();
@@ -31,5 +27,5 @@ export function Dashboard() {
   if (role === "admin") {
     content = <AdminPageLayout><AdminDashboard /></AdminPageLayout>;
   }
-  return <Suspense fallback={<DashboardFallback />}>{content || <HttpErrorPage status={403} />}</Suspense>;
+  return content || <HttpErrorPage status={403} />;
 }

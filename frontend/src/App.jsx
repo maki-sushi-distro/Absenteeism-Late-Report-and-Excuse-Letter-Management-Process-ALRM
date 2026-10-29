@@ -1,8 +1,10 @@
 import { lazy, Suspense } from "react";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
 import { ProtectedRoute } from "./routes/ProtectedRoute";
 import AppErrorBoundary from "./components/AppErrorBoundary";
+import AuthLoading from "./components/loading/AuthLoading";
+import SessionShellSkeleton from "./components/loading/SessionShellSkeleton";
 import "./App.css";
 
 const Login = lazy(() => import("./pages/login"));
@@ -39,7 +41,9 @@ const StudentRequestForm = lazy(() => import("./pages/auth/student/StudentReques
 const HttpErrorPage = lazy(() => import("./pages/HttpErrorPage"));
 
 function RouteFallback() {
-  return <div role="status" aria-label="Loading page" className="min-h-screen bg-white p-6 dark:bg-slate-950"><div className="h-8 w-44 animate-pulse rounded bg-slate-200 dark:bg-slate-800" /></div>;
+  const { pathname } = useLocation();
+  const authPath = /^\/(login|verify-otp)\/*$/.test(pathname) || pathname.startsWith("/auth/");
+  return authPath ? <AuthLoading label="Loading page..." /> : <SessionShellSkeleton />;
 }
 
 function App() {

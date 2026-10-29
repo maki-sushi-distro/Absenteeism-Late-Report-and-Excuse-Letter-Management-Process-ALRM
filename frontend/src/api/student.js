@@ -12,4 +12,8 @@ export function getStudentAttendanceSummary() {
   return apiRequest("/attendance/summary");
 }
 
+export function getStudentDashboard() {
+  return apiRequest("/dashboard");
+}
+
 export { createStudentRequest } from "./studentRequests.js";

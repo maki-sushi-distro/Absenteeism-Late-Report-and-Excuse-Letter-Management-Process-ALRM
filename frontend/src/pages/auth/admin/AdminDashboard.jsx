@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  createClass,
   createProgram,
   deleteClass,
   deleteProgram,
   getAdminDashboard,
   getClasses,
   getPrograms,
+  updateClass,
   updateStaffRole,
 } from "@/api/admin";
 import { getUserManagementUsers } from "@/api/adminUserManagement";
@@ -20,11 +22,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { isGeneralEducationProgram } from "@/lib/programs";
+import ClassForm from "./classes/ClassForm";
 
 const emptyProgramForm = { program_name: "", program_head_id: "" };
 const endpoints = { dashboard: getAdminDashboard, users: getUserManagementUsers, programs: getPrograms, classes: getClasses };
 const pendingResources = { dashboard: true, users: true, programs: true, classes: true };
-const viewResources = { dashboard: Object.keys(endpoints), users: ["users"], programs: ["programs", "users"], classes: ["classes", "programs"], reports: ["programs"] };
+const viewResources = { dashboard: Object.keys(endpoints), users: ["users"], programs: ["programs", "users"], classes: ["classes", "programs", "users"], reports: ["programs"] };
 
 export function AdminDashboard({ view = "dashboard" }) {
   const [resources, setResources] = useState({
@@ -42,6 +45,7 @@ export function AdminDashboard({ view = "dashboard" }) {
   const [working, setWorking] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [classEditor, setClassEditor] = useState(null);
 
   const loadData = useCallback(async () => {
     if (!mounted.current) return;
@@ -113,6 +117,23 @@ export function AdminDashboard({ view = "dashboard" }) {
     if (created) setProgramForm(emptyProgramForm);
   }
 
+  async function handleSaveClass(values) {
+    if (working) return;
+    setWorking("save-class");
+    setError("");
+    setNotice("");
+    try {
+      if (classEditor?.item) await updateClass(classEditor.item.id, values);
+      else await createClass(values);
+      if (!mounted.current) return;
+      setNotice(classEditor?.item ? "Class updated." : "Class created.");
+      setClassEditor(null);
+      await loadData();
+    } finally {
+      if (mounted.current) setWorking("");
+    }
+  }
+
   const loading = (viewResources[view] || []).some((key) => resourceLoading[key]);
   const waiting = (key) => resourceLoading[key] && !ready[key];
   const programOptionsReady = ready.users && !resourceLoading.users && !errors.users;
@@ -125,6 +146,7 @@ export function AdminDashboard({ view = "dashboard" }) {
   const showReports = view === "reports";
   const staffUsers = users.filter((user) => ["instructor", "program_head", "administrator"].includes(user.role));
   const programHeads = users.filter((user) => ["instructor", "program_head"].includes(user.role));
+  const instructors = users.filter((user) => user.role === "instructor" && user.status !== "deactivated");
 
   if (view === "dashboard") return <AdminOverview resources={resources} onRetry={loadData} />;
 
@@ -179,12 +201,15 @@ export function AdminDashboard({ view = "dashboard" }) {
           )}
         </div> : null}
 
-        {showClasses ? waiting("classes") ? <SectionPlaceholder rows={3} /> : errors.classes ? resourceError("classes") : <div className="grid min-w-0 gap-6">
+        {showClasses ? waiting("classes") || waiting("programs") || waiting("users") ? <SectionPlaceholder rows={3} /> : errors.classes ? resourceError("classes") : <div className="grid min-w-0 gap-6">
           {!showPrograms && errors.programs ? resourceError("programs") : null}
+          {errors.users ? resourceError("users") : null}
+          <div className="flex justify-end"><Button type="button" onClick={() => setClassEditor({ item: null })} disabled={Boolean(working)} className="bg-[#172f6b] text-white hover:bg-[#203f8a]">Create Class</Button></div>
+          {classEditor && <ClassForm key={classEditor.item?.id || "new"} item={classEditor.item} programs={visiblePrograms} instructors={instructors} saving={working === "save-class"} onCancel={() => setClassEditor(null)} onSave={handleSaveClass} />}
           <section aria-labelledby="existing-classes-title" className="min-w-0 rounded-lg border border-slate-200 bg-white p-5">
           <h2 id="existing-classes-title" className="mb-4 text-lg font-semibold">Existing Classes</h2>
           {visibleClasses.length === 0 ? <EmptyState title="No classes found" /> : (
-            <div className="grid gap-3 lg:grid-cols-2">{visibleClasses.map((item) => <article key={item.id} className="min-w-0 rounded-lg border border-slate-200 p-4"><div className="flex items-start justify-between gap-3"><span className="min-w-0 break-words font-medium">{item.subject_name}</span><Button size="sm" variant="destructive" className="shrink-0" onClick={() => { setWorking(`delete-class-${item.id}`); runAction(() => deleteClass(item.id), "Class deleted."); }}>Delete</Button></div><p className="mt-2 break-words text-xs text-slate-500">ID {item.id} · {item.program?.program_name || "Program"}</p></article>)}</div>
+            <div className="grid gap-3 lg:grid-cols-2">{visibleClasses.map((item) => <article key={item.id} className="min-w-0 rounded-lg border border-slate-200 p-4"><div className="flex items-start justify-between gap-3"><span className="min-w-0 break-words font-medium">{item.subject_name}</span><div className="flex shrink-0 gap-2"><Button size="sm" variant="outline" onClick={() => setClassEditor({ item })} disabled={Boolean(working)}>Edit</Button><Button size="sm" variant="destructive" onClick={() => { setWorking(`delete-class-${item.id}`); runAction(() => deleteClass(item.id), "Class deleted."); }}>Delete</Button></div></div><p className="mt-2 break-words text-xs text-slate-500">{item.program?.program_name || "Program"} · {item.year_level || "Year unavailable"} · {item.semester || "Semester unavailable"} Semester</p><dl className="mt-3 grid gap-1 text-xs text-slate-600"><div><dt className="inline font-medium">Academic units:</dt> <dd className="inline">{item.credit_units ?? "Unavailable"}</dd></div><div><dt className="inline font-medium">Class/contact hours:</dt> <dd className="inline">{item.weekly_hours ?? "Unavailable"} weekly</dd></div></dl></article>)}</div>
           )}
           </section>
         </div> : null}

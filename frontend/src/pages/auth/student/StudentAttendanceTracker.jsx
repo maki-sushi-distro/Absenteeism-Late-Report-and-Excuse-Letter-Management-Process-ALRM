@@ -10,9 +10,11 @@ function StudentAttendanceTracker({ attendance }) {
           <h3 className="font-semibold">{item.subject_name}</h3>
           <StatusBadge value={item.tracker?.status || "safe"} />
         </div>
-        <p className="mt-3 text-sm text-slate-600 dark:text-slate-300">
-          Lates: {item.tracker?.total_lates || 0} | Absences: {item.tracker?.total_absences || 0} | Converted: {item.tracker?.converted_absences || 0}
-        </p>
+        <dl className="mt-3 grid gap-1 text-sm text-slate-600 dark:text-slate-300">
+          <div><dt className="inline font-medium">Lates:</dt> <dd className="inline">{item.tracker?.total_lates ?? 0}</dd></div>
+          <div><dt className="inline font-medium">Absences:</dt> <dd className="inline">{item.tracker?.total_absences ?? 0}</dd></div>
+          <div><dt className="inline font-medium">Recorded absence hours:</dt> <dd className="inline">{item.tracker?.absence_hours ?? 0}</dd></div>
+        </dl>
       </article>)}
     </div>}
   </section>;

@@ -1,5 +1,3 @@
-export const ATTENDANCE_POLICY = { warning: 2, incidentReport: 3, latesPerAbsence: 3 };
-
 export { programShortName } from "../../../../lib/programs.js";
 
 export function studentProfile(user, classes = []) {
@@ -14,15 +12,6 @@ export function studentProfile(user, classes = []) {
     academic: [user?.program?.program_name, year, sections.length ? `Section ${sections.join(", ")}` : ""].filter(Boolean).join(" - ") || "Not assigned",
     term: terms.join(" / "),
   };
-}
-
-export function attendanceStanding(attendance = []) {
-  // Thresholds apply to each class, never to the sum across different classes.
-  const highest = attendance.filter((item) => item.tracker != null).reduce((current, item) =>
-    !current || Number(item.tracker.converted_absences || 0) > Number(current.tracker.converted_absences || 0) ? item : current, null);
-  const converted = Number(highest?.tracker?.converted_absences || 0);
-  const status = converted >= ATTENDANCE_POLICY.incidentReport ? "IR" : converted >= ATTENDANCE_POLICY.warning ? "warning" : "safe";
-  return { converted, status, subject: highest?.subject_name || "", hasData: attendance.some((item) => item.tracker != null) };
 }
 
 export function requestTotals(requests = []) {

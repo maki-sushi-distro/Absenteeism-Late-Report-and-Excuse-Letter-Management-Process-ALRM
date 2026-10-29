@@ -3,18 +3,34 @@ import { assertValidInputs, emailPattern, isIdentifier, isValidDate, personNameP
 const yearLevels = ['1st', '2nd', '3rd', '4th'];
 
 export function prepareAccountInput(data) {
-  const payload = { name: sanitizeText(data.name), email: sanitizeText(data.email).toLowerCase(), role: data.role };
+  const payload = {
+    first_name: sanitizeText(data.first_name),
+    middle_name: sanitizeText(data.middle_name) || null,
+    last_name: sanitizeText(data.last_name),
+    email: sanitizeText(data.email).toLowerCase(),
+    role: data.role,
+    school_id_number: sanitizeText(data.school_id_number),
+  };
+  if (data.role !== 'administrator') payload.program_id = sanitizeText(data.program_id);
   assertValidInputs({
-    name: textError(payload.name, 'Full name', { min: 2, pattern: personNamePattern }),
+    first_name: textError(payload.first_name, 'First name', { min: 1, pattern: personNamePattern }),
+    middle_name: payload.middle_name ? textError(payload.middle_name, 'Middle name', { min: 1, pattern: personNamePattern }) : '',
+    last_name: textError(payload.last_name, 'Last name', { min: 1, pattern: personNamePattern }),
     email: textError(payload.email, 'Email address', { pattern: emailPattern }),
     role: ['student', 'instructor', 'program_head', 'administrator'].includes(data.role) ? '' : 'Select an available role.',
+    program_id: data.role === 'administrator' || isIdentifier(payload.program_id) ? '' : 'Select a valid program.',
+    school_id_number: textError(payload.school_id_number, 'User ID', { pattern: /^[\p{L}\p{N}][\p{L}\p{N} ._/-]*$/u }),
   });
   return payload;
 }
 
 export function prepareProfileInput(data) {
-  const payload = { program_id: sanitizeText(data.program_id) };
-  const errors = { program_id: isIdentifier(payload.program_id) ? '' : 'Select a valid program.' };
+  const payload = {};
+  const errors = {};
+  if (Object.hasOwn(data, 'program_id')) {
+    payload.program_id = sanitizeText(data.program_id);
+    errors.program_id = isIdentifier(payload.program_id) ? '' : 'Select a valid program.';
+  }
   if (Object.hasOwn(data, 'school_id_number')) {
     payload.school_id_number = sanitizeText(data.school_id_number);
     errors.school_id_number = textError(payload.school_id_number, 'School ID number', { pattern: /^[\p{L}\p{N}][\p{L}\p{N} ._/-]*$/u });
@@ -47,15 +63,19 @@ export function prepareProgramInput(data, partial = false) {
 export function prepareClassInput(data, partial = false) {
   const payload = {};
   const errors = {};
-  for (const [key, label] of [['subject_name', 'Subject'], ['section', 'Section'], ['schedule', 'Schedule']]) {
+  for (const [key, label] of [['subject_name', 'Subject'], ['section', 'Section']]) {
     if (partial && !Object.hasOwn(data, key)) continue;
     payload[key] = sanitizeText(data[key]);
     errors[key] = textError(payload[key], label);
   }
-  for (const [key, label] of [['instructor_id', 'instructor'], ['program_id', 'program']]) {
+  for (const [key, label] of [['program_id', 'program'], ['curriculum_subject_id', 'curriculum subject']]) {
     if (partial && !Object.hasOwn(data, key)) continue;
     payload[key] = sanitizeText(data[key]);
     errors[key] = isIdentifier(payload[key]) ? '' : `Select a valid ${label}.`;
+  }
+  if (!partial || Object.hasOwn(data, 'instructor_id')) {
+    payload.instructor_id = data.instructor_id ? sanitizeText(data.instructor_id) : null;
+    errors.instructor_id = payload.instructor_id === null || isIdentifier(payload.instructor_id) ? '' : 'Select a valid instructor.';
   }
   for (const [key, choices] of [['semester', ['1st', '2nd']], ['year_level', yearLevels]]) {
     if (partial && !Object.hasOwn(data, key)) continue;
@@ -66,6 +86,25 @@ export function prepareClassInput(data, partial = false) {
     payload.school_year = sanitizeText(data.school_year);
     const match = /^(\d{4})-(\d{4})$/.exec(payload.school_year);
     errors.school_year = match && Number(match[2]) === Number(match[1]) + 1 ? '' : 'Enter consecutive school years, for example 2026-2027.';
+  }
+  if (!partial || Object.hasOwn(data, 'schedule')) {
+    payload.schedule = Array.isArray(data.schedule) ? data.schedule.map((meeting) => ({
+      day: sanitizeText(meeting.day),
+      start: sanitizeText(meeting.start),
+      end: sanitizeText(meeting.end),
+      room: sanitizeText(meeting.room) || null,
+    })) : [];
+    const invalidMeeting = payload.schedule.find((meeting) => !['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].includes(meeting.day)
+      || !/^([01]\d|2[0-3]):[0-5]\d$/.test(meeting.start)
+      || !/^([01]\d|2[0-3]):[0-5]\d$/.test(meeting.end)
+      || meeting.end <= meeting.start);
+    errors.schedule = invalidMeeting ? 'Complete each meeting with a valid day and an end time after its start.' : '';
+  }
+  if (payload.schedule?.length === 0) {
+    payload.weekly_hours = Number(data.weekly_hours);
+    payload.meetings_per_week = Number(data.meetings_per_week);
+    errors.weekly_hours = Number.isFinite(payload.weekly_hours) && payload.weekly_hours > 0 && payload.weekly_hours <= 168 ? '' : 'Enter confirmed weekly contact hours.';
+    errors.meetings_per_week = Number.isInteger(payload.meetings_per_week) && payload.meetings_per_week >= 1 && payload.meetings_per_week <= 42 ? '' : 'Enter the confirmed meetings per week.';
   }
   assertValidInputs(errors);
   return payload;

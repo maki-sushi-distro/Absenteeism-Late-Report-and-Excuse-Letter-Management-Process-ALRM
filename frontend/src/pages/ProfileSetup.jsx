@@ -21,7 +21,6 @@ import {
   YEAR_LEVELS,
   clearLegacyProfileSetup,
   isProfileSetupComplete,
-  isProfileSetupReady,
   splitVerifiedName,
 } from "@/lib/profileSetup";
 import { normalizeRole } from "@/lib/roles";
@@ -101,6 +100,9 @@ function ProfileSetup() {
   const isStudent = serverRole === "student";
   const isInstructor = serverRole === "instructor";
   const roleLabel = ROLE_LABELS[user?.role] || user?.role || "";
+  const needsProgram = !user?.program_id;
+  const needsSchoolId = (isStudent || isInstructor) && !user?.school_id_number;
+  const needsYearLevel = isStudent && !user?.year_level;
 
   const parsedName = useMemo(() => splitVerifiedName(user?.name), [user?.name]);
   const [programs, setPrograms] = useState([]);
@@ -120,21 +122,16 @@ function ProfileSetup() {
     () =>
       programs.find(
         (program) => String(programId(program)) === String(form.programId),
-      ),
-    [form.programId, programs],
+      ) || (!needsProgram ? user?.program : null),
+    [form.programId, needsProgram, programs, user?.program],
   );
   const availableYearOptions = isAssociateComputerTechnology(selectedProgram)
     ? ASSOCIATE_YEAR_LEVELS
     : YEAR_LEVELS;
-  const formReady = isProfileSetupReady({
-    role: serverRole,
-    userId: user?.id,
-    schoolIdNumber: form.schoolIdNumber,
-    programId: form.programId,
-    selectedProgramId: selectedProgram ? programId(selectedProgram) : "",
-    yearLevel: form.yearLevel,
-    yearOptions: availableYearOptions,
-  });
+  const validProgram = Boolean(form.programId) && (!needsProgram || Boolean(selectedProgram));
+  const validSchoolId = !(isStudent || isInstructor) || Boolean(form.schoolIdNumber.trim());
+  const validYear = !isStudent || availableYearOptions.some((year) => year.value === form.yearLevel);
+  const formReady = Boolean(serverRole) && validProgram && validSchoolId && validYear;
 
   // Isang beses: linisin ang lumang localStorage setup.
   useEffect(() => {
@@ -151,6 +148,10 @@ function ProfileSetup() {
     let alive = true;
 
     async function loadPrograms() {
+      if (!needsProgram) {
+        setProgramsLoading(false);
+        return;
+      }
       setProgramsLoading(true);
       setProgramsError("");
 
@@ -174,7 +175,7 @@ function ProfileSetup() {
     return () => {
       alive = false;
     };
-  }, [programsRequestKey]);
+  }, [needsProgram, programsRequestKey]);
 
   function updateField(name, value) {
     setForm((current) => {
@@ -207,11 +208,11 @@ function ProfileSetup() {
     }
 
     if (!serverRole) nextErrors.role = "Your account has no role. Contact an administrator.";
-    if (!selectedProgram) nextErrors.programId = "Select a program from the available list.";
-    if ((isStudent || isInstructor) && !form.schoolIdNumber.trim()) {
+    if (needsProgram && !selectedProgram) nextErrors.programId = "Select a program from the available list.";
+    if (needsSchoolId && !form.schoolIdNumber.trim()) {
       nextErrors.schoolIdNumber = `Enter your ${isInstructor ? "instructor" : "student"} ID.`;
     }
-    if (isStudent && !availableYearOptions.some(year => year.value === form.yearLevel)) {
+    if (needsYearLevel && !availableYearOptions.some(year => year.value === form.yearLevel)) {
       nextErrors.yearLevel = "Select an available year.";
     }
 
@@ -223,11 +224,12 @@ function ProfileSetup() {
     event.preventDefault();
 
     // The server determines the role; the form only submits profile fields.
-    const payload = { program_id: form.programId };
-    if (isStudent || isInstructor) {
+    const payload = {};
+    if (needsProgram) payload.program_id = form.programId;
+    if (needsSchoolId) {
       payload.school_id_number = form.schoolIdNumber.trim();
     }
-    if (isStudent) {
+    if (needsYearLevel) {
       payload.year_level = form.yearLevel; // "1st" | "2nd" | "3rd" | "4th"
     }
 
@@ -315,18 +317,7 @@ function ProfileSetup() {
 
           <form className="grid gap-5" onSubmit={handleSubmit}>
             <div className="grid gap-4 md:grid-cols-2">
-              <div className="grid min-w-0 gap-2">
-                <Label htmlFor="setup-role">Role</Label>
-                <Input
-                  id="setup-role"
-                  readOnly
-                  value={roleLabel}
-                  className="h-10 cursor-default rounded-[5px] border-slate-300 bg-slate-50 text-sm font-medium text-slate-700 shadow-none"
-                />
-                <FieldError message={errors.role} />
-              </div>
-
-              <div className="grid min-w-0 gap-2">
+              {needsProgram && <div className="grid min-w-0 gap-2">
                 <Label htmlFor="setup-program">Program</Label>
                 {programsLoading ? <LoadingSkeleton variant="field" label="Loading programs..." /> : <select
                   id="setup-program"
@@ -369,9 +360,9 @@ function ProfileSetup() {
                   </div>
                 )}
                 <FieldError message={errors.programId} />
-              </div>
+              </div>}
 
-              {(isStudent || isInstructor) && (
+              {needsSchoolId && (
                 <div className="grid min-w-0 gap-2">
                   <Label htmlFor="setup-school-id-number">
                     {isInstructor ? "Instructor ID" : "Student ID"}
@@ -394,7 +385,7 @@ function ProfileSetup() {
                 </div>
               )}
 
-              {isStudent && (
+              {needsYearLevel && (
                   <div className="grid min-w-0 gap-2">
                     <Label htmlFor="setup-year">Year</Label>
                     <select
@@ -425,7 +416,7 @@ function ProfileSetup() {
             <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
               <Button
                 type="submit"
-                disabled={!formReady || submitting || programsLoading || Boolean(programsError)}
+                disabled={!formReady || submitting || (needsProgram && (programsLoading || Boolean(programsError)))}
                 className="h-10 rounded-[5px] bg-[#0b4bd3] px-5 font-bold text-white hover:bg-[#083da9]"
               >
                 {submitting && <Spinner className="mr-2" />}
@@ -436,8 +427,7 @@ function ProfileSetup() {
 
           <p className="flex items-center gap-2 text-xs text-slate-500">
             <CheckCircle2 className="size-3.5 text-green-600" />
-            This setup only appears before dashboard access when required
-            profile details are missing.
+            Only missing fields are requested. Your assigned {roleLabel || "account"} details cannot be changed here.
           </p>
         </CardContent>
       </Card>

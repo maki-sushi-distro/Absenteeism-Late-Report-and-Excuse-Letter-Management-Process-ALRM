@@ -1,4 +1,4 @@
-import { getStudentAttendanceSummary, getStudentClasses, getStudentRequests } from "@/api/student";
+import { getStudentClasses, getStudentDashboard, getStudentRequests } from "@/api/student";
 import { useApiResource } from "@/hooks/useApiResource";
 
 const isRecord = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
@@ -17,14 +17,10 @@ function loadRequests() {
     isId(item.id) && ["absence", "late"].includes(item.type) && typeof item.status === "string");
 }
 
-function loadAttendance() {
-  return loadList(getStudentAttendanceSummary, "attendance", (item) => {
-    if (!isId(item.class_id)) return false;
-    if (item.tracker === null) return true;
-    const converted = item.tracker?.converted_absences;
-    return isRecord(item.tracker) && ["number", "string"].includes(typeof converted)
-      && String(converted).trim() !== "" && Number.isFinite(Number(converted)) && Number(converted) >= 0;
-  });
+async function loadThreshold() {
+  const dashboard = await getStudentDashboard();
+  if (!isRecord(dashboard)) throw new Error("Your attendance threshold is unavailable because the server returned an unexpected response.");
+  return isRecord(dashboard.threshold) ? dashboard.threshold : {};
 }
 
 function loadClasses() {
@@ -34,7 +30,7 @@ function loadClasses() {
 
 export default function useStudentDashboardResources(userId) {
   const requests = useApiResource(loadRequests, userId);
-  const attendance = useApiResource(loadAttendance, userId);
+  const threshold = useApiResource(loadThreshold, userId);
   const classes = useApiResource(loadClasses, userId);
-  return { requests, attendance, classes };
+  return { requests, threshold, classes };
 }

@@ -13,9 +13,9 @@ import useStudentDashboardResources from "./useStudentDashboardResources";
 function StudentDashboardContent({ user }) {
   const { preferences } = useStudentPreferences(user.id);
   const resources = useStudentDashboardResources(user.id);
-  const { requests, attendance, classes } = resources;
+  const { requests, threshold, classes } = resources;
   const { hash } = useLocation();
-  const loading = requests.loading || attendance.loading || classes.loading;
+  const loading = requests.loading || threshold.loading || classes.loading;
 
   useEffect(() => {
     if (!requests.loading && hash === "#recent-notifications") {

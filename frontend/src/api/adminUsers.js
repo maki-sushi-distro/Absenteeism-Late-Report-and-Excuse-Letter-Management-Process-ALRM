@@ -30,6 +30,8 @@ async function expectJson(res) {
     const error = new Error(message);
     error.status = res.status;
     error.body = body;
+    error.fieldErrors = body?.errors || null;
+    error.errors = body?.errors || null;
     throw error;
   }
 
@@ -53,17 +55,9 @@ export async function createAdminUser(payload) {
 }
 
 export function createInstructor(form) {
-  return createAdminUser({
-    name: form.fullName,
-    email: form.email,
-    role: "instructor",
-  });
+  return createAdminUser({ ...form, role: "instructor" });
 }
 
 export function createStudent(form) {
-  return createAdminUser({
-    name: form.fullName,
-    email: form.email,
-    role: "student",
-  });
+  return createAdminUser({ ...form, role: "student" });
 }

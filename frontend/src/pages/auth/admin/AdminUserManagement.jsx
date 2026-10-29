@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "react-router-dom";
-import { ChevronLeft, ChevronRight, Search } from "lucide-react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { ChevronLeft, ChevronRight, Search, UserPlus } from "lucide-react";
 import { changeManagedUser, getUserManagementPrograms, getUserManagementUsers } from "@/api/adminUserManagement";
 import { useAuth } from "@/context/AuthContext";
 import { EmptyState } from "@/components/common/EmptyState";
@@ -16,6 +16,7 @@ import { filterUsers, paginateUsers, studentYearSection, userDepartment, userDis
 const initialFilters = { tab: "approved", status: "approved", role: "", program: "", year: "", search: "" };
 
 export default function AdminUserManagement() {
+  const navigate = useNavigate();
   const { user: currentUser } = useAuth();
   const [params] = useSearchParams();
   const [filters, setFilters] = useState(() => ({ ...initialFilters, tab: params.get("tab") === "waiting" ? "waiting" : "approved" }));
@@ -102,7 +103,10 @@ export default function AdminUserManagement() {
 
   return (
     <div className="min-w-0 w-full space-y-5 text-slate-950">
-      <h1 className="text-2xl font-bold">User Management</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-2xl font-bold">User Management</h1>
+        <Button type="button" onClick={() => navigate("/users/add")} className="h-10 bg-[#172f6b] px-4 text-white hover:bg-[#203f8a]"><UserPlus className="size-4" />Add User</Button>
+      </div>
       <nav aria-label="User approval views" className="flex flex-wrap gap-1 border-b border-slate-200">
         {[["approved", "Approved Users"], ["waiting", "Waiting for Approval"]].map(([value, label]) => (
           <button key={value} type="button" aria-current={filters.tab === value ? "page" : undefined} disabled={working} onClick={() => changeFilter("tab", value)} className={`min-h-10 min-w-24 border-b-2 px-5 py-2 text-sm font-bold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 ${filters.tab === value ? "border-[#173D83] text-[#173D83]" : "border-transparent text-slate-500 hover:text-[#173D83]"}`}>

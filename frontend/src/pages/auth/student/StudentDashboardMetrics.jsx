@@ -21,7 +21,7 @@ export function StudentDashboardResourceError({ title, error, onRetry }) {
   </div>;
 }
 
-export default function StudentDashboardMetrics({ requests, attendance, classes, alertsEnabled = true }) {
+export default function StudentDashboardMetrics({ requests, threshold, classes, alertsEnabled = true }) {
   const totals = requests.data ? requestTotals(requests.data) : null;
   return <section aria-label="Attendance overview" className="mt-8 grid gap-5 @[640px]:grid-cols-[minmax(0,1fr)_minmax(0,2.19fr)_minmax(0,1fr)] @[800px]:gap-[26px]">
     {requests.loading ? <RecordedMetricPlaceholder /> : <RecordedMetric title="Absences Recorded" value={totals?.absences} icon={UserRoundX}>
@@ -30,9 +30,9 @@ export default function StudentDashboardMetrics({ requests, attendance, classes,
         ({totals.excused} excused, {totals.unexcused} unexcused{totals.pending ? `, ${totals.pending} pending` : ""})
       </> : "Recorded requests are unavailable."}
     </RecordedMetric>}
-    {attendance.loading ? <ThresholdPlaceholder /> : attendance.error ? <article className="min-h-[225px] min-w-0 rounded-[7px] border border-[#c9c6c6] dark:border-slate-700">
-      <StudentDashboardResourceError title="Attendance unavailable" error={attendance.error} onRetry={attendance.reload} />
-    </article> : <AttendanceThreshold attendance={attendance.data} alertsEnabled={alertsEnabled} />}
+    {threshold.loading ? <ThresholdPlaceholder /> : threshold.error ? <article className="min-h-[225px] min-w-0 rounded-[7px] border border-[#c9c6c6] dark:border-slate-700">
+      <StudentDashboardResourceError title="Attendance unavailable" error={threshold.error} onRetry={threshold.reload} />
+    </article> : <AttendanceThreshold threshold={threshold.data} alertsEnabled={alertsEnabled} />}
     {requests.loading ? <RecordedMetricPlaceholder /> : <RecordedMetric title="Lates Recorded" value={totals?.lates} icon={Clock}>{totals ? "Total recorded tardiness across all registered schedules." : "Recorded requests are unavailable."}</RecordedMetric>}
   </section>;
 }

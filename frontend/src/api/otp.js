@@ -1,4 +1,5 @@
 import { apiFetch } from "./client.js";
+import { assertValidInputs } from "../lib/inputValidation.js";
 
 const PENDING_TOKEN_KEY = "pending_otp_token";
 const PENDING_EMAIL_KEY = "pending_otp_email";
@@ -108,6 +109,7 @@ export async function sendOtp({ userId, email, pending }) {
 }
 
 export async function verifyOtp({ userId, email, code, pending }) {
+  assertValidInputs({ code: typeof code === 'string' && /^\d{6}$/.test(code) ? '' : 'Enter the six-digit verification code.' });
   return expectJson(await apiFetch("/api/auth/otp/verify", {
     method: "POST", body: JSON.stringify({ user_id: userId, email, pending, otp: code, code, otp_code: code }),
   }));

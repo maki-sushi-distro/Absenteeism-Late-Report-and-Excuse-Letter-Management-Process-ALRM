@@ -1,4 +1,5 @@
 import { apiFetch } from "./client.js";
+import { prepareRequestInput } from "../pages/auth/student/request-form/requestInputs.js";
 
 async function readJson(res) {
   try {
@@ -57,7 +58,7 @@ export async function getStudentClasses() {
 export async function createStudentRequest(payload) {
   const res = await apiFetch("/api/requests", {
     method: "POST",
-    body: JSON.stringify(payload),
+    body: JSON.stringify(prepareRequestInput(payload)),
   });
 
   return expectJson(res);
@@ -72,7 +73,7 @@ export async function getStudentRequest(requestId, options = {}) {
 export async function updateStudentRequest(requestId, payload) {
   const res = await apiFetch(`/api/requests/${encodeURIComponent(requestId)}`, {
     method: "PATCH",
-    body: JSON.stringify(payload),
+    body: JSON.stringify(prepareRequestInput(payload, true)),
   });
   const body = await expectJson(res);
   return body?.data ?? body;

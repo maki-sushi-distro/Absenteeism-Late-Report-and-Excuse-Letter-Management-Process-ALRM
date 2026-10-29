@@ -1,5 +1,6 @@
 import { createStudent } from "@/api/adminUsers";
-import { AdminUserForm, emailPattern, Mail, User } from "./AdminUserForm";
+import { AdminUserForm, Mail, User } from "./AdminUserForm";
+import { emailPattern } from "@/lib/inputValidation";
 
 const initialValues = {
   fullName: "",

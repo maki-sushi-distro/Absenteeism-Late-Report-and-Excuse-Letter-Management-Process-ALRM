@@ -18,10 +18,9 @@ import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
+import { sanitizeText } from "@/lib/inputValidation";
 import { getAdminPrograms } from "@/api/adminUsers";
 import AdminPageLayout from "./AdminPageLayout";
-
-const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function formErrorFrom(error) {
   if (error?.status === 404 || error?.status === 405) {
@@ -168,7 +167,9 @@ function AdminUserForm({
 
   async function handleSubmit(event) {
     event.preventDefault();
-    const nextErrors = validate(values);
+    if (submitting) return;
+    const clean = { ...values, fullName: sanitizeText(values.fullName), email: sanitizeText(values.email).toLowerCase() };
+    const nextErrors = validate(clean);
 
     setErrors(nextErrors);
     setSuccess("");
@@ -179,7 +180,7 @@ function AdminUserForm({
     setSubmitting(true);
 
     try {
-      const result = await createUser(values);
+      const result = await createUser(clean);
       setSuccess(
         result?.message ||
           `${title} pre-registered. The account will be completed at first sign-in.`,
@@ -187,6 +188,7 @@ function AdminUserForm({
       setValues(initialValues);
       setErrors({});
     } catch (error) {
+      if (error.fieldErrors) setErrors(Object.fromEntries(Object.entries(error.fieldErrors).map(([key, messages]) => [key === "name" ? "fullName" : key, Array.isArray(messages) ? messages[0] : messages])));
       setSubmitError(formErrorFrom(error));
     } finally {
       setSubmitting(false);
@@ -317,4 +319,4 @@ function AdminUserForm({
   );
 }
 
-export { AdminUserForm, emailPattern, IdCard, Mail, User };
+export { AdminUserForm, IdCard, Mail, User };

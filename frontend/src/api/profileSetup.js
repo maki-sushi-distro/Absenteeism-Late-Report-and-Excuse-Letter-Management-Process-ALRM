@@ -1,4 +1,5 @@
 import { apiFetch } from "./client.js";
+import { prepareProfileInput } from "../lib/formInputs.js";
 
 // Kumpirmado sa route:list: GET api/complete-profile/programs -> Auth\ProfileController@programs
 export const PROGRAMS_ENDPOINT = "/api/complete-profile/programs";
@@ -74,7 +75,7 @@ export async function getProfileSetupPrograms() {
 export async function saveProfileSetup(payload) {
   const res = await apiFetch(COMPLETE_PROFILE_ENDPOINT, {
     method: "POST",
-    body: JSON.stringify(payload),
+    body: JSON.stringify(prepareProfileInput(payload)),
   });
 
   return expectJson(res);

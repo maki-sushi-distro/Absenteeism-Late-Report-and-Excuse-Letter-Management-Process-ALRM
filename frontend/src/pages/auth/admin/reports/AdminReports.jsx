@@ -24,6 +24,7 @@ export default function AdminReports({ programs }) {
   async function generate(event) {
     event.preventDefault();
     if (pending.current) return;
+    if (filters.program_id && !programs.some(program => String(program.id) === filters.program_id)) { setError("Select a program from the available list."); return; }
     if (filters.date_from && filters.date_to && filters.date_from > filters.date_to) { setError("The end date must be on or after the start date."); return; }
     const controller = new AbortController();
     pending.current = controller;

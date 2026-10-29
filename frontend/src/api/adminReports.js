@@ -1,8 +1,9 @@
 import { apiFetch, ApiError, buildQuery } from "./client.js";
 import { normalizeReportRows } from "../pages/auth/admin/reports/reportData.js";
+import { prepareReportFilters } from "../lib/formInputs.js";
 
 export async function generateAdminReport(filters = {}, options = {}) {
-  const snapshot = { ...filters };
+  const snapshot = prepareReportFilters(filters);
   const response = await apiFetch(`/api/admin/reports/export${buildQuery(snapshot)}`, options);
   if (!response.ok) {
     const payload = await response.json().catch(() => null);

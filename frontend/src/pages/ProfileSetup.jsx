@@ -24,6 +24,7 @@ import {
   splitVerifiedName,
 } from "@/lib/profileSetup";
 import { normalizeRole } from "@/lib/roles";
+import { prepareProfileInput } from "@/lib/formInputs";
 import lvLogo from "@/assets/LV_Logo.png";
 
 const ROLE_LABELS = {
@@ -187,16 +188,20 @@ function ProfileSetup() {
     setError("");
   }
 
-  function validate() {
+  function validate(payload) {
     const nextErrors = {};
+    try { prepareProfileInput(payload); }
+    catch (issue) {
+      for (const [key, messages] of Object.entries(issue.fieldErrors || {})) nextErrors[FIELD_MAP[key] || key] = messages[0];
+    }
 
     if (!serverRole) nextErrors.role = "Your account has no role. Contact an administrator.";
-    if (!form.programId) nextErrors.programId = "Select your program.";
+    if (!selectedProgram) nextErrors.programId = "Select a program from the available list.";
     if (isStudent && !form.studentNumber.trim()) {
       nextErrors.studentNumber = "Enter your student ID.";
     }
-    if (isStudent && !form.yearLevel) {
-      nextErrors.yearLevel = "Select your year.";
+    if (isStudent && !availableYearOptions.some(year => year.value === form.yearLevel)) {
+      nextErrors.yearLevel = "Select an available year.";
     }
 
     setErrors(nextErrors);
@@ -206,14 +211,14 @@ function ProfileSetup() {
   async function handleSubmit(event) {
     event.preventDefault();
 
-    if (!validate()) return;
-
     // Walang role, status, student_id, student_number. Ito lang ang tinatanggap ng backend.
     const payload = { program_id: form.programId };
     if (isStudent) {
       payload.school_student_id = form.studentNumber.trim();
       payload.year_level = form.yearLevel; // "1st" | "2nd" | "3rd" | "4th"
     }
+
+    if (submitting || !validate(payload)) return;
 
     setSubmitting(true);
     setError("");

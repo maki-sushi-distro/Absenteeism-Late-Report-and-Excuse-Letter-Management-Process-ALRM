@@ -373,7 +373,7 @@ test("administrator create and delete mutations retain their payloads and await 
     await page.flush();
     await settle();
     const payload = view === "programs" ? { program_name: "New Program", program_head_id: "instructor-one" }
-      : { subject_name: "New Subject", section: "A", schedule: "Monday", instructor_id: "instructor-one", program_id: "program-one", semester: "1st", school_year: "2026-2027" };
+      : { subject_name: "New Subject", section: "A", schedule: "Monday", instructor_id: "instructor-one", program_id: "program-one", year_level: "3rd", semester: "1st", school_year: "2026-2027" };
     for (const [name, value] of Object.entries(payload)) fill(name, value);
     await page.flush();
     const form = elements(page.value, node => node.type === "form")[0];

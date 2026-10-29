@@ -1,5 +1,6 @@
-import { LIMITS } from "./constants.js";
+import { absenceReasonOptions, LIMITS, proofOptions } from "./constants.js";
 import { yearOptionsForProgram } from "./utils.js";
+import { isValidDate, personNamePattern, sanitizeText } from "../../../../lib/inputValidation.js";
 
 function validateStudentInfo(form) {
   const errors = {};
@@ -23,6 +24,8 @@ function validateStudentInfo(form) {
     errors.guardianName = `Parent or guardian's name must not exceed ${LIMITS.guardianName} characters.`;
   } else if (/\p{N}/u.test(form.guardianName.trim())) {
     errors.guardianName = "Parent or guardian's name must not contain numbers.";
+  } else if (!personNamePattern.test(form.guardianName)) {
+    errors.guardianName = "Enter a valid parent or guardian's name.";
   }
   if (!form.contactNumber.trim()) {
     errors.contactNumber = "Enter your contact number.";
@@ -30,7 +33,7 @@ function validateStudentInfo(form) {
     errors.contactNumber =
       "Enter all 10 digits after +63, starting with 9.";
   }
-  if (!form.dateSubmitted) errors.dateSubmitted = "Choose a date.";
+  if (!isValidDate(form.dateSubmitted)) errors.dateSubmitted = "Choose a valid date.";
 
   return errors;
 }
@@ -53,11 +56,11 @@ function validateDetails(form, classes, classesError) {
     // NEW
     errors.minutesLate = "Enter a valid number of minutes (max 999).";
   }
-  if (form.requestType === "absence" && !form.startDateOfAbsence) {
-    errors.startDateOfAbsence = "Choose the start date of absence.";
+  if (form.requestType === "absence" && !isValidDate(form.startDateOfAbsence)) {
+    errors.startDateOfAbsence = "Choose a valid start date of absence.";
   }
-  if (form.requestType === "absence" && !form.endDateOfAbsence) {
-    errors.endDateOfAbsence = "Choose the end date of absence.";
+  if (form.requestType === "absence" && !isValidDate(form.endDateOfAbsence)) {
+    errors.endDateOfAbsence = "Choose a valid end date of absence.";
   }
   if (
     form.requestType === "absence" &&
@@ -90,16 +93,17 @@ function validateDetails(form, classes, classesError) {
     // NEW
     errors.reason = `Reason must not exceed ${LIMITS.reason} characters.`;
   }
-  if (form.requestType === "absence" && form.absenceReasons.length === 0) {
-    errors.absenceReasons = "Select at least one reason.";
+  if (form.requestType === "absence" && (!Array.isArray(form.absenceReasons) || !form.absenceReasons.length || new Set(form.absenceReasons).size !== form.absenceReasons.length || form.absenceReasons.some(reason => !absenceReasonOptions.includes(reason)))) {
+    errors.absenceReasons = "Select at least one available reason.";
   }
 
   return errors;
 }
 
-export function validateStep({ step, form, classes, classesError }) {
+export function validateStep({ step, form, classes = [], classesError }) {
+  form = { ...form, studentName: sanitizeText(form.studentName), guardianName: sanitizeText(form.guardianName), contactNumber: sanitizeText(form.contactNumber), reason: sanitizeText(form.reason, { multiline: true }) };
   if (step === 0) {
-    return form.requestType ? {} : { requestType: "Select a request." };
+    return ["absence", "late"].includes(form.requestType) ? {} : { requestType: "Select a request." };
   }
 
   if (step === 2) {
@@ -113,6 +117,9 @@ export function validateStep({ step, form, classes, classesError }) {
   if (step === 4) return validateDetails(form, classes, classesError);
 
   if (step === 5) {
+    if (form.requestType === "absence" && (!Array.isArray(form.proof_types) || new Set(form.proof_types).size !== form.proof_types.length || form.proof_types.some(proof => !proofOptions.includes(proof)))) {
+      return { proof_types: "Select valid supporting document types." };
+    }
     return form.evidenceFile
       ? {}
       : { evidenceFile: "Upload a supporting document before continuing." };

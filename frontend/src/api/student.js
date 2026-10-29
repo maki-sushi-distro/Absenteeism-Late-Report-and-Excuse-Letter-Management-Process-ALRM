@@ -12,9 +12,4 @@ export function getStudentAttendanceSummary() {
   return apiRequest("/attendance/summary");
 }
 
-export function createStudentRequest(data) {
-  return apiRequest("/requests", {
-    method: "POST",
-    body: JSON.stringify(data),
-  });
-}
+export { createStudentRequest } from "./studentRequests.js";

@@ -4,6 +4,7 @@ import { ErrorState } from "@/components/common/ErrorState";
 import LoadingSkeleton from "@/components/loading/LoadingSkeleton";
 import { filterReportRows, requestClass, requestDate, requestStudent } from "./programHeadData";
 import { useProgramHeadRecords } from "./useProgramHeadRecords";
+import { isValidDate } from "@/lib/inputValidation";
 
 const field = "w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900";
 
@@ -14,7 +15,7 @@ function ReportFilters({ draft, change, programName, generate, invalid }) {
     <label className="grid gap-2 text-sm font-medium">From<input className={field} type="date" value={draft.from} onChange={(event) => change("from", event.target.value)} /></label>
     <label className="grid gap-2 text-sm font-medium">To<input className={field} type="date" value={draft.to} onChange={(event) => change("to", event.target.value)} /></label>
     <button type="submit" disabled={invalid} className="rounded-md bg-blue-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">Generate report</button>
-    {invalid ? <p role="alert" className="text-sm text-rose-600 sm:col-span-2 xl:col-span-5">The end date must be on or after the start date.</p> : null}
+    {invalid ? <p role="alert" className="text-sm text-rose-600 sm:col-span-2 xl:col-span-5">Choose valid dates with the end date on or after the start date.</p> : null}
   </form>;
 }
 
@@ -45,7 +46,7 @@ export function ProgramHeadReports() {
   const { dashboard, flags, requests, errors, loading, refresh } = useProgramHeadRecords();
   const [draft, setDraft] = useState({ type: "activity", from: "", to: "" });
   const [applied, setApplied] = useState(null);
-  const invalid = Boolean(draft.from && draft.to && draft.from > draft.to);
+  const invalid = !["activity", "risk"].includes(draft.type) || Boolean((draft.from && !isValidDate(draft.from)) || (draft.to && !isValidDate(draft.to)) || (draft.from && draft.to && draft.from > draft.to));
   const rows = applied ? filterReportRows(applied.type === "risk" ? flags : requests, applied.from, applied.to, (row) => applied.type === "risk" ? row.flagged_date && new Date(row.flagged_date) : requestDate(row)) : [];
   const relevantError = errors[applied?.type === "risk" ? "flags" : "requests"];
   function generate(event) { event.preventDefault(); if (invalid) return; setApplied({ ...draft }); refresh(); }

@@ -1,4 +1,5 @@
 import { apiFetch } from "./client.js";
+import { prepareAccountInput } from "../lib/formInputs.js";
 
 async function readJson(res) {
   try {
@@ -45,7 +46,7 @@ export async function getAdminPrograms() {
 export async function createAdminUser(payload) {
   const res = await apiFetch("/api/admin/users", {
     method: "POST",
-    body: JSON.stringify(payload),
+    body: JSON.stringify(prepareAccountInput(payload)),
   });
 
   return expectJson(res);
@@ -53,16 +54,16 @@ export async function createAdminUser(payload) {
 
 export function createInstructor(form) {
   return createAdminUser({
-    name: form.fullName.trim(),
-    email: form.email.trim().toLowerCase(),
+    name: form.fullName,
+    email: form.email,
     role: "instructor",
   });
 }
 
 export function createStudent(form) {
   return createAdminUser({
-    name: form.fullName.trim(),
-    email: form.email.trim().toLowerCase(),
+    name: form.fullName,
+    email: form.email,
     role: "student",
   });
 }

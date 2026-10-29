@@ -1,9 +1,11 @@
+import { assertValidInputs, isWholeNumber, sanitizeText } from "../../../../lib/inputValidation.js";
+
 function buildReason(form, isAbsence) {
   if (isAbsence) {
     return form.absenceReasons.join(", ");
   }
 
-  return form.reason.trim();
+  return sanitizeText(form.reason, { multiline: true });
 }
 
 export function buildRequestPayload(form, classes, evidence = null) {
@@ -24,8 +26,8 @@ export function buildRequestPayload(form, classes, evidence = null) {
     proof_types: isAbsence ? [...(form.proof_types || [])] : [],
     evidence_file_url: evidence?.path || null,
     evidence_type: evidence?.type || null,
-    guardian_name: form.guardianName.trim(),
-    contact_number: form.contactNumber.trim(),
+    guardian_name: sanitizeText(form.guardianName),
+    contact_number: sanitizeText(form.contactNumber),
   };
 }
 
@@ -57,10 +59,13 @@ export function buildRequestEditForm(record) {
 
 export function buildRequestUpdatePayload(form) {
   const isAbsence = form.type === "absence";
+  if (!isAbsence) {
+    assertValidInputs({ minutes_late: isWholeNumber(form.minutes_late) ? '' : 'Minutes late must be a whole number between 1 and 999.' });
+  }
   return {
     type: form.type,
     subjects_missed: form.subjects_missed,
-    reason: form.reason.trim(),
+    reason: sanitizeText(form.reason, { multiline: true }),
     minutes_late: isAbsence ? null : Number(form.minutes_late),
     start_date_of_absence: isAbsence ? form.start_date_of_absence : null,
     end_date_of_absence: isAbsence ? form.end_date_of_absence || null : null,

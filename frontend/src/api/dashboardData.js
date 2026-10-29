@@ -1,4 +1,5 @@
 import { apiRequest, buildQuery } from "./client.js";
+export { createProgram } from "./admin.js";
 
 export function getAdminDashboard() {
   return apiRequest("/admin/dashboard");
@@ -6,13 +7,6 @@ export function getAdminDashboard() {
 
 export function getInstructorDashboard() {
   return apiRequest("/instructor/dashboard");
-}
-
-export function createProgram(data) {
-  return apiRequest("/admin/programs", {
-    method: "POST",
-    body: JSON.stringify(data),
-  });
 }
 
 export function getProgramHeadRequests(status = "") {

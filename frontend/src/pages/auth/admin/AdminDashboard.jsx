@@ -22,7 +22,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 const emptyProgramForm = { program_name: "", program_head_id: "" };
-const emptyClassForm = { subject_name: "", section: "", instructor_id: "", schedule: "", program_id: "", semester: "1st", school_year: "" };
+const emptyClassForm = { subject_name: "", section: "", instructor_id: "", schedule: "", program_id: "", year_level: "", semester: "1st", school_year: "" };
 const endpoints = { dashboard: getAdminDashboard, users: getUserManagementUsers, programs: getPrograms, classes: getClasses };
 const pendingResources = { dashboard: true, users: true, programs: true, classes: true };
 const viewResources = { dashboard: Object.keys(endpoints), users: ["users"], programs: ["programs", "users"], classes: ["classes", "users", "programs"], reports: ["programs"] };
@@ -107,7 +107,8 @@ export function AdminDashboard({ view = "dashboard" }) {
 
   async function handleCreateProgram(event) {
     event.preventDefault();
-    if (!programOptionsReady) return;
+    if (!programOptionsReady || working) return;
+    if (programForm.program_head_id && !programHeads.some(user => String(user.id) === programForm.program_head_id)) { setError("Select a program head from the available list."); return; }
     setWorking("create-program");
     const created = await runAction(
       () => createProgram({ program_name: programForm.program_name, program_head_id: programForm.program_head_id || null }),
@@ -118,7 +119,8 @@ export function AdminDashboard({ view = "dashboard" }) {
 
   async function handleCreateClass(event) {
     event.preventDefault();
-    if (!classOptionsReady) return;
+    if (!classOptionsReady || working) return;
+    if (!instructors.some(user => String(user.id) === classForm.instructor_id) || !programs.some(program => String(program.id) === classForm.program_id)) { setError("Select an instructor and program from the available lists."); return; }
     setWorking("create-class");
     const created = await runAction(
       () => createClass(classForm),
@@ -207,6 +209,7 @@ export function AdminDashboard({ view = "dashboard" }) {
             <select name="instructor_id" aria-label="Instructor" disabled={!programOptionsReady} value={classForm.instructor_id} onChange={updateClassForm} required className="h-11 rounded-md border border-slate-300 bg-white px-3 text-sm dark:border-slate-700 dark:bg-slate-900"><option value="">Select instructor</option>{instructors.map((user) => <option key={user.id} value={user.id}>{user.name}</option>)}</select>
             <select name="program_id" aria-label="Program" disabled={resourceLoading.programs || Boolean(errors.programs)} value={classForm.program_id} onChange={updateClassForm} required className="h-11 rounded-md border border-slate-300 bg-white px-3 text-sm dark:border-slate-700 dark:bg-slate-900"><option value="">Select program</option>{programs.map((program) => <option key={program.id} value={program.id}>{program.program_name}</option>)}</select>
             <select name="semester" aria-label="Semester" value={classForm.semester} onChange={updateClassForm} required className="h-11 rounded-md border border-slate-300 bg-white px-3 text-sm dark:border-slate-700 dark:bg-slate-900"><option value="1st">1st semester</option><option value="2nd">2nd semester</option></select>
+            <select name="year_level" aria-label="Year level" value={classForm.year_level} onChange={updateClassForm} required className="h-11 rounded-md border border-slate-300 bg-white px-3 text-sm"><option value="">Select year level</option>{["1st", "2nd", "3rd", "4th"].map(year => <option key={year} value={year}>{year} year</option>)}</select>
             <Input name="school_year" value={classForm.school_year} onChange={updateClassForm} placeholder="School year (2026-2027)" aria-label="School year" pattern="[0-9]{4}-[0-9]{4}" className="h-11" required />
             <Button type="submit" disabled={!classOptionsReady || working === "create-class"} className="h-11 w-full justify-self-center bg-[#172f6b] px-6 py-3 text-white hover:bg-[#203f8a] md:col-span-2 md:w-[calc(50%-0.75rem)]">Create class</Button>
           </form>

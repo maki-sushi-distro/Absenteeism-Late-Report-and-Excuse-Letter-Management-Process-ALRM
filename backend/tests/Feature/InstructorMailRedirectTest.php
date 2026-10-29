@@ -53,21 +53,22 @@ class InstructorMailRedirectTest extends TestCase
         );
         $this->assertSame('teacher-id', UserNotification::sole()->user_id);
 
-        config(['mail.default' => 'array']);
+        config(['mail.default' => 'array', 'mail.logo_url' => 'https://backend.example.com/images/mail/lv-logo.png']);
         Mail::swap(new MailManager($this->app));
         $user = new User(['name' => 'OTP User', 'email' => 'otp-user@example.com']);
-        $user->notify(new SendOtpCode('123456'));
+        $user->notifyNow(new SendOtpCode('123456'));
 
-        $messages = Mail::mailer()->getSymfonyTransport()->messages();
+        $messages = $this->arrayMailTransport()->messages();
         $this->assertCount(1, $messages);
         $this->assertSame('otp-user@example.com', $messages->first()->getOriginalMessage()->getTo()[0]->getAddress());
         $email = $messages->first()->getOriginalMessage();
-        $this->assertSame('[ALRM] Email verification code', $email->getSubject());
+        $this->assertSame('[ALRM] Your verification code', $email->getSubject());
         $this->assertStringContainsString('Your ALRM verification code:', $email->getHtmlBody());
         $this->assertStringContainsString('LA VERDAD CHRISTIAN COLLEGE, INC.', $email->getHtmlBody());
-        $this->assertStringContainsString('src="cid:', $email->getHtmlBody());
-        $this->assertStringContainsString("Your ALRM verification code:\n\n123456", $email->getTextBody());
-        $this->assertStringContainsString('This code expires in 5 minutes.', $email->getTextBody());
+        $this->assertStringContainsString('src="https://backend.example.com/images/mail/lv-logo.png"', $email->getHtmlBody());
+        $this->assertCount(0, $email->getAttachments());
+        $this->assertStringContainsString('Your ALRM verification code is: 123456', $email->getTextBody());
+        $this->assertStringContainsString('This code expires in approximately 5 minutes.', $email->getTextBody());
     }
 
     public function test_empty_test_recipient_restores_delivery_to_the_assigned_instructor(): void
@@ -91,9 +92,9 @@ class InstructorMailRedirectTest extends TestCase
 
         foreach (['student', 'instructor'] as $role) {
             $user = new User(['name' => 'OTP User', 'role' => $role, 'email' => $role.'@example.com']);
-            $user->notify(new SendOtpCode('123456'));
+            $user->notifyNow(new SendOtpCode('123456'));
         }
-        $messages = Mail::mailer()->getSymfonyTransport()->messages();
+        $messages = $this->arrayMailTransport()->messages();
         $this->assertCount(2, $messages);
         $addresses = $messages->map(fn ($message) => $message->getOriginalMessage()->getTo()[0]->getAddress())->all();
         $this->assertEqualsCanonicalizing(['student@example.com', 'instructor@example.com'], $addresses);

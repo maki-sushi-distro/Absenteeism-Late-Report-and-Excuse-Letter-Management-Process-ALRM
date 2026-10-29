@@ -15,6 +15,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Validation\ValidationException;
 use Laravel\Sanctum\HasApiTokens;
 
 #[Fillable([
@@ -36,6 +37,29 @@ use Laravel\Sanctum\HasApiTokens;
     'status', 'year_level', 'program', 'programs', 'heads_program', 'headed_program_exists'])]
 class User extends Authenticatable
 {
+    public const array STUDENT_INSTRUCTOR_EMAILS = [
+        'marwin.mandocdoc@student.laverdad.edu.ph',
+        'macrobert.savandal@student.laverdad.edu.ph',
+        'jimueljarina@student.laverdad.edu.ph',
+        'ranceljoycuervo@student.laverdad.edu.ph',
+    ];
+
+    protected static function booted(): void
+    {
+        static::saving(function (User $user): void {
+            $email = strtolower(trim((string) $user->email));
+            $domain = substr(strrchr($email, '@') ?: '', 1);
+            if ($user->role === 'instructor'
+                && $domain === strtolower((string) config('institution.student_domain'))
+                && ! in_array($email, self::STUDENT_INSTRUCTOR_EMAILS, true)
+                && ($user->isDirty('role') || $user->isDirty('email'))) {
+                throw ValidationException::withMessages([
+                    'role' => 'Only the four designated student test accounts may be instructors.',
+                ]);
+            }
+        });
+    }
+
     /** @use HasFactory<UserFactory> */
     use HasApiTokens, HasFactory, HasUuids, Notifiable;
 

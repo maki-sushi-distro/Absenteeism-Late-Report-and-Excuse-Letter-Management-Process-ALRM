@@ -22,9 +22,10 @@ class InstructorExcuseRequestMailTest extends TestCase
                 'href="'.rtrim($frontend, '/').'/instructor/class-requests"',
                 $html,
             );
-            $this->assertStringNotContainsString('images/mail/lv-logo.png', $html);
+            $this->assertStringContainsString('images/mail/lv-logo.png', $html);
             $this->assertStringContainsString('ALRM System Notification', $html);
-            $this->assertStringNotContainsString('La Verdad', $html);
+            $this->assertStringContainsString('LA VERDAD CHRISTIAN COLLEGE, INC.', $html);
+            $this->assertStringNotContainsString('cid:', $html);
             $this->assertStringNotContainsString('<x-mail::', $html);
         }
     }

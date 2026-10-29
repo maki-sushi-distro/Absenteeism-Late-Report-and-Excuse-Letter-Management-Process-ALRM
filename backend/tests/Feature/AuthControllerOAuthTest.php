@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\OtpCode;
+use App\Models\Program;
 use App\Models\User;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Crypt;
@@ -116,12 +117,14 @@ class AuthControllerOAuthTest extends SecurityTestCase
         $this->assertSame(1, OtpCode::where('user_id', $user->id)->count());
     }
 
-    public function test_returning_pending_instructor_on_an_institutional_domain_is_auto_approved(): void
+    public function test_returning_pending_allowlisted_student_instructor_is_auto_approved(): void
     {
+        config(['institution.student_domain' => 'student.laverdad.edu.ph']);
+        $email = User::STUDENT_INSTRUCTOR_EMAILS[0];
         $user = $this->user('instructor', [
-            'email' => 'student1@student.edu.ph', 'google_id' => 'google-123', 'status' => 'pending',
+            'email' => $email, 'google_id' => 'google-123', 'status' => 'pending',
         ]);
-        $this->provider();
+        $this->provider([], $email);
         $nonce = Str::random(64);
 
         $this->withUnencryptedCookies(['alrm_oauth' => $nonce])
@@ -192,6 +195,43 @@ class AuthControllerOAuthTest extends SecurityTestCase
 
         $this->assertSame('approved', $user->fresh()->status);
         $this->assertSame('instructor', $user->role);
+    }
+
+    public function test_first_google_login_keeps_roster_assignments_and_uses_google_name(): void
+    {
+        foreach (['student', 'instructor', 'program_head', 'administrator'] as $role) {
+            $program = Program::factory()->create();
+            $domain = $role === 'student' ? 'student.edu.ph' : 'staff.edu.ph';
+            $user = $this->user($role, [
+                'email' => $role.'@'.$domain, 'name' => 'Roster Name',
+                'status' => 'pending', 'google_id' => null,
+                'school_id_number' => 'ID-'.$role,
+                'program_id' => $role === 'student' ? $program->id : null,
+                'year_level' => $role === 'student' ? '2nd' : null,
+            ]);
+            if ($role === 'instructor') {
+                $user->programs()->attach($program);
+            } elseif ($role === 'program_head') {
+                $program->update(['program_head_id' => $user->id]);
+            }
+
+            $this->provider([], $user->email);
+            $nonce = Str::random(64);
+            $this->withUnencryptedCookies(['alrm_oauth' => $nonce])
+                ->get('/api/auth/google/callback?state='.urlencode($this->state($nonce)))
+                ->assertRedirectContains('/auth/otp?user_id=');
+
+            $user->refresh();
+            $this->assertSame('Student', $user->name);
+            $this->assertSame('google-123', $user->google_id);
+            $this->assertSame('approved', $user->status);
+            $this->assertSame($role, $user->role);
+            $this->assertSame('ID-'.$role, $user->school_id_number);
+            $this->assertSame($role === 'student' ? $program->id : null, $user->program_id);
+            $this->assertSame($role === 'student' ? '2nd' : null, $user->year_level);
+            $this->assertSame($role === 'instructor' ? 1 : 0, $user->programs()->count());
+            $this->assertSame($role === 'program_head' ? $user->id : null, $program->fresh()->program_head_id);
+        }
     }
 
     public function test_returning_external_account_is_not_automatically_approved(): void

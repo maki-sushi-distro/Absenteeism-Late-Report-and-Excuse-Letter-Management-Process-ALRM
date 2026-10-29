@@ -97,10 +97,10 @@ class ProgramController extends Controller
      */
     public function destroy(Program $program)
     {
-        if ($program->classes()->exists() || $program->users()->exists()) {
+        if ($program->classes()->exists() || $program->users()->exists() || $program->curricula()->exists()) {
             return response()->json([
                 'success' => false,
-                'message' => 'Cannot delete a program that still has classes or users.',
+                'message' => 'Cannot delete a program that still has classes, users, or curriculum history.',
                 'data' => null,
             ], 409);
         }

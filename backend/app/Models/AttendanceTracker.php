@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Database\Factories\AttendanceTrackerFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -12,6 +13,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'enrollment_id',
     'total_lates',
     'total_absences',
+    'absence_hours',
     'converted_absences',
     'status',
     'warning_notified_at',
@@ -20,10 +22,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 ])]
 class AttendanceTracker extends Model
 {
-    /** @use HasFactory<\Database\Factories\AttendanceTrackerFactory> */
+    /** @use HasFactory<AttendanceTrackerFactory> */
     use HasFactory, HasUuids;
 
     protected $keyType = 'string';
+
     public $incrementing = false;
 
     protected $table = 'attendance_tracker';
@@ -31,12 +34,13 @@ class AttendanceTracker extends Model
     protected function casts(): array
     {
         return [
-            'total_lates'         => 'integer',
-            'total_absences'      => 'integer',
-            'converted_absences'  => 'integer',
+            'total_lates' => 'integer',
+            'total_absences' => 'integer',
+            'absence_hours' => 'float',
+            'converted_absences' => 'integer',
             'warning_notified_at' => 'datetime',
             'critical_notified_at' => 'datetime',
-            'ir_notified_at'      => 'datetime',
+            'ir_notified_at' => 'datetime',
         ];
     }
 
@@ -49,7 +53,7 @@ class AttendanceTracker extends Model
     public function unitsUsed(): float
     {
         return round(
-            $this->total_absences * $this->enrollment->class->unitsPerMeeting()
+            ($this->absence_hours ?? $this->total_absences * $this->enrollment->class->unitsPerMeeting())
                 + floor($this->total_lates / 3),
             2
         );
@@ -94,9 +98,9 @@ class AttendanceTracker extends Model
     {
         $this->converted_absences = $this->total_absences + (int) floor($this->total_lates / 3);
 
-        $class      = $this->enrollment->class;
-        $total      = $class->totalSemesterHours();
-        $used       = $this->unitsUsed();
+        $class = $this->enrollment->class;
+        $total = $class->totalSemesterHours();
+        $used = $this->unitsUsed();
 
         $this->status = match (true) {
             $total <= 0 => 'safe',

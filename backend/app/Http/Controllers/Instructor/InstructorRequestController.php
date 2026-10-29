@@ -130,6 +130,9 @@ class InstructorRequestController extends Controller
             if ($request->type === 'late') {
                 $tracker->total_lates++;
             } else {
+                $class = $request->enrollment->class;
+                $tracker->absence_hours = ($tracker->absence_hours ?? $tracker->total_absences * $class->unitsPerMeeting())
+                    + $class->absenceHoursForPeriod($request->start_date_of_absence, $request->end_date_of_absence);
                 $tracker->total_absences++;
             }
 

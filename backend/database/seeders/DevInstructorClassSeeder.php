@@ -16,12 +16,7 @@ class DevInstructorClassSeeder extends Seeder
 {
     public const string DEV_HOME_PROGRAM_NAME = 'Bachelor of Science in Information System';
 
-    public const array DEV_INSTRUCTOR_EMAILS = [
-        'marwin.mandocdoc@student.laverdad.edu.ph',
-        'macrobert.savandal@student.laverdad.edu.ph',
-        'jimueljarina@student.laverdad.edu.ph',
-        'ranceljoycuervo@student.laverdad.edu.ph',
-    ];
+    public const array DEV_INSTRUCTOR_EMAILS = User::STUDENT_INSTRUCTOR_EMAILS;
 
     // Stable, distinct subjects shared across all degree programs.
     private const array SUBJECTS_BY_EMAIL = [
@@ -95,9 +90,14 @@ class DevInstructorClassSeeder extends Seeder
                     $existingClasses = $group->where('instructor_id', $dev->id);
                     $existing = $existingClasses->firstWhere('subject_name', $subject) ?? $existingClasses->first();
                     $copy = $existing ?? new ClassModel([...$context, 'instructor_id' => $dev->id]);
+                    $schedule = $source?->schedule;
+                    if (! is_array($schedule) || $schedule === []) {
+                        // Keep an entered timetable only when it belongs to this subject.
+                        $schedule = $existing?->subject_name === $subject ? ($existing->schedule ?? []) : [];
+                    }
                     $copy->fill([
                         'subject_name' => $subject,
-                        'schedule' => $source?->schedule ?? [],
+                        'schedule' => $schedule,
                     ])->save();
 
                     foreach ($students as $enrollment) {

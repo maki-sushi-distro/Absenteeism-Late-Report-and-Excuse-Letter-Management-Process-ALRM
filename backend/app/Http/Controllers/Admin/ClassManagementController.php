@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Admin\SaveClassRequest;
 use App\Models\ClassModel;
 use App\Models\Enrollment;
 use App\Models\User;
@@ -10,8 +11,7 @@ use App\Services\AcademicPeriod;
 use App\Services\AuditLoggerService;
 use App\Support\BoundedCollection;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
+use Illuminate\Support\Facades\DB;
 
 class ClassManagementController extends Controller
 {
@@ -32,22 +32,16 @@ class ClassManagementController extends Controller
     /**
      * POST /api/admin/classes
      */
-    public function store(Request $request)
+    public function store(SaveClassRequest $request)
     {
-        $validated = $request->validate([
-            'subject_name' => ['required', 'string', 'max:255'],
-            'section' => ['required', 'string', 'max:50'],
-            'instructor_id' => ['required', 'string', 'uuid', Rule::exists('users', 'id')->where('role', 'instructor')],
-            'schedule' => ['required', 'string', 'max:4096'],
-            'program_id' => ['required', 'string', 'uuid', 'exists:programs,id'],
-            'year_level' => ['required', 'in:1st,2nd,3rd,4th'],
-            'semester' => ['required', 'in:1st,2nd'],
-            'school_year' => ['required', 'string', 'regex:/^\d{4}-\d{4}$/'],
-        ]);
+        $validated = $request->classAttributes();
+        $class = DB::transaction(function () use ($validated) {
+            $class = ClassModel::create($validated);
+            $this->enrollMatchingStudents($class);
+            $this->auditLogger->log('created_class', 'classes', $class->id);
 
-        $class = ClassModel::create($validated);
-        $this->enrollMatchingStudents($class);
-        $this->auditLogger->log('created_class', 'classes', $class->id);
+            return $class;
+        });
 
         return response()->json([
             'success' => true,
@@ -71,22 +65,18 @@ class ClassManagementController extends Controller
     /**
      * PUT/PATCH /api/admin/classes/{class}
      */
-    public function update(Request $request, ClassModel $class)
+    public function update(SaveClassRequest $request, ClassModel $class)
     {
-        $validated = $request->validate([
-            'subject_name' => ['sometimes', 'string', 'max:255'],
-            'section' => ['sometimes', 'string', 'max:50'],
-            'instructor_id' => ['sometimes', 'string', 'uuid', Rule::exists('users', 'id')->where('role', 'instructor')],
-            'schedule' => ['sometimes', 'string', 'max:4096'],
-            'program_id' => ['sometimes', 'string', 'uuid', 'exists:programs,id'],
-            'year_level' => ['sometimes', 'in:1st,2nd,3rd,4th'],
-            'semester' => ['sometimes', 'in:1st,2nd'],
-            'school_year' => ['sometimes', 'string', 'regex:/^\d{4}-\d{4}$/'],
-        ]);
-
-        $class->update($validated);
-        $this->enrollMatchingStudents($class->fresh());
-        $this->auditLogger->log('updated_class', 'classes', $class->id);
+        $validated = $request->classAttributes();
+        DB::transaction(function () use ($class, $validated) {
+            $class->update($validated);
+            $this->enrollMatchingStudents($class->fresh());
+            // Trackers depend on the class's contact hours, not its credit units.
+            $class->enrollments()->with('attendanceTracker')->each(function ($enrollment) {
+                $enrollment->attendanceTracker?->recompute();
+            });
+            $this->auditLogger->log('updated_class', 'classes', $class->id);
+        });
 
         return response()->json([
             'success' => true,

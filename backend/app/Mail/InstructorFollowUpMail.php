@@ -29,7 +29,7 @@ class InstructorFollowUpMail extends Mailable implements ShouldQueue
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: 'Follow-up: Pending Excuse Request from '.$this->student->name,
+            subject: '[ALRM] Follow-up: Pending Excuse Request from '.$this->student->name,
         );
     }
 

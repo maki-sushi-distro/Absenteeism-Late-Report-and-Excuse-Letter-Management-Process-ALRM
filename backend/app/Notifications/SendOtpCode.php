@@ -28,12 +28,12 @@ class SendOtpCode extends Notification
      *
      * Uses a fully custom Blade view (resources/views/emails/otp-code.blade.php)
      * instead of the default Markdown mail template, so we control the
-     * ALRM branding, layout, and automated notification footer.
+     * ALRM branding, layout, and authentication-specific security notice.
      */
     public function toMail(object $notifiable): MailMessage
     {
         return (new MailMessage)
-            ->subject("{$this->code} is your ALRM verification code")
+            ->subject('[ALRM] Email verification code')
             ->view(['html' => 'emails.otp-code', 'text' => 'emails.otp-code-text'], [
                 'name'              => $notifiable->name,
                 'code'              => $this->code,

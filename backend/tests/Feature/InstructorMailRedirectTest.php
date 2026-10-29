@@ -62,8 +62,10 @@ class InstructorMailRedirectTest extends TestCase
         $this->assertCount(1, $messages);
         $this->assertSame('otp-user@example.com', $messages->first()->getOriginalMessage()->getTo()[0]->getAddress());
         $email = $messages->first()->getOriginalMessage();
-        $this->assertSame('123456 is your ALRM verification code', $email->getSubject());
+        $this->assertSame('[ALRM] Email verification code', $email->getSubject());
         $this->assertStringContainsString('Your ALRM verification code:', $email->getHtmlBody());
+        $this->assertStringContainsString('LA VERDAD CHRISTIAN COLLEGE, INC.', $email->getHtmlBody());
+        $this->assertStringContainsString('src="cid:', $email->getHtmlBody());
         $this->assertStringContainsString("Your ALRM verification code:\n\n123456", $email->getTextBody());
         $this->assertStringContainsString('This code expires in 5 minutes.', $email->getTextBody());
     }

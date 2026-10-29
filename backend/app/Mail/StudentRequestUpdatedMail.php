@@ -26,7 +26,7 @@ class StudentRequestUpdatedMail extends Mailable implements ShouldQueue
 
     public function envelope(): Envelope
     {
-        return new Envelope(subject: 'Update on Your Excuse Request');
+        return new Envelope(subject: '[ALRM] Update on Your Excuse Request');
     }
 
     public function content(): Content

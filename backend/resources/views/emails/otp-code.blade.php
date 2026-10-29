@@ -13,9 +13,10 @@
 
                 {{-- Header --}}
                 <tr>
-                    <td align="center" style="background:linear-gradient(135deg,#0b2a52,#164a86); padding:32px 24px;">
-                        <p style="margin:0; font-family:Arial, Helvetica, sans-serif; font-size:13px; letter-spacing:1.5px; text-transform:uppercase; color:#d9c07a; font-weight:bold;">
-                            ALRM
+                    <td align="center" style="background-color:#0b2a52; background-image:linear-gradient(135deg,#0b2a52,#164a86); padding:32px 24px;">
+                        <img src="{{ $message->embed(public_path('images/mail/lv-logo.png')) }}" alt="La Verdad Christian College logo" width="84" height="84" style="display:block; width:84px; height:84px; margin:0 auto 16px; border:0;">
+                        <p style="margin:0; font-family:Georgia, 'Times New Roman', serif; font-size:14px; letter-spacing:1.5px; text-transform:uppercase; color:#d9c07a; font-weight:bold;">
+                            LA VERDAD CHRISTIAN COLLEGE, INC.
                         </p>
                     </td>
                 </tr>
@@ -24,10 +25,10 @@
                 <tr>
                     <td style="padding:36px 40px 8px;">
                         <h1 style="margin:0 0 8px; font-family:Arial, Helvetica, sans-serif; font-size:20px; color:#0b2a52;">
-                            Hello {{ $name }},
+                            Please verify your identity, {{ $name }}
                         </h1>
                         <p style="margin:0 0 24px; font-family:Arial, Helvetica, sans-serif; font-size:15px; line-height:1.6; color:#4a5568;">
-                            Use the verification code below to complete your login to the ALRM system.
+                            Use this one-time verification code to complete your ALRM sign-in.
                         </p>
                     </td>
                 </tr>
@@ -39,9 +40,7 @@
                             <tr>
                                 <td align="center" style="padding:22px 16px;">
                                     <p style="margin:0 0 12px; font-family:Arial, Helvetica, sans-serif; font-size:14px; color:#4a5568;">Your ALRM verification code:</p>
-                                    <span style="display:inline-block; font-family:'Courier New', Courier, monospace; font-size:34px; font-weight:bold; letter-spacing:10px; color:#0b2a52;">
-                                        {{ $code }}
-                                    </span>
+                                    <span style="display:inline-block; font-family:'Courier New', Courier, monospace; font-size:34px; font-weight:bold; letter-spacing:4px; color:#0b2a52;">{{ $code }}</span>
                                 </td>
                             </tr>
                         </table>
@@ -52,7 +51,7 @@
                 <tr>
                     <td style="padding:0 40px 8px;">
                         <p style="margin:0 0 10px; font-family:Arial, Helvetica, sans-serif; font-size:14px; line-height:1.6; color:#4a5568;">
-                            ⏱️ This code will expire in <strong>{{ $expiresInMinutes ?? 5 }} minutes</strong>.
+                            This code expires in <strong>{{ $expiresInMinutes ?? 5 }} minutes</strong> and can only be used once.
                         </p>
                         <p style="margin:0 0 28px; font-family:Arial, Helvetica, sans-serif; font-size:14px; line-height:1.6; color:#8a94a6;">
                             If you did not request this code, you can safely ignore this email — no changes will be made to your account.
@@ -66,9 +65,12 @@
                     </td>
                 </tr>
 
-                {{-- ALRM notification footer --}}
+                {{-- Authentication-specific footer --}}
                 <tr>
-                    @include('mail.partials.footer')
+                    <td style="padding:0 40px 32px; font-family:Arial, Helvetica, sans-serif;">
+                        <p style="margin:0 0 8px; font-size:14px; font-weight:bold; color:#0b2a52;">Do not share this code with anyone.</p>
+                        <p style="margin:0; font-size:12px; line-height:1.6; color:#4a5568;">ALRM will never ask you to send this code by email or message. Enter it only on the ALRM sign-in page.</p>
+                    </td>
                 </tr>
 
             </table>

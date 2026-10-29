@@ -20,7 +20,6 @@ import {
   ASSOCIATE_YEAR_LEVELS,
   YEAR_LEVELS,
   clearLegacyProfileSetup,
-  confirmStaffProfileSetup,
   isProfileSetupComplete,
   isProfileSetupReady,
   splitVerifiedName,
@@ -239,7 +238,6 @@ function ProfileSetup() {
 
     try {
       await saveProfileSetup(payload);
-      if (isInstructor) confirmStaffProfileSetup(user);
       await refreshUser(); // kunin ang bagong user mula sa server
       navigate("/dashboard", { replace: true });
     } catch (saveError) {

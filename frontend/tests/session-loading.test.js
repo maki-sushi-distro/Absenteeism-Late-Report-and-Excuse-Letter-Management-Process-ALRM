@@ -4,7 +4,6 @@ import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter } from "react-router-dom";
 import { createServer } from "vite";
-import { confirmStaffProfileSetup } from "../src/lib/profileSetup.js";
 
 let server;
 let SessionStatus;
@@ -155,8 +154,6 @@ test("the startup logo never mounts protected content or overrides the server's 
     assert.doesNotMatch(wrongRole, /PROTECTED CONTENT/);
     assert.match(wrongRole, /403/);
     const instructor = { id: "verified-instructor", role: "instructor", program_id: "program-one", school_id_number: "FAC-2026-001" };
-    items.set("alrm_session_version", "verified-session");
-    confirmStaffProfileSetup(instructor, { sessionVersion: "verified-session", storage });
     assert.match(render({ user: instructor }), /PROTECTED CONTENT/);
   } finally {
     for (const [key, descriptor] of [["sessionStorage", originalSession], ["localStorage", originalLocal]]) {
@@ -179,7 +176,6 @@ test("verified SPA routes show their page skeleton without replaying the startup
   globalThis.window = { innerWidth: 1280, localStorage: storage };
   try {
     const instructor = { id: "verified-instructor", role: "instructor", program_id: "program-one", school_id_number: "FAC-2026-001", name: "Preview Instructor" };
-    confirmStaffProfileSetup(instructor, { sessionVersion: "verified-route-session", storage });
     const html = renderToStaticMarkup(React.createElement(MemoryRouter, { initialEntries: ["/instructor/class-requests"] },
       React.createElement(SessionTestContext.Provider, { value: {
         user: instructor,

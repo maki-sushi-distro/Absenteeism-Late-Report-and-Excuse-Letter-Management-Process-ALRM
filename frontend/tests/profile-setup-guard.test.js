@@ -89,12 +89,7 @@ test("instructors require their entered instructor ID and a loaded matching prog
   assert.equal(profileSetup.isProfileSetupReady({ ...complete, role: "admin" }), false);
 });
 
-test("preassigned instructors require confirmation while program heads skip setup", () => {
-  const values = new Map();
-  const storage = {
-    getItem: (key) => values.get(key) ?? null,
-    setItem: (key, value) => values.set(key, value),
-  };
+test("persisted profile fields keep instructors complete across login sessions", () => {
   const instructor = {
     id: "instructor-1",
     role: "instructor",
@@ -102,34 +97,29 @@ test("preassigned instructors require confirmation while program heads skip setu
     school_id_number: "FAC-2026-001",
     programs: [{ id: "program-1" }],
   };
-  const options = { sessionVersion: "session-one", storage };
 
-  assert.equal(profileSetup.isProfileSetupComplete(instructor, options), false);
-  assert.equal(profileSetup.needsProfileSetup(instructor, options), true);
-  assert.equal(profileSetup.confirmStaffProfileSetup(instructor, options), true);
-  assert.equal(profileSetup.isProfileSetupComplete(instructor, options), true);
-  assert.equal(profileSetup.isProfileSetupComplete(instructor, { ...options, sessionVersion: "session-two" }), false);
+  assert.equal(profileSetup.isProfileSetupComplete(instructor, { sessionVersion: "session-one" }), true);
+  assert.equal(profileSetup.isProfileSetupComplete(instructor, { sessionVersion: "session-two" }), true);
+  assert.equal(profileSetup.needsProfileSetup(instructor), false);
 
   const programHead = { ...instructor, id: "head-1", role: "program_head" };
-  assert.equal(profileSetup.isProfileSetupComplete(programHead, options), true);
-  assert.equal(profileSetup.needsProfileSetup(programHead, options), false);
+  assert.equal(profileSetup.isProfileSetupComplete(programHead), true);
+  assert.equal(profileSetup.needsProfileSetup(programHead), false);
 });
 
-test("staff confirmation still requires assigned server data and tolerates blocked session storage", () => {
-  const blocked = {
-    getItem() { throw new Error("Storage blocked"); },
-    setItem() { throw new Error("Storage blocked"); },
-  };
-  const assigned = { id: "staff-blocked", role: "instructor", program_id: "program-1", school_id_number: "FAC-2026-002" };
-  const unassigned = { id: "staff-unassigned", role: "instructor", program_id: null, programs: [] };
-  const options = { sessionVersion: "session-blocked", storage: blocked };
+test("profile completion requires the persisted fields for each role", () => {
+  const instructor = { id: "staff", role: "instructor", program_id: "program-1", school_id_number: "FAC-2026-002" };
+  const student = { id: "student", role: "student", program_id: "program-1", school_id_number: "24-001", year_level: "1st" };
 
-  assert.equal(profileSetup.confirmStaffProfileSetup(assigned, options), true);
-  assert.equal(profileSetup.isProfileSetupComplete(assigned, options), true);
-  assert.equal(profileSetup.confirmStaffProfileSetup(unassigned, options), true);
-  assert.equal(profileSetup.isProfileSetupComplete(unassigned, options), false);
-  assert.equal(profileSetup.isProfileSetupComplete({ id: "admin", role: "administrator" }, options), true);
-  assert.equal(profileSetup.isProfileSetupComplete({ id: "student", role: "student", program_id: "program-1", school_id_number: "24-001", year_level: "1st" }, options), true);
+  assert.equal(profileSetup.isProfileSetupComplete(instructor), true);
+  assert.equal(profileSetup.isProfileSetupComplete({ ...instructor, program_id: null, programs: [] }), false);
+  assert.equal(profileSetup.isProfileSetupComplete({ ...instructor, school_id_number: "" }), false);
+  assert.equal(profileSetup.isProfileSetupComplete(student), true);
+  for (const field of ["program_id", "school_id_number", "year_level"]) {
+    assert.equal(profileSetup.isProfileSetupComplete({ ...student, [field]: "" }), false, field);
+  }
+  assert.equal(profileSetup.isProfileSetupComplete({ id: "admin", role: "administrator" }), true);
+  assert.equal(profileSetup.isProfileSetupComplete({ id: "head", role: "program_head" }), true);
 });
 
 test("the form button is unavailable until the role-specific fields are complete", () => {

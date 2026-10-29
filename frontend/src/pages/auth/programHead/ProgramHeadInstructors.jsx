@@ -30,23 +30,32 @@ function StudentRequestTable({ requests }) {
   const students = new Map();
   for (const request of requests) {
     const student = request.enrollment?.student;
-    if (!student?.id) continue;
-    if (!students.has(student.id)) students.set(student.id, { name: requestStudent(request), absences: 0, lates: 0 });
-    if (request.type === "absence") students.get(student.id).absences += 1;
-    if (request.type === "late") students.get(student.id).lates += 1;
+    const classRecord = requestClass(request);
+    if (!student?.id || !classRecord?.id) continue;
+    const key = `${student.id}:${classRecord.id}`;
+    if (!students.has(key)) students.set(key, { name: requestStudent(request), className: `${classRecord.subject_name || "Unavailable"} · ${classRecord.section || "No section"}`, absences: 0, lates: 0 });
+    if (request.type === "absence") students.get(key).absences += 1;
+    if (request.type === "late") students.get(key).lates += 1;
   }
-  return <div className={panel}><table className="w-full min-w-[500px] text-left text-sm"><thead className="bg-slate-50 text-slate-600 dark:bg-slate-800 dark:text-slate-300"><tr><th className="px-4 py-3">Student</th><th className="px-4 py-3">Absence requests</th><th className="px-4 py-3">Late requests</th></tr></thead><tbody className="divide-y divide-slate-200 dark:divide-slate-800">{[...students.entries()].map(([id, row]) => <tr key={id}><td className="px-4 py-3 font-medium">{row.name}</td><td className="px-4 py-3">{row.absences}</td><td className="px-4 py-3">{row.lates}</td></tr>)}</tbody></table></div>;
+  return <div className={panel}><table className="w-full min-w-[650px] text-left text-sm"><thead className="bg-slate-50 text-slate-600 dark:bg-slate-800 dark:text-slate-300"><tr><th className="px-4 py-3">Student</th><th className="px-4 py-3">Class</th><th className="px-4 py-3">Absence requests</th><th className="px-4 py-3">Late requests</th></tr></thead><tbody className="divide-y divide-slate-200 dark:divide-slate-800">{[...students.entries()].map(([id, row]) => <tr key={id}><td className="px-4 py-3 font-medium">{row.name}</td><td className="px-4 py-3">{row.className}</td><td className="px-4 py-3">{row.absences}</td><td className="px-4 py-3">{row.lates}</td></tr>)}</tbody></table></div>;
 }
 
 export function ProgramHeadInstructorDetail() {
   const { instructorId } = useParams();
   const { requests, errors, loading } = useProgramHeadRecords();
   const instructor = instructorRows(requests).find((row) => row.id === instructorId);
-  const [classId, setClassId] = useState("");
-  const selectedClass = classId || instructor?.classes[0]?.id;
-  const visible = requests.filter((request) => requestClass(request)?.instructor?.id === instructorId && requestClass(request)?.id === selectedClass);
+  const [searchInput, setSearchInput] = useState("");
+  const [search, setSearch] = useState("");
+  const instructorRequests = requests.filter((request) => requestClass(request)?.instructor?.id === instructorId);
+  const query = search.trim().toLowerCase();
+  const visible = instructorRequests.filter((request) => {
+    const classRecord = requestClass(request);
+    return !query || `${requestStudent(request)} ${classRecord?.subject_name || ""} ${classRecord?.section || ""}`.toLowerCase().includes(query);
+  });
+  function submitSearch(event) { event.preventDefault(); setSearch(searchInput); }
+  function clearSearch() { setSearchInput(""); setSearch(""); }
   return <div className="space-y-5"><PageBreadcrumbs items={[{ label: "Instructors", to: "/program-head/instructors" }, { label: instructor?.name || "Instructor Details" }]} />
     {errors.requests ? <ErrorState message={errors.requests} /> : null}
-    {loading ? <LoadingSkeleton variant="profile" columns={3} label="Loading instructor" /> : instructor ? <><header><h1 className="text-2xl font-bold">{instructor.name}</h1><p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Student request activity by class</p></header><label className="block text-sm font-medium">Class <select value={selectedClass} onChange={(event) => setClassId(event.target.value)} className="ml-2 max-w-full rounded-md border border-slate-300 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-900">{instructor.classes.map((item) => <option key={item.id} value={item.id}>{item.subject_name} · {item.section || "No section"}</option>)}</select></label><StudentRequestTable requests={visible} /><p className="text-xs text-slate-500 dark:text-slate-400">These are submitted requests, not complete attendance or threshold records.</p></> : <p className="text-sm text-slate-500">Instructor not found in program requests.</p>}
+    {loading ? <LoadingSkeleton variant="profile" columns={4} label="Loading instructor" /> : instructor ? <><header><h1 className="text-2xl font-bold">{instructor.name}</h1><p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Student request activity by class</p></header><form onSubmit={submitSearch} className="flex flex-wrap items-end gap-2"><label className="grid min-w-64 flex-1 gap-2 text-sm font-medium">Search<span className="relative"><Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" /><input maxLength={TEXT_INPUT_MAX_LENGTH} value={searchInput} onChange={(event) => setSearchInput(event.target.value)} placeholder="Search student, subject, or section" className="w-full rounded-md border border-slate-300 bg-white py-2 pl-9 pr-3 font-normal dark:border-slate-700 dark:bg-slate-900" /></span></label><button type="submit" className="rounded-md bg-blue-900 px-4 py-2 text-sm font-semibold text-white">Search</button><button type="button" onClick={clearSearch} disabled={!searchInput && !search} className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700">Clear search</button></form>{visible.length ? <StudentRequestTable requests={visible} /> : <p className="rounded-md border border-slate-200 p-5 text-sm text-slate-500 dark:border-slate-800 dark:text-slate-400">No student requests match your search.</p>}<p className="text-xs text-slate-500 dark:text-slate-400">These are submitted requests, not complete attendance or threshold records.</p></> : <p className="text-sm text-slate-500">Instructor not found in program requests.</p>}
   </div>;
 }

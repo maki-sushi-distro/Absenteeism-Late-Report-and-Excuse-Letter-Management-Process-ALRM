@@ -17,7 +17,7 @@ export function ProgramHeadDashboard({ view = "dashboard" }) {
     {view !== "dashboard" ? needed.filter((key) => errors[key]).map((key) => <ErrorState key={key} title={`Could not load ${key}`} message={errors[key]} />) : null}
     {view === "dashboard" ? <ProgramHeadOverview dashboard={dashboard} flags={flags} requests={requests} errors={errors} resourceLoading={resourceLoading} ready={ready} /> : null}
     {failed ? <button type="button" onClick={refresh} className="text-sm font-medium text-blue-800 underline dark:text-blue-300">Retry loading</button> : null}
-    {view === "flagged" && !waiting && !errors.flags ? <FlaggedRecords flags={flags} /> : null}
+    {view === "flagged" && !waiting && !errors.flags ? <FlaggedRecords flags={flags} onRefresh={refresh} /> : null}
     {view === "requests" && !waiting && !errors.requests ? <RequestRecords requests={requests} /> : null}
   </div>;
 }

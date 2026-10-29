@@ -7,6 +7,7 @@ import { saveProfileSetup } from "../src/api/profileSetup.js";
 import { createStudentRequest } from "../src/api/studentRequests.js";
 import { createClass, getAdminUsers, updateStaffRole } from "../src/api/admin.js";
 import { getStudentAttendanceSummary } from "../src/api/student.js";
+import { resolveProgramHeadFlag } from "../src/api/programHead.js";
 import {
   createProgram,
   decideInstructorRequest,
@@ -198,6 +199,16 @@ test("instructor decisions and admin mutations send backend-accepted payloads", 
     "/api/admin/users/user-one/status",
     "/api/admin/programs",
   ]);
+});
+
+test("program heads resolve the follow-up flag with an empty PATCH", async () => {
+  const requests = captureJsonRequest({ success: true, data: { id: "flag-one", status: "resolved" } });
+
+  await resolveProgramHeadFlag("flag-one");
+
+  assert.equal(requests[0].method, "PATCH");
+  assert.equal(requests[0].body, null);
+  assert.equal(new URL(requests[0].url, "https://example.test").pathname, "/api/program-head/followup-flags/flag-one/resolve");
 });
 
 test("admin role assignment and class creation use registered routes and UUIDs", async () => {

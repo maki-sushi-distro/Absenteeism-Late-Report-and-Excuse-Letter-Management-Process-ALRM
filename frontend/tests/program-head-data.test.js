@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { filterReportRows, instructorRows, monthlyActivity, requestDate } from "../src/pages/auth/programHead/programHeadData.js";
+import { filterReportRows, formatRiskPercentage, instructorRows, monthlyActivity, requestDate } from "../src/pages/auth/programHead/programHeadData.js";
 
 const makeRequest = (type, date, instructorId = "i-1") => ({
   type,
@@ -31,4 +31,10 @@ test("monthly activity counts absence and late requests by submission month", ()
 test("report date filters are inclusive and ignore invalid dated rows", () => {
   const rows = [makeRequest("late", "2026-10-01"), makeRequest("late", "2026-10-03"), makeRequest("late", "bad-date")];
   assert.deepEqual(filterReportRows(rows, "2026-10-01", "2026-10-01", requestDate), [rows[0]]);
+});
+
+test("risk percentages are formatted without inventing missing attendance data", () => {
+  assert.equal(formatRiskPercentage(14.58), "14.58%");
+  assert.equal(formatRiskPercentage(20), "20%");
+  assert.equal(formatRiskPercentage(null), "Unavailable");
 });

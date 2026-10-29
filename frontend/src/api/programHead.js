@@ -1,4 +1,4 @@
-import { apiRequest, buildQuery } from "./client.js";
+import { apiDownload, apiRequest, buildQuery } from "./client.js";
 import { getCollection } from "./collections.js";
 
 export function getProgramHeadDashboard() {
@@ -15,4 +15,13 @@ export function getProgramHeadRequests(filters = {}) {
 
 export function getProgramHeadAuditLogs() {
   return getCollection("/program-head/audit-logs");
+}
+
+export function resolveProgramHeadFlag(flagId) {
+  return apiRequest(`/program-head/followup-flags/${encodeURIComponent(flagId)}/resolve`, { method: "PATCH" });
+}
+
+export function downloadProgramHeadReport({ type, from, to }) {
+  const query = buildQuery({ report_type: type, date_from: from, date_to: to });
+  return apiDownload(`/program-head/reports/export${query}`, `program-${type}-report.csv`);
 }

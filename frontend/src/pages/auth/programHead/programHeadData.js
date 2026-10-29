@@ -54,3 +54,10 @@ export function withinDates(date, from, to) {
 export function filterReportRows(records, from, to, getDate) {
   return records.filter((record) => withinDates(getDate(record), from, to));
 }
+
+export function formatRiskPercentage(value) {
+  if (value === null || value === undefined || value === "") return "Unavailable";
+  const percentage = Number(value);
+  if (!Number.isFinite(percentage)) return "Unavailable";
+  return `${new Intl.NumberFormat("en", { maximumFractionDigits: 2 }).format(percentage)}%`;
+}

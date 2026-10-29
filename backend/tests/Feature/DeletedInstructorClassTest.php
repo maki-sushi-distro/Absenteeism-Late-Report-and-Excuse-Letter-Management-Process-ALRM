@@ -10,25 +10,12 @@ use App\Models\Program;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
-use Tests\TestCase;
+use Tests\SecurityTestCase;
 
-class DeletedInstructorClassTest extends TestCase
+class DeletedInstructorClassTest extends SecurityTestCase
 {
     public function test_deleted_instructor_class_is_hidden_and_rejects_new_requests_without_deleting_enrollments(): void
     {
-        config(['database.default' => 'sqlite', 'database.connections.sqlite.database' => ':memory:']);
-        DB::purge('sqlite');
-
-        foreach ([
-            '0001_01_01_000000_create_users_table.php',
-            '2026_08_23_163150_create_programs_table.php',
-            '2026_08_23_163637_create_classes_table.php',
-            '2026_08_23_165347_create_enrollments_table.php',
-        ] as $migration) {
-            (require database_path('migrations/'.$migration))->up();
-        }
-
         $student = User::create(['name' => 'Student', 'email' => 'student@example.com', 'role' => 'student']);
         $instructor = User::create(['name' => 'Instructor', 'email' => 'instructor@example.com', 'role' => 'instructor']);
         $program = Program::create(['program_name' => 'Test Program']);

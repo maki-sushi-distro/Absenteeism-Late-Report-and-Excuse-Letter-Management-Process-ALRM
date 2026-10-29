@@ -53,7 +53,7 @@ class InstructorMailRedirectTest extends TestCase
         );
         $this->assertSame('teacher-id', UserNotification::sole()->user_id);
 
-        config(['mail.default' => 'array']);
+        config(['mail.default' => 'array', 'app.url' => 'https://backend.example.com/']);
         Mail::swap(new MailManager($this->app));
         $user = new User(['name' => 'OTP User', 'email' => 'otp-user@example.com']);
         $user->notifyNow(new SendOtpCode('123456'));
@@ -65,7 +65,8 @@ class InstructorMailRedirectTest extends TestCase
         $this->assertSame('[ALRM] Email verification code', $email->getSubject());
         $this->assertStringContainsString('Your ALRM verification code:', $email->getHtmlBody());
         $this->assertStringContainsString('LA VERDAD CHRISTIAN COLLEGE, INC.', $email->getHtmlBody());
-        $this->assertStringContainsString('src="cid:', $email->getHtmlBody());
+        $this->assertStringContainsString('src="https://backend.example.com/images/mail/lv-logo.png"', $email->getHtmlBody());
+        $this->assertCount(0, $email->getAttachments());
         $this->assertStringContainsString("Your ALRM verification code:\n\n123456", $email->getTextBody());
         $this->assertStringContainsString('This code expires in 5 minutes.', $email->getTextBody());
     }

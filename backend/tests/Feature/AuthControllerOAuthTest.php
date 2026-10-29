@@ -116,12 +116,14 @@ class AuthControllerOAuthTest extends SecurityTestCase
         $this->assertSame(1, OtpCode::where('user_id', $user->id)->count());
     }
 
-    public function test_returning_pending_instructor_on_an_institutional_domain_is_auto_approved(): void
+    public function test_returning_pending_allowlisted_student_instructor_is_auto_approved(): void
     {
+        config(['institution.student_domain' => 'student.laverdad.edu.ph']);
+        $email = User::STUDENT_INSTRUCTOR_EMAILS[0];
         $user = $this->user('instructor', [
-            'email' => 'student1@student.edu.ph', 'google_id' => 'google-123', 'status' => 'pending',
+            'email' => $email, 'google_id' => 'google-123', 'status' => 'pending',
         ]);
-        $this->provider();
+        $this->provider([], $email);
         $nonce = Str::random(64);
 
         $this->withUnencryptedCookies(['alrm_oauth' => $nonce])

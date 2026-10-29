@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Observers\ExcuseRequestObserver;
+use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -10,6 +12,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
+#[ObservedBy(ExcuseRequestObserver::class)]
 #[Fillable([
     'enrollment_id',
     'type',
@@ -20,6 +23,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
     'reason',
     'evidence_file_url',
     'evidence_type',
+    'proof_types',
     'status',
     'date_submitted',
     'date_reviewed',
@@ -27,6 +31,15 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 ])]
 class ExcuseRequest extends Model
 {
+    public const PROOF_TYPES = [
+        'Medical Certificate',
+        'Prescription / Medical Record',
+        'Death Certificate / Funeral Notice',
+        'School Activity Endorsement',
+        'Letter from Parent/Guardian',
+        'Others',
+    ];
+
     /** @use HasFactory<\Database\Factories\ExcuseRequestFactory> */
     use HasFactory, HasUuids;
 
@@ -39,6 +52,7 @@ class ExcuseRequest extends Model
     protected function casts(): array
     {
         return [
+            'proof_types'           => 'array',
             'start_date_of_absence' => 'date',
             'end_date_of_absence'   => 'date',
             'date_submitted'        => 'datetime',

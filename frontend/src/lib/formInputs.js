@@ -15,9 +15,9 @@ export function prepareAccountInput(data) {
 export function prepareProfileInput(data) {
   const payload = { program_id: sanitizeText(data.program_id) };
   const errors = { program_id: isIdentifier(payload.program_id) ? '' : 'Select a valid program.' };
-  if (Object.hasOwn(data, 'school_student_id')) {
-    payload.school_student_id = sanitizeText(data.school_student_id);
-    errors.school_student_id = textError(payload.school_student_id, 'Student ID', { pattern: /^[\p{L}\p{N}][\p{L}\p{N} ._/-]*$/u });
+  if (Object.hasOwn(data, 'school_id_number')) {
+    payload.school_id_number = sanitizeText(data.school_id_number);
+    errors.school_id_number = textError(payload.school_id_number, 'School ID number', { pattern: /^[\p{L}\p{N}][\p{L}\p{N} ._/-]*$/u });
   }
   if (Object.hasOwn(data, 'year_level')) {
     payload.year_level = data.year_level;

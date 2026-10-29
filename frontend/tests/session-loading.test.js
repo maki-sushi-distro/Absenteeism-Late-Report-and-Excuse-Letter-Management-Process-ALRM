@@ -4,6 +4,7 @@ import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter } from "react-router-dom";
 import { createServer } from "vite";
+import { confirmStaffProfileSetup } from "../src/lib/profileSetup.js";
 
 let server;
 let SessionStatus;
@@ -153,7 +154,10 @@ test("the startup logo never mounts protected content or overrides the server's 
     const wrongRole = render({ user: { id: "verified-admin", role: "administrator" } });
     assert.doesNotMatch(wrongRole, /PROTECTED CONTENT/);
     assert.match(wrongRole, /403/);
-    assert.match(render({ user: { id: "verified-instructor", role: "instructor", program_id: "program-one" } }), /PROTECTED CONTENT/);
+    const instructor = { id: "verified-instructor", role: "instructor", program_id: "program-one", school_id_number: "FAC-2026-001" };
+    items.set("alrm_session_version", "verified-session");
+    confirmStaffProfileSetup(instructor, { sessionVersion: "verified-session", storage });
+    assert.match(render({ user: instructor }), /PROTECTED CONTENT/);
   } finally {
     for (const [key, descriptor] of [["sessionStorage", originalSession], ["localStorage", originalLocal]]) {
       if (descriptor) Object.defineProperty(globalThis, key, descriptor);
@@ -166,19 +170,31 @@ test("verified SPA routes show their page skeleton without replaying the startup
   const { ProtectedRoute } = await server.ssrLoadModule("/src/routes/ProtectedRoute.jsx");
   const Page = (await server.ssrLoadModule("/src/pages/auth/instructor/InstructorRequests/index.js")).default;
   const originalWindow = globalThis.window;
-  globalThis.window = { innerWidth: 1280, localStorage: { getItem: () => null } };
+  const originalSession = Object.getOwnPropertyDescriptor(globalThis, "sessionStorage");
+  const originalLocal = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
+  const items = new Map([["alrm_session_version", "verified-route-session"]]);
+  const storage = { getItem: key => items.get(key) ?? null, setItem: (key, value) => items.set(key, value) };
+  Object.defineProperty(globalThis, "sessionStorage", { configurable: true, value: storage });
+  Object.defineProperty(globalThis, "localStorage", { configurable: true, value: storage });
+  globalThis.window = { innerWidth: 1280, localStorage: storage };
   try {
+    const instructor = { id: "verified-instructor", role: "instructor", program_id: "program-one", school_id_number: "FAC-2026-001", name: "Preview Instructor" };
+    confirmStaffProfileSetup(instructor, { sessionVersion: "verified-route-session", storage });
     const html = renderToStaticMarkup(React.createElement(MemoryRouter, { initialEntries: ["/instructor/class-requests"] },
       React.createElement(SessionTestContext.Provider, { value: {
-        user: { id: "verified-instructor", role: "instructor", program_id: "program-one", name: "Preview Instructor" },
+        user: instructor,
         loading: false, sessionError: "",
       } }, React.createElement(ProtectedRoute, { allowedRoles: ["instructor"] }, React.createElement(Page)))));
     assert.match(html, /data-slot="table-page-skeleton"/);
-    assert.match(html, /data-layout="requests"/);
+    assert.match(html, /data-layout="courses"/);
     assert.doesNotMatch(html, /auth-loading|session-restore-skeleton|Loading ALRM System/);
   } finally {
     if (originalWindow === undefined) delete globalThis.window;
     else globalThis.window = originalWindow;
+    for (const [key, descriptor] of [["sessionStorage", originalSession], ["localStorage", originalLocal]]) {
+      if (descriptor) Object.defineProperty(globalThis, key, descriptor);
+      else delete globalThis[key];
+    }
   }
 });
 
@@ -267,7 +283,7 @@ async function withCookieProvider(run, { hint = null } = {}) {
     }
   }
 }
-const cookieUser = { id: 'verified-student', role: 'student', program_id: 'one', year_level: '1st', school_student_id: '2026-001' };
+const cookieUser = { id: 'verified-student', role: 'student', program_id: 'one', year_level: '1st', school_id_number: '2026-001' };
 
 test('provider restores a cookie on startup with no marker and treats guest 401 normally', async () => {
   await withCookieProvider(async ({ page, calls, state }) => {

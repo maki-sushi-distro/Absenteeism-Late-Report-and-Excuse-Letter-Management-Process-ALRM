@@ -9,7 +9,7 @@ import { buildInitialForm } from "../src/pages/auth/student/request-form/utils.j
 import { validateStep } from "../src/pages/auth/student/request-form/validation.js";
 
 const user = { name: "Alex Student", email: "alex@student.laverdad.edu.ph",
-  school_student_id: "2026-001", year_level: "3rd",
+  school_id_number: "2026-001", year_level: "3rd",
   program: { program_name: "Bachelor of Science in Information System" } };
 const form = { ...buildInitialForm(initialForm, user, getStoredProfileSetup(user)), requestType: "late" };
 let server;

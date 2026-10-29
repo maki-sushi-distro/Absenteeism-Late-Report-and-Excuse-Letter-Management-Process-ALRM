@@ -19,7 +19,7 @@ export default function RequestSummary({ form, user, classes = [], editing, onSt
     ["Request type", isAbsence ? "Absence" : "Late"],
     ["Student name", form.studentName],
     ["Email address", user?.email],
-    ["Student ID", user?.school_student_id],
+    ["Student ID", user?.school_id_number],
     ["Program", form.program],
     ["Year level", form.level],
     ["Parent/Guardian's name", payload.guardian_name],

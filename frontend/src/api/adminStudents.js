@@ -77,7 +77,7 @@ function filterStudents(students, filters) {
     const searchable = [
       student?.name,
       student?.email,
-      student?.school_student_id,
+      student?.school_id_number,
       student?.student_id,
     ]
       .map(normalized)

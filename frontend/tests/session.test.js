@@ -3,7 +3,7 @@ import { afterEach, beforeEach, mock, test } from 'node:test';
 import * as client from '../src/api/client.js';
 import { getSessionUser } from '../src/api/session.js';
 import { getPostLoginPath, rememberAuthenticatedPage } from '../src/api/authSecurity.js';
-const user = { id: 'student-one', role: 'student', program_id: 1, school_student_id: '2026-1001', year_level: '1st Year' };
+const user = { id: 'student-one', role: 'student', program_id: 1, school_id_number: '2026-1001', year_level: '1st Year' };
 let items;
 beforeEach(() => {
   items = new Map();

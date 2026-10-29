@@ -5,7 +5,7 @@ import { changeManagedUser, getUserManagementPrograms, getUserManagementUsers } 
 import { filterUsers, paginateUsers, studentYearSection, userDepartment, userDisplayId, userErrorMessage, userPermissions } from "../src/pages/auth/admin/userManagementData.js";
 
 const accounts = [
-  { id: "s1", name: "Zoe Student", role: "student", status: "approved", school_student_id: "2026-001", program_id: "p1", year_level: "1st" },
+  { id: "s1", name: "Zoe Student", role: "student", status: "approved", school_id_number: "2026-001", program_id: "p1", year_level: "1st" },
   { id: "s2", name: "Amy Student", role: "student", status: "approved", program_id: "p2", year_level: "2nd" },
   { id: "staff1", name: "Ada Staff", email: "ada@laverdad.edu.ph", role: "instructor", status: "pending", program: { id: "p1", program_name: "BSIS" } },
   { id: "staff2", name: "Grace Staff", role: "program_head", status: "deactivated", program_id: "p1" },

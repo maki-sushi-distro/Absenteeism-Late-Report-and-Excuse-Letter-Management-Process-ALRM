@@ -65,7 +65,7 @@ function formatDate(value) {
 
 function displayId(student) {
   return valueFrom(student, [
-    "school_student_id",
+    "school_id_number",
     "student_id",
     "studentId",
     "display_id",

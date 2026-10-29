@@ -2,10 +2,11 @@
 
 namespace App\Models;
 
-use Database\Factories\UserFactory;
 use App\Enums\UserStatus;
+use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
+use Illuminate\Database\Eloquent\Attributes\Visible;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -23,7 +24,7 @@ use Laravel\Sanctum\HasApiTokens;
     'password',
     'role',
     'program_id',
-    'school_student_id',
+    'school_id_number',
     'status',
     'deactivated_at',
     'year_level',
@@ -31,13 +32,20 @@ use Laravel\Sanctum\HasApiTokens;
     'contact_number',
 ])]
 #[Hidden(['password', 'remember_token'])]
+#[Visible(['id', 'name', 'email', 'role', 'program_id', 'school_id_number',
+    'status', 'year_level', 'program', 'programs', 'heads_program', 'headed_program_exists'])]
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, Notifiable, HasApiTokens, HasUuids;
+    use HasApiTokens, HasFactory, HasUuids, Notifiable;
 
     protected $keyType = 'string';
+
     public $incrementing = false;
+
+    protected $attributes = [
+        'email_notifications_enabled' => false,
+    ];
 
     protected function casts(): array
     {
@@ -45,6 +53,7 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'deactivated_at' => 'datetime',
             'password' => 'hashed',
+            'email_notifications_enabled' => 'boolean',
         ];
     }
 
@@ -80,6 +89,27 @@ class User extends Authenticatable
     public function headedProgram(): HasOne
     {
         return $this->hasOne(Program::class, 'program_head_id');
+    }
+
+    /** Explicit co-head assignments, separate from teaching membership. */
+    public function additionalHeadedPrograms(): BelongsToMany
+    {
+        return $this->belongsToMany(Program::class, 'program_head_assignments')->withTimestamps();
+    }
+
+    public function headedProgramIds(): array
+    {
+        return Program::where('program_head_id', $this->id)->pluck('id')
+            ->merge($this->additionalHeadedPrograms()->pluck('programs.id'))
+            // A role change grants head access to the account's current program,
+            // including changes made directly in the database for SQA testing.
+            ->merge($this->role === 'program_head' && $this->program_id !== null ? [$this->program_id] : [])
+            ->unique()->values()->all();
+    }
+
+    public function headsProgram(?string $programId): bool
+    {
+        return $programId !== null && in_array($programId, $this->headedProgramIds(), true);
     }
 
     /**
@@ -138,5 +168,13 @@ class User extends Authenticatable
     public function canLogin(): bool
     {
         return UserStatus::allowsLogin($this->status);
+    }
+
+    public function canReceiveEmailNotifications(): bool
+    {
+        return $this->canLogin()
+            && filled($this->google_id)
+            && filled($this->email)
+            && $this->email_notifications_enabled;
     }
 }

@@ -2,17 +2,16 @@
 
 namespace App\Exports;
 
-use App\Models\ExcuseRequest;
 use Illuminate\Support\Collection;
 use Maatwebsite\Excel\Concerns\FromCollection;
+use Maatwebsite\Excel\Concerns\WithCustomValueBinder;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithMapping;
+use PhpOffice\PhpSpreadsheet\Cell\StringValueBinder;
 
-class ReportExport implements FromCollection, WithHeadings, WithMapping
+class ReportExport extends StringValueBinder implements FromCollection, WithCustomValueBinder, WithHeadings, WithMapping
 {
-    public function __construct(protected Collection $requests)
-    {
-    }
+    public function __construct(protected Collection $requests) {}
 
     public function collection(): Collection
     {

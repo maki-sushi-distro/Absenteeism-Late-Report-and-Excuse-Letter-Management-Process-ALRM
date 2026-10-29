@@ -14,7 +14,7 @@ class ProgramPolicy
     public function view(User $user, Program $program): bool
     {
         return $user->role === 'administrator'
-            || $program->program_head_id === $user->id
+            || $user->headsProgram($program->id)
             || $user->programs->contains($program->id);
     }
 

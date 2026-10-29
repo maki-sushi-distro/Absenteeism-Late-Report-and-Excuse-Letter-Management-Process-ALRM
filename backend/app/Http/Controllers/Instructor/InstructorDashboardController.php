@@ -22,7 +22,7 @@ class InstructorDashboardController extends Controller
         $flaggedStudents = $classes->flatMap(function ($class) {
             return $class->enrollments->filter(function ($enrollment) {
                 return $enrollment->attendanceTracker
-                    && in_array($enrollment->attendanceTracker->status, ['warning', 'IR'], true);
+                    && in_array($enrollment->attendanceTracker->status, ['warning', 'critical', 'IR'], true);
             })->map(function ($enrollment) use ($class) {
                 return [
                     'student'  => $enrollment->student->only(['id', 'name']),

@@ -3,13 +3,14 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
-use App\Support\TrustedDeviceManager;
 use App\Models\OtpCode;
 use App\Models\User;
 use App\Notifications\SendOtpCode;
+use App\Support\TrustedDeviceManager;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class OtpController extends Controller
@@ -18,6 +19,14 @@ class OtpController extends Controller
      * Generate and email a fresh OTP code for the given user.
      */
     public static function issue(User $user): void
+    {
+        DB::transaction(function () use ($user) {
+            User::whereKey($user->id)->lockForUpdate()->firstOrFail();
+            self::issueLocked($user);
+        });
+    }
+
+    private static function issueLocked(User $user): void
     {
         $existing = OtpCode::where('user_id', $user->id)
             ->whereNull('verified_at')
@@ -36,12 +45,38 @@ class OtpController extends Controller
         $code = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
 
         OtpCode::create([
-            'user_id'    => $user->id,
-            'code'       => $code,
+            'user_id' => $user->id,
+            'code' => $code,
             'expires_at' => now()->addMinutes(5),
         ]);
 
         $user->notify(new SendOtpCode($code));
+    }
+
+    /**
+     * Tama ba ang "pending" token para sa user_id na ito?
+     * Ang token ay ibinibigay ng Google callback (AuthController::callback)
+     * at nakatago sa cache nang 10 minuto.
+     */
+    private function pendingMatches(Request $request): bool
+    {
+        $pending = (string) $request->input('pending');
+
+        if ($pending === '') {
+            return false;
+        }
+
+        return (string) Cache::get("auth_pending:{$pending}")
+            === (string) $request->input('user_id');
+    }
+
+    private function expiredSession(): JsonResponse
+    {
+        return response()->json([
+            'success' => false,
+            'message' => 'Your login session expired. Please sign in again.',
+            'data' => null,
+        ], 410);
     }
 
     /**
@@ -56,17 +91,32 @@ class OtpController extends Controller
         return response()->json([
             'success' => false,
             'message' => 'Your account is not active. Please contact an administrator.',
-            'data'    => null,
+            'data' => null,
         ], 403);
     }
 
+    /**
+     * POST /api/auth/otp/resend
+     */
     public function resend(Request $request): JsonResponse
     {
         $request->validate([
-            'user_id' => 'required|string|exists:users,id',
+            'user_id' => 'required|uuid|exists:users,id',
+            'pending' => 'required|string|size:40',
         ]);
 
-        $user = User::findOrFail($request->string('user_id'));
+        return DB::transaction(function () use ($request) {
+            $user = User::whereKey($request->input('user_id'))->lockForUpdate()->firstOrFail();
+
+            return $this->resendLocked($request, $user);
+        });
+    }
+
+    private function resendLocked(Request $request, User $user): JsonResponse
+    {
+        if (! $this->pendingMatches($request)) {
+            return $this->expiredSession();
+        }
 
         if (! $user->canLogin()) {
             return $this->rejectInactive($user);
@@ -83,7 +133,7 @@ class OtpController extends Controller
                 return response()->json([
                     'success' => false,
                     'message' => 'Too many attempts. Please log in again.',
-                    'data'    => null,
+                    'data' => null,
                 ], 429);
             }
 
@@ -95,7 +145,7 @@ class OtpController extends Controller
                 return response()->json([
                     'success' => false,
                     'message' => "Please wait {$waitTime} seconds before requesting another code.",
-                    'data'    => ['retry_after' => $waitTime],
+                    'data' => ['retry_after' => $waitTime],
                 ], 429);
             }
         }
@@ -113,11 +163,11 @@ class OtpController extends Controller
 
         $code = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
 
-        $otp = new OtpCode();
+        $otp = new OtpCode;
         $otp->forceFill([
-            'user_id'    => $user->id,
-            'code'       => $code,
-            'attempts'   => $carriedAttempts,
+            'user_id' => $user->id,
+            'code' => $code,
+            'attempts' => $carriedAttempts,
             'expires_at' => now()->addMinutes(5),
         ])->save();
 
@@ -126,7 +176,7 @@ class OtpController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'A new code has been sent.',
-            'data'    => null,
+            'data' => null,
         ]);
     }
 
@@ -138,11 +188,23 @@ class OtpController extends Controller
     public function verify(Request $request): JsonResponse
     {
         $request->validate([
-            'user_id' => 'required|string|exists:users,id',
-            'code'    => 'required|string',
+            'user_id' => 'required|uuid|exists:users,id',
+            'code' => 'required|digits:6',
+            'pending' => 'required|string|size:40',
         ]);
 
-        $user = User::findOrFail($request->string('user_id'));
+        return DB::transaction(function () use ($request) {
+            $user = User::whereKey($request->input('user_id'))->lockForUpdate()->firstOrFail();
+
+            return $this->verifyLocked($request, $user);
+        });
+    }
+
+    private function verifyLocked(Request $request, User $user): JsonResponse
+    {
+        if (! $this->pendingMatches($request)) {
+            return $this->expiredSession();
+        }
 
         if (! $user->canLogin()) {
             return $this->rejectInactive($user);
@@ -157,7 +219,7 @@ class OtpController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'No pending verification found. Please log in again.',
-                'data'    => null,
+                'data' => null,
             ], 404);
         }
 
@@ -165,7 +227,7 @@ class OtpController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'This code has expired. Please log in again.',
-                'data'    => null,
+                'data' => null,
             ], 422);
         }
 
@@ -173,7 +235,7 @@ class OtpController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Too many attempts. Please log in again.',
-                'data'    => null,
+                'data' => null,
             ], 429);
         }
 
@@ -183,14 +245,18 @@ class OtpController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Invalid code.',
-                'data'    => null,
+                'data' => null,
             ], 422);
         }
 
         $otp->update(['verified_at' => now()]);
 
+        // Isang beses lang magagamit ang pending token.
+        Cache::forget("auth_pending:{$request->input('pending')}");
+        Cache::forget("auth_pending_sent:{$request->input('pending')}");
+
         $user->tokens()->delete();
-        $token = $user->createToken('alrm-spa')->plainTextToken;
+        $token = $user->createToken('alrm-spa', ['*'], now()->addHours(8))->plainTextToken;
         $code = Str::random(40);
         Cache::put("auth_exchange:{$code}", $token, now()->addSeconds(60));
 
@@ -199,7 +265,7 @@ class OtpController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'OK',
-            'data'    => ['exchange_code' => $code],
+            'data' => ['exchange_code' => $code],
         ])->cookie($cookie);
     }
 }

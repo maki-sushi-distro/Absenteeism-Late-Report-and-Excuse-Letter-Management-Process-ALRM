@@ -75,6 +75,7 @@ test("the public login retains Google sign-in and the current school assets", as
   const html = renderToStaticMarkup(React.createElement(MemoryRouter, { initialEntries: ["/login"] }, React.createElement(TestAuthContext.Provider, { value: { user: null, loading: false, sessionError: "" } }, React.createElement(Login))));
   assert.match(html, /Sign in with Google/);
   assert.match(html, /Welcome Back!/);
+  assert.match(html, /data-slot="card-description"[^>]*class="[^"]*\btext-center\b[^"]*"[^>]*>Sign in with your La Verdad Christian College account\.<\/div>/);
   assert.match(html, /alt="La Verdad Christian College logo"/);
   assert.match(html, /LV_Picture\.jpg/);
   assert.doesNotMatch(html, /type="password"/);
@@ -91,7 +92,7 @@ test("signed-out URLs cannot replace the remembered dashboard destination", () =
   const originalStorage = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
   const values = new Map();
   Object.defineProperty(globalThis, "localStorage", { configurable: true, value: { getItem: key => values.get(key) ?? null, setItem: (key, value) => values.set(key, value) } });
-  const user = { id: "student-1", role: "student", program_id: "program-1", year_level: "3rd", school_student_id: "2026-001" };
+  const user = { id: "student-1", role: "student", program_id: "program-1", year_level: "3rd", school_id_number: "2026-001" };
   try {
     rememberAuthenticatedPage(user, "/student/records");
     rememberAuthenticatedPage(user, "/signed-out");

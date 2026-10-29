@@ -6,7 +6,7 @@ const auditActions = { submitted_request: "Submitted", updated_request: "Updated
 function requestInfo(request) {
   const course = request.enrollment?.class;
   const student = request.enrollment?.student;
-  return { student: student?.name || "Unavailable", studentId: student?.school_student_id || "", email: student?.email || "", subject: course?.subject_name || request.subjects_missed || "Unavailable", classId: course?.id || "", type: request.type === "absence" ? "Absent" : request.type === "late" ? "Late" : "Unavailable", instructor: course?.instructor?.name || "Unavailable" };
+  return { student: student?.name || "Unavailable", studentId: student?.school_id_number || "", email: student?.email || "", subject: course?.subject_name || request.subjects_missed || "Unavailable", classId: course?.id || "", type: request.type === "absence" ? "Absent" : request.type === "late" ? "Late" : "Unavailable", instructor: course?.instructor?.name || "Unavailable" };
 }
 export function requestActivity(requests = []) {
   return newest(requests.flatMap(request => {
@@ -46,9 +46,12 @@ export function filterActivity(rows, { search = "", action = "", subject = "", d
   })()));
 }
 export function programOverviewRows(dashboard, classes = []) {
-  return (dashboard?.programs_summary || []).filter(program => !isGeneralEducationProgram(program)).map(program => ({
-    id: program.id, name: program.program_name, students: program.student_count ?? null,
-    instructors: new Set(classes.filter(course => course.program_id === program.id).map(course => course.instructor_id).filter(Boolean)).size,
-    atRisk: program.at_risk_count ?? null, pending: program.pending_requests ?? null,
-  }));
+  return (dashboard?.programs_summary || []).filter(program => !isGeneralEducationProgram(program)).map(program => {
+    const programClasses = classes.filter(course => course.program_id === program.id);
+    return {
+      id: program.id, name: program.program_name, students: program.student_count ?? null,
+      classes: program.classes_count ?? programClasses.length,
+      instructors: new Set(programClasses.map(course => course.instructor_id).filter(Boolean)).size,
+    };
+  });
 }

@@ -64,12 +64,13 @@ test("activity search combines with action, subject and date using supplied acco
   assert.equal(filterActivity(rows, { search: "Alex", action: "Approved" }).length, 0);
   assert.equal(filterActivity(rows, { search: "", action: "", subject: "", date: "" }).length, 2);
 });
-test("program overview uses real per-program counts and leaves absent risk and request totals unknown", () => {
-  const rows = programOverviewRows({ programs_summary: [{ id: "p1", program_name: "BSIS", student_count: 12 }] }, [{ id: "c1", program_id: "p1", instructor_id: "i1" }, { id: "c2", program_id: "p1", instructor_id: "i1" }]);
+test("program overview rows contain only real per-program student, class and instructor counts", () => {
+  const rows = programOverviewRows({ programs_summary: [{ id: "p1", program_name: "BSIS", student_count: 12, classes_count: 2 }] }, [{ id: "c1", program_id: "p1", instructor_id: "i1" }, { id: "c2", program_id: "p1", instructor_id: "i1" }]);
   assert.equal(rows[0].students, 12);
+  assert.equal(rows[0].classes, 2);
   assert.equal(rows[0].instructors, 1);
-  assert.equal(rows[0].atRisk, null);
-  assert.equal(rows[0].pending, null);
+  assert.equal(Object.hasOwn(rows[0], "atRisk"), false);
+  assert.equal(Object.hasOwn(rows[0], "pending"), false);
 });
 
 test("admin program overview excludes the General Education program", () => {
@@ -78,6 +79,14 @@ test("admin program overview excludes the General Education program", () => {
     { id: "p1", program_name: "Bachelor of Science in Information System", student_count: 12 },
   ] });
   assert.deepEqual(rows.map(row => row.id), ["p1"]);
+});
+
+test("program overview falls back to the loaded class collection when the summary omits class counts", () => {
+  const rows = programOverviewRows({ programs_summary: [{ id: "p1", program_name: "BSIS", student_count: 2 }] }, [
+    { id: "c1", program_id: "p1", instructor_id: "i1" },
+    { id: "c2", program_id: "p1", instructor_id: "i2" },
+  ]);
+  assert.deepEqual(rows[0], { id: "p1", name: "BSIS", students: 2, classes: 2, instructors: 2 });
 });
 test("a flag with no assigned instructor remains unavailable", () => {
   const [row] = flagActivity([{ id: "f1", flagged_date: "2026-10-01", request: { id: "r1" } }]);

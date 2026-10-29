@@ -68,7 +68,7 @@ test("self accounts and missing sessions expose details without mutation control
 });
 
 test("students use the same modal with their academic details and status action", () => {
-  const student = { ...account, role: "student", school_student_id: "2026-001", year_level: "3rd", section: "BSIS 3" };
+  const student = { ...account, role: "student", school_id_number: "2026-001", year_level: "3rd", section: "BSIS 3" };
   const html = render({ user: student });
   assert.match(html, /<dialog\b/);
   for (const value of ["2026-001", "BSIS", "Year/Section", "3rd / BSIS 3", "Deactivate Account"]) assert.ok(html.includes(value), value);

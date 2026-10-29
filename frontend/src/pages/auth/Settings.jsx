@@ -120,7 +120,7 @@ function schoolStudentId(user, storedSetup) {
     storedSetup?.student_number ||
     storedSetup?.studentNumber ||
     storedSetup?.student_id ||
-    user?.school_student_id ||
+    user?.school_id_number ||
     user?.student_number ||
     user?.studentNumber ||
     user?.school_id ||

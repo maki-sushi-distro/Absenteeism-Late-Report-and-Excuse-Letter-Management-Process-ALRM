@@ -67,8 +67,8 @@ export async function getProfileSetupPrograms() {
 
 /**
  * POST /api/complete-profile
- * Student:  { program_id, school_student_id, year_level }
- * Staff:    { program_id }
+ * Student:  { program_id, school_id_number, year_level }
+ * Instructor: { program_id, school_id_number }
  * Hindi na nilulunok ang 404/405/409/422: lahat ay itinatapon bilang Error
  * (may .status at .fieldErrors) para makita ng screen.
  */

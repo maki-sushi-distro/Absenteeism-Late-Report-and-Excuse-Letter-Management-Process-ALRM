@@ -3,10 +3,13 @@
 namespace App\Http\Controllers\ProgramHead;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\UserResource;
 use App\Models\AttendanceTracker;
 use App\Models\ExcuseRequest;
 use App\Models\FollowupFlag;
-use App\Models\Enrollment;
+use App\Models\Program;
+use App\Models\User;
+use App\Support\BoundedCollection;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
@@ -20,32 +23,32 @@ class ProgramHeadDashboardController extends Controller
      */
     public function index()
     {
-        $program = Auth::user()->headedProgram;
+        $programIds = Auth::user()->headedProgramIds();
 
-        if (! $program) {
+        if (! $programIds) {
             return response()->json([
                 'success' => false,
                 'message' => 'No program is assigned to this account.',
-                'data'    => null,
+                'data' => null,
             ], 403);
         }
 
-        $trackerQuery = AttendanceTracker::whereHas('enrollment.class', function ($q) use ($program) {
-            $q->where('program_id', $program->id);
+        $trackerQuery = AttendanceTracker::whereHas('enrollment.class', function ($q) use ($programIds) {
+            $q->whereIn('program_id', $programIds);
         });
 
         $data = [
-            'program_name'     => $program->program_name,
-            'total_students' => Enrollment::whereHas('class', function ($q) use ($program) {
-                $q->where('program_id', $program->id);
-            })->distinct('student_id')->count('student_id'),
-            'total_classes'    => $program->classes()->count(),
-            'pending_requests' => ExcuseRequest::whereHas('enrollment.class', function ($q) use ($program) {
-                $q->where('program_id', $program->id);
+            'program_name' => Program::whereIn('id', $programIds)->pluck('program_name')->implode(', '),
+            'total_students' => User::where('role', 'student')->whereIn('program_id', $programIds)->count(),
+            'total_instructors' => $this->instructorQuery($programIds)->count(),
+            'total_classes' => Program::whereIn('id', $programIds)->withCount('classes')->get()->sum('classes_count'),
+            'pending_requests' => ExcuseRequest::whereHas('enrollment.class', function ($q) use ($programIds) {
+                $q->whereIn('program_id', $programIds);
             })->where('status', 'pending')->count(),
-            'warning_count'    => (clone $trackerQuery)->where('status', 'warning')->count(),
-            'ir_count'         => (clone $trackerQuery)->where('status', 'IR')->count(),
-            'recent_flags'     => FollowupFlag::where('escalated_to', Auth::id())
+            'warning_count' => (clone $trackerQuery)->where('status', 'warning')->count(),
+            'ir_count' => (clone $trackerQuery)->where('status', 'IR')->count(),
+            'critical_count' => (clone $trackerQuery)->where('status', 'critical')->count(),
+            'recent_flags' => $this->flagQuery()
                 ->with('request.enrollment.student', 'request.enrollment.class')
                 ->latest('flagged_date')
                 ->take(5)
@@ -55,7 +58,7 @@ class ProgramHeadDashboardController extends Controller
         return response()->json([
             'success' => true,
             'message' => null,
-            'data'    => $data,
+            'data' => $data,
         ]);
     }
 
@@ -65,7 +68,7 @@ class ProgramHeadDashboardController extends Controller
      */
     public function flaggedStudents(Request $request)
     {
-        $query = FollowupFlag::where('escalated_to', Auth::id())
+        $query = $this->flagQuery()
             ->with([
                 'request.enrollment.student',
                 'request.enrollment.class',
@@ -79,13 +82,9 @@ class ProgramHeadDashboardController extends Controller
             $query->where('status', $request->query('status'));
         }
 
-        $flags = $query->latest('flagged_date')->get();
+        $flags = $query->latest('flagged_date');
 
-        return response()->json([
-            'success' => true,
-            'message' => null,
-            'data'    => $flags,
-        ]);
+        return BoundedCollection::respond($flags);
     }
 
     /**
@@ -94,18 +93,18 @@ class ProgramHeadDashboardController extends Controller
      */
     public function requests(Request $request)
     {
-        $program = Auth::user()->headedProgram;
+        $programIds = Auth::user()->headedProgramIds();
 
-        if (! $program) {
+        if (! $programIds) {
             return response()->json([
                 'success' => false,
                 'message' => 'No program is assigned to this account.',
-                'data'    => null,
+                'data' => null,
             ], 403);
         }
 
-        $query = ExcuseRequest::whereHas('enrollment.class', function ($q) use ($program) {
-            $q->where('program_id', $program->id);
+        $query = ExcuseRequest::whereHas('enrollment.class', function ($q) use ($programIds) {
+            $q->whereIn('program_id', $programIds);
         })->with(['enrollment.student', 'enrollment.class.instructor', 'reviewer', 'followupFlag']);
 
         if ($request->filled('status')) {
@@ -115,12 +114,45 @@ class ProgramHeadDashboardController extends Controller
             $query->where('status', $request->query('status'));
         }
 
-        $requests = $query->latest()->get();
+        $requests = $query->latest();
 
-        return response()->json([
-            'success' => true,
-            'message' => null,
-            'data'    => $requests,
-        ]);
+        return BoundedCollection::respond($requests);
+    }
+
+    public function students()
+    {
+        $programIds = Auth::user()->headedProgramIds();
+        abort_unless($programIds, 403, 'No program is assigned to this account.');
+
+        return BoundedCollection::respond(
+            User::where('role', 'student')->whereIn('program_id', $programIds)->with('program')->orderBy('name'),
+            UserResource::class,
+        );
+    }
+
+    public function instructors()
+    {
+        $programIds = Auth::user()->headedProgramIds();
+        abort_unless($programIds, 403, 'No program is assigned to this account.');
+
+        return BoundedCollection::respond($this->instructorQuery($programIds)->with('programs')->orderBy('name'), UserResource::class);
+    }
+
+    private function instructorQuery(array $programIds)
+    {
+        return User::where('role', 'instructor')->where(function ($query) use ($programIds) {
+            $query->whereHas('programs', fn ($query) => $query->whereIn('programs.id', $programIds))
+                ->orWhereHas('classesTaught', fn ($query) => $query->whereIn('program_id', $programIds));
+        });
+    }
+
+    private function flagQuery()
+    {
+        $programIds = Auth::user()->headedProgramIds();
+
+        return FollowupFlag::where(function ($query) use ($programIds) {
+            $query->where('escalated_to', Auth::id())
+                ->orWhereHas('request.enrollment.class', fn ($query) => $query->whereIn('program_id', $programIds));
+        });
     }
 }

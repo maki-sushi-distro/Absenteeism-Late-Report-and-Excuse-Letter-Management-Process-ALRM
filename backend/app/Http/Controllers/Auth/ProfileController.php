@@ -3,10 +3,12 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\UserResource;
 use App\Models\ClassModel;
 use App\Models\Enrollment;
 use App\Models\Program;
 use App\Models\User;
+use App\Services\AcademicPeriod;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -14,11 +16,30 @@ use Illuminate\Validation\Rule;
 
 class ProfileController extends Controller
 {
+    public function updateNotificationPreferences(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'email_notifications_enabled' => ['required', 'boolean'],
+        ]);
+
+        $user = $request->user();
+        $user->forceFill([
+            'email_notifications_enabled' => (bool) $validated['email_notifications_enabled'],
+        ])->save();
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'email_notifications_enabled' => $user->email_notifications_enabled,
+            ],
+        ]);
+    }
+
     public function programs(): JsonResponse
     {
         return response()->json([
             'success' => true,
-            'data'    => Program::query()
+            'data' => Program::query()
                 ->where('program_name', '!=', 'General Education')
                 ->orderBy('program_name')
                 ->get(['id', 'program_name']),
@@ -42,40 +63,38 @@ class ProfileController extends Controller
         $user = $request->user();
         $isStudent = $user->role === 'student';
 
-        if ($isStudent && $user->program_id !== null && $user->school_student_id !== null) {
+        if ($isStudent && $user->program_id !== null && $user->school_id_number !== null) {
             return response()->json([
                 'success' => false,
                 'message' => 'Your profile is already complete. Please contact an administrator to change your program or year level.',
-                'data'    => null,
+                'data' => null,
             ], 409);
         }
 
         $validated = $request->validate([
-            'program_id'        => ['required', 'string', 'uuid', 'exists:programs,id'],
-            'school_student_id' => [
+            'program_id' => ['required', 'string', 'uuid', 'exists:programs,id'],
+            'school_id_number' => [
                 Rule::requiredIf($isStudent),
                 'nullable',
                 'string',
                 'max:50',
-                Rule::unique('users', 'school_student_id')->ignore($user->id),
+                Rule::unique('users', 'school_id_number')->ignore($user->id),
             ],
-            'year_level'        => [
+            'year_level' => [
                 Rule::requiredIf($isStudent),
                 'nullable',
                 Rule::in(['1st', '2nd', '3rd', '4th']),
             ],
-            'role'              => ['prohibited'],
-            'status'            => ['prohibited'],
+            'role' => ['prohibited'],
+            'status' => ['prohibited'],
         ]);
 
         if ($isStudent) {
             DB::transaction(function () use ($user, $validated) {
-                // forceFill so this keeps working after program_id is
-                // removed from User's #[Fillable] (mass-assignment fix).
                 $user->forceFill([
-                    'program_id'        => $validated['program_id'],
-                    'school_student_id' => $validated['school_student_id'],
-                    'year_level'        => $validated['year_level'],
+                    'program_id' => $validated['program_id'],
+                    'school_id_number' => $validated['school_id_number'],
+                    'year_level' => $validated['year_level'],
                 ])->save();
 
                 $this->autoEnrollStudent(
@@ -85,14 +104,18 @@ class ProfileController extends Controller
                 );
             });
         } else {
-            // instructor / program_head / administrator — many-to-many
-            $user->programs()->syncWithoutDetaching([$validated['program_id']]);
+            DB::transaction(function () use ($user, $validated) {
+                if (array_key_exists('school_id_number', $validated)) {
+                    $user->forceFill(['school_id_number' => $validated['school_id_number']])->save();
+                }
+                $user->programs()->syncWithoutDetaching([$validated['program_id']]);
+            });
         }
 
         return response()->json([
             'success' => true,
             'message' => 'Profile completed.',
-            'data'    => $user->fresh('program', 'programs'),
+            'data' => new UserResource($user->fresh('program', 'programs')),
         ]);
     }
 
@@ -101,15 +124,15 @@ class ProfileController extends Controller
         $matchingClasses = ClassModel::query()
             ->where('program_id', $programId)
             ->where('year_level', $yearLevel)
-            ->where('semester', config('academic.current_semester'))
-            ->where('school_year', config('academic.current_school_year'))
+            ->where('semester', AcademicPeriod::semester())
+            ->where('school_year', AcademicPeriod::schoolYear())
             ->get();
 
         foreach ($matchingClasses as $class) {
             Enrollment::firstOrCreate(
                 [
                     'student_id' => $user->id,
-                    'class_id'   => $class->id,
+                    'class_id' => $class->id,
                 ],
                 [
                     'year_level' => $yearLevel,

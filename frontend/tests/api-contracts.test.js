@@ -48,7 +48,7 @@ test("profile setup uses the backend complete-profile contract", async () => {
   const requests = captureJsonRequest();
   const payload = {
     program_id: "43b62cb1-65b9-4ea3-bf83-b65b0eed3ab0",
-    school_student_id: "2026-1001",
+    school_id_number: "2026-1001",
     year_level: "1st",
   };
 
@@ -91,7 +91,7 @@ test("admin student listing uses the users endpoint and filters locally", async 
         email: "alex@student.laverdad.edu.ph",
         role: "student",
         program_id: "program-one",
-        school_student_id: "2026-1001",
+        school_id_number: "2026-1001",
         year_level: "1st",
       },
       {
@@ -121,12 +121,12 @@ test("admin student profile resolves its program without treating the user UUID 
     if (String(url).includes("/api/admin/programs")) {
       return Response.json({ success: true, data: [{ id: "program-one", program_name: "BS Information Systems" }] });
     }
-    return Response.json({ success: true, data: [{ id: "database-uuid", role: "student", program_id: "program-one", school_student_id: "2026-1001" }] });
+    return Response.json({ success: true, data: [{ id: "database-uuid", role: "student", program_id: "program-one", school_id_number: "2026-1001" }] });
   });
 
   const student = await getAdminStudent("database-uuid");
 
-  assert.equal(student.school_student_id, "2026-1001");
+  assert.equal(student.school_id_number, "2026-1001");
   assert.equal(student.program.program_name, "BS Information Systems");
   assert.equal(requests.length, 2);
 });

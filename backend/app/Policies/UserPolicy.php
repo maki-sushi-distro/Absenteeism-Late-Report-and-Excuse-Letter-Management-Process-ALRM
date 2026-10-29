@@ -16,7 +16,13 @@ class UserPolicy
             return true;
         }
 
-        return $target->program?->program_head_id === $user->id;
+        $programIds = $user->headedProgramIds();
+
+        return ($target->role === 'student' && in_array($target->program_id, $programIds, true))
+            || ($target->role === 'instructor' && (
+                $target->programs()->whereIn('programs.id', $programIds)->exists()
+                || $target->classesTaught()->whereIn('program_id', $programIds)->exists()
+            ));
     }
 
     /**

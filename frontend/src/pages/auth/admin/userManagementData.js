@@ -7,7 +7,7 @@ export const ROLE_LABELS = {
 };
 
 export function userDisplayId(user) {
-  return (user.role === "student" ? user.school_student_id : user.faculty_id || user.employee_id) || (user.role === "student" ? "Unassigned" : "Unavailable");
+  return user.school_id_number || (user.role === "student" ? "Unassigned" : user.faculty_id || user.employee_id || "Unavailable");
 }
 
 function headedPrograms(user, programs) {

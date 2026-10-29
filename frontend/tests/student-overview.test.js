@@ -34,7 +34,7 @@ test("missing trackers are distinguished from an actual zero absence record", ()
 });
 
 test("profile shows school identity and actual academic data without exposing database ID", () => {
-  const profile = studentProfile({ id: "database-uuid", name: "Juan", school_student_id: "2023-00104", year_level: "3rd", program: { program_name: "BS Information Systems" } }, [
+  const profile = studentProfile({ id: "database-uuid", name: "Juan", school_id_number: "2023-00104", year_level: "3rd", program: { program_name: "BS Information Systems" } }, [
     { section: "3A", semester: "1st", school_year: "2026-2027" },
     { section: "3A", semester: "1st", school_year: "2026-2027" },
   ]);
@@ -44,15 +44,17 @@ test("profile shows school identity and actual academic data without exposing da
   assert.equal(studentProfile({ id: "private-uuid" }).studentId, "Not available");
 });
 
-test("recent activity uses submission and review dates, keeps request IDs and skips invalid timestamps", () => {
+test("recent activity excludes student submissions and keeps only recorded instructor decisions", () => {
   const events = recentRequestActivity([
     { id: "r-1", type: "absence", status: "approved", date_submitted: "2026-10-01", date_reviewed: "2026-10-03", enrollment: { class: { subject_name: "Math" } } },
     { id: "r-2", type: "late", status: "pending", date_submitted: "2026-10-02", subjects_missed: "English" },
     { id: "r-3", type: "late", status: "invalid", date_submitted: "invalid", updated_at: "2026-10-04" },
+    { id: "r-4", type: "late", status: "noted", date_submitted: "2026-10-02", date_reviewed: "2026-10-04", subjects_missed: "Science" },
   ]);
-  assert.deepEqual(events.map((event) => event.id), ["r-1-reviewed", "r-2-submitted", "r-1-submitted"]);
-  assert.equal(events[0].requestId, "r-1");
-  assert.match(events[0].message, /Math approved/);
-  assert.match(events[1].message, /English submitted/);
+  assert.deepEqual(events.map((event) => event.id), ["r-4-reviewed", "r-1-reviewed"]);
+  assert.equal(events[0].requestId, "r-4");
+  assert.match(events[0].message, /Science noted/);
+  assert.match(events[1].message, /Math approved/);
+  assert.deepEqual(recentRequestActivity([{ id: "pending", type: "absence", status: "pending", date_submitted: "2026-10-05" }]), []);
   assert.deepEqual(recentRequestActivity(), []);
 });

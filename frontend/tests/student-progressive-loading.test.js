@@ -9,8 +9,8 @@ import { createServer } from "vite";
 let server, Page, AuthContext, ResourceContext;
 let pending, resources;
 const originalStorage = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
-const user = { id: "student-one", name: "Ana Santos", school_student_id: "2026-001", year_level: "1st", program: { program_name: "BS Information Systems" } };
-const requests = [{ id: "request-one", type: "absence", status: "pending", subjects_missed: "Mathematics", date_submitted: "2026-10-20T09:00:00Z" }];
+const user = { id: "student-one", name: "Ana Santos", school_id_number: "2026-001", year_level: "1st", program: { program_name: "BS Information Systems" } };
+const requests = [{ id: "request-one", type: "absence", status: "approved", subjects_missed: "Mathematics", date_submitted: "2026-10-20T09:00:00Z", date_reviewed: "2026-10-21T09:00:00Z" }];
 const attendance = [{ class_id: "class-one", subject_name: "Mathematics", tracker: { converted_absences: "2" } }];
 const classes = [{ class_id: "class-one", section: "A", semester: "1st", school_year: "2026-2027" }];
 
@@ -112,7 +112,7 @@ test("requests reveal recorded metrics and notifications while attendance and cl
   assert.match(html, /Absences Recorded/);
   assert.match(html, />1<\/p>/);
   assert.match(html, /Lates Recorded/);
-  assert.match(html, /Mathematics submitted/);
+  assert.match(html, /Mathematics approved/);
   assert.match(html, /data-slot="threshold-placeholder"/);
   assert.doesNotMatch(html, /Across 0 enrolled|Good Standing/);
   assert.equal((html.match(/data-slot="metric-placeholder"/g) || []).length, 1);
@@ -145,12 +145,12 @@ test("each endpoint failure leaves successful components and offers only one ret
     assert.equal((html.match(/role="alert"/g) || []).length, 1, failed);
     assert.doesNotMatch(html, /role="status"|data-slot="metric-placeholder"/);
     if (failed !== "/api/attendance/summary") assert.match(html, /Cautionary Standing/);
-    if (failed !== "/api/requests") assert.match(html, /Mathematics submitted/);
+    if (failed !== "/api/requests") assert.match(html, /Mathematics approved/);
     const resource = [...resources.values()].find((entry) => entry.error);
     resource.reload();
     html = render();
     if (failed !== "/api/attendance/summary") assert.match(html, /Cautionary Standing/);
-    if (failed !== "/api/requests") assert.match(html, /Mathematics submitted/);
+    if (failed !== "/api/requests") assert.match(html, /Mathematics approved/);
     await setImmediate();
     await settle(failed, failed === "/api/requests" ? requests : failed === "/api/classes" ? classes : attendance);
     assert.doesNotMatch(render(), /role="alert"|role="status"|data-slot="skeleton"/);

@@ -29,11 +29,13 @@ after(async () => { await server?.close(); });
 function render(Page, path = "/", loading = false) {
   return renderToStaticMarkup(React.createElement(MemoryRouter, { initialEntries: [path] }, React.createElement(Context.Provider, { value: name => ({ data: loading ? null : data[name], loading, error: "", reload() {} }) }, React.createElement(Page))));
 }
-test("overview renders actual student counts with an empty-state label for missing totals", () => {
+test("overview renders only database-backed program row values", () => {
   const html = render(Overview);
   assert.match(html, /Program Overview/);
   assert.match(html, />12</);
-  assert.match(html, /No data yet/);
+  for (const heading of ["Department", "Students", "Classes", "Instructors"]) assert.match(html, new RegExp(`>${heading}<`));
+  assert.doesNotMatch(html, /No data yet|Students at Risk/);
+  assert.doesNotMatch(html, /<th[^>]*>Pending Requests<\/th>/);
   const managePrograms = html.match(/<a\b[^>]*>Manage programs<\/a>/)?.[0];
   assert.ok(managePrograms);
   assert.match(managePrograms, /bg-\[#172f6b\]/);

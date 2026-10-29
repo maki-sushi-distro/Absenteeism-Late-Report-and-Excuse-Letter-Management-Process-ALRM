@@ -21,7 +21,7 @@ async function loadActivity() {
   return loadRequestActivity();
 }
 
-test("bell activity uses authenticated student requests and refreshes backend decisions", async () => {
+test("bell activity excludes the student's submission and appears after an instructor decision", async () => {
   const record = { id: "request-1", type: "absence", subjects_missed: "Math", status: "pending", date_submitted: "2026-10-18T09:00:00Z" };
   mockApiFetch(async (url, options) => {
     assert.ok(String(url).endsWith("/api/requests"));
@@ -29,7 +29,7 @@ test("bell activity uses authenticated student requests and refreshes backend de
     assert.equal(options.headers.get("Authorization"), null);
     return Response.json({ success: true, data: [record] });
   });
-  assert.deepEqual((await loadActivity()).map((event) => event.id), ["request-1-submitted"]);
+  assert.deepEqual(await loadActivity(), []);
   record.status = "approved";
   record.date_reviewed = "2026-10-19T09:00:00Z";
   const refreshed = await loadActivity();
@@ -128,7 +128,9 @@ test("notification menu links navigate to existing settings and notification des
 
 test("notification page loads activity beyond the dropdown preview", async () => {
   const records = Array.from({ length: 9 }, (_, index) => ({
-    id: `r${index}`, type: "late", status: "pending", subjects_missed: "Math", date_submitted: `2026-10-${String(index + 1).padStart(2, "0")}`,
+    id: `r${index}`, type: "late", status: "approved", subjects_missed: "Math",
+    date_submitted: `2026-10-${String(index + 1).padStart(2, "0")}`,
+    date_reviewed: `2026-10-${String(index + 1).padStart(2, "0")}T09:00:00Z`,
   }));
   mockApiFetch(async () => Response.json({ success: true, data: records }));
   const activity = await loadActivity();

@@ -10,7 +10,7 @@ export default function RequestReviewEditor({ form, user, classes, classesLoadin
     { name: "requestType", label: "Request type", options: requestOptions },
     { name: "studentName", label: "Student name", readOnly: true },
     { name: "email", label: "Email address", value: user?.email || "Not available", readOnly: true },
-    { name: "schoolId", label: "Student ID", value: user?.school_student_id || "Not available", readOnly: true },
+    { name: "schoolId", label: "Student ID", value: user?.school_id_number || "Not available", readOnly: true },
     { name: "program", label: "Program", readOnly: true },
     { name: "level", label: "Year level", readOnly: true },
     { name: "guardianName", label: "Parent/Guardian's name", maxLength: LIMITS.guardianName },

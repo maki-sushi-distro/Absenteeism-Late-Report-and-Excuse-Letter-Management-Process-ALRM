@@ -20,6 +20,7 @@ import {
   ASSOCIATE_YEAR_LEVELS,
   YEAR_LEVELS,
   clearLegacyProfileSetup,
+  confirmStaffProfileSetup,
   isProfileSetupComplete,
   isProfileSetupReady,
   splitVerifiedName,
@@ -38,7 +39,7 @@ const ROLE_LABELS = {
 // Backend field name -> form field name
 const FIELD_MAP = {
   program_id: "programId",
-  school_student_id: "studentNumber",
+  school_id_number: "schoolIdNumber",
   year_level: "yearLevel",
 };
 
@@ -99,7 +100,7 @@ function ProfileSetup() {
   // Ang role ay galing sa server at read-only. Hindi ito ipinapadala.
   const serverRole = normalizeRole(user?.role);
   const isStudent = serverRole === "student";
-  const isStaff = ["instructor", "program"].includes(serverRole);
+  const isInstructor = serverRole === "instructor";
   const roleLabel = ROLE_LABELS[user?.role] || user?.role || "";
 
   const parsedName = useMemo(() => splitVerifiedName(user?.name), [user?.name]);
@@ -111,7 +112,7 @@ function ProfileSetup() {
   const [error, setError] = useState("");
   const [form, setForm] = useState({
     programId: user?.program_id || "",
-    studentNumber: user?.school_student_id || "",
+    schoolIdNumber: user?.school_id_number || "",
     yearLevel: user?.year_level || "",
   });
   const [errors, setErrors] = useState({});
@@ -129,9 +130,9 @@ function ProfileSetup() {
   const formReady = isProfileSetupReady({
     role: serverRole,
     userId: user?.id,
+    schoolIdNumber: form.schoolIdNumber,
     programId: form.programId,
     selectedProgramId: selectedProgram ? programId(selectedProgram) : "",
-    studentNumber: form.studentNumber,
     yearLevel: form.yearLevel,
     yearOptions: availableYearOptions,
   });
@@ -208,9 +209,8 @@ function ProfileSetup() {
 
     if (!serverRole) nextErrors.role = "Your account has no role. Contact an administrator.";
     if (!selectedProgram) nextErrors.programId = "Select a program from the available list.";
-    if (isStaff && !user?.id) nextErrors.accountId = "Your account ID is unavailable. Contact an administrator.";
-    if (isStudent && !form.studentNumber.trim()) {
-      nextErrors.studentNumber = "Enter your student ID.";
+    if ((isStudent || isInstructor) && !form.schoolIdNumber.trim()) {
+      nextErrors.schoolIdNumber = `Enter your ${isInstructor ? "instructor" : "student"} ID.`;
     }
     if (isStudent && !availableYearOptions.some(year => year.value === form.yearLevel)) {
       nextErrors.yearLevel = "Select an available year.";
@@ -223,10 +223,12 @@ function ProfileSetup() {
   async function handleSubmit(event) {
     event.preventDefault();
 
-    // Walang role, status, student_id, student_number. Ito lang ang tinatanggap ng backend.
+    // The server determines the role; the form only submits profile fields.
     const payload = { program_id: form.programId };
+    if (isStudent || isInstructor) {
+      payload.school_id_number = form.schoolIdNumber.trim();
+    }
     if (isStudent) {
-      payload.school_student_id = form.studentNumber.trim();
       payload.year_level = form.yearLevel; // "1st" | "2nd" | "3rd" | "4th"
     }
 
@@ -237,6 +239,7 @@ function ProfileSetup() {
 
     try {
       await saveProfileSetup(payload);
+      if (isInstructor) confirmStaffProfileSetup(user);
       await refreshUser(); // kunin ang bagong user mula sa server
       navigate("/dashboard", { replace: true });
     } catch (saveError) {
@@ -325,13 +328,6 @@ function ProfileSetup() {
                 <FieldError message={errors.role} />
               </div>
 
-              {isStaff && (
-                <div className="grid min-w-0 gap-2">
-                  <ReadOnlyIdentityField label="Account ID" value={user?.id} />
-                  <FieldError message={errors.accountId} />
-                </div>
-              )}
-
               <div className="grid min-w-0 gap-2">
                 <Label htmlFor="setup-program">Program</Label>
                 {programsLoading ? <LoadingSkeleton variant="field" label="Loading programs..." /> : <select
@@ -377,27 +373,30 @@ function ProfileSetup() {
                 <FieldError message={errors.programId} />
               </div>
 
-              {isStudent && (
-                <>
-                  <div className="grid min-w-0 gap-2">
-                    <Label htmlFor="setup-student-number">Student ID</Label>
-                    <Input
-                      id="setup-student-number"
-                      value={form.studentNumber}
-                      onChange={(event) =>
-                        updateField("studentNumber", event.target.value)
-                      }
-                      disabled={submitting}
-                      aria-invalid={Boolean(errors.studentNumber)}
-                      placeholder="Enter your school student ID"
-                      className="h-10 rounded-[5px] border-slate-300 text-sm shadow-none"
-                    />
-                    <p className="text-xs text-slate-500">
-                      Required for student accounts.
-                    </p>
-                    <FieldError message={errors.studentNumber} />
-                  </div>
+              {(isStudent || isInstructor) && (
+                <div className="grid min-w-0 gap-2">
+                  <Label htmlFor="setup-school-id-number">
+                    {isInstructor ? "Instructor ID" : "Student ID"}
+                  </Label>
+                  <Input
+                    id="setup-school-id-number"
+                    value={form.schoolIdNumber}
+                    onChange={(event) =>
+                      updateField("schoolIdNumber", event.target.value)
+                    }
+                    disabled={submitting}
+                    aria-invalid={Boolean(errors.schoolIdNumber)}
+                    placeholder={`Enter your ${isInstructor ? "instructor" : "student"} ID`}
+                    className="h-10 rounded-[5px] border-slate-300 text-sm shadow-none"
+                  />
+                  <p className="text-xs text-slate-500">
+                    Required for {isInstructor ? "instructor" : "student"} accounts.
+                  </p>
+                  <FieldError message={errors.schoolIdNumber} />
+                </div>
+              )}
 
+              {isStudent && (
                   <div className="grid min-w-0 gap-2">
                     <Label htmlFor="setup-year">Year</Label>
                     <select
@@ -422,7 +421,6 @@ function ProfileSetup() {
                     </p>
                     <FieldError message={errors.yearLevel} />
                   </div>
-                </>
               )}
             </div>
 

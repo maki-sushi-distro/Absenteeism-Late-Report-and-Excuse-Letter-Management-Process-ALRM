@@ -37,6 +37,7 @@ class AdminDashboardController extends Controller
             'pending_requests'        => ExcuseRequest::where('status', 'pending')->count(),
             'warning_count'           => AttendanceTracker::where('status', 'warning')->count(),
             'ir_count'                => AttendanceTracker::where('status', 'IR')->count(),
+            'critical_count'          => AttendanceTracker::where('status', 'critical')->count(),
             'open_followup_flags'     => FollowupFlag::where('status', 'open')->count(),
             'programs_summary' => Program::withCount([
                     'classes',

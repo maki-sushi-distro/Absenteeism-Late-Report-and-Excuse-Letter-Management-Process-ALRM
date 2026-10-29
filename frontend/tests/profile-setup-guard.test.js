@@ -61,7 +61,7 @@ test("students cannot continue until every required profile field is complete", 
     userId: "student-1",
     programId: "program-1",
     selectedProgramId: "program-1",
-    studentNumber: "24-001",
+    schoolIdNumber: "24-001",
     yearLevel: "1st",
     yearOptions,
   };
@@ -69,37 +69,87 @@ test("students cannot continue until every required profile field is complete", 
   assert.equal(profileSetup.isProfileSetupReady(complete), true);
   assert.equal(profileSetup.isProfileSetupReady({ ...complete, programId: "" }), false);
   assert.equal(profileSetup.isProfileSetupReady({ ...complete, selectedProgramId: "program-2" }), false);
-  assert.equal(profileSetup.isProfileSetupReady({ ...complete, studentNumber: "   " }), false);
+  assert.equal(profileSetup.isProfileSetupReady({ ...complete, schoolIdNumber: "   " }), false);
   assert.equal(profileSetup.isProfileSetupReady({ ...complete, yearLevel: "4th" }), false);
 });
 
-test("staff require their authenticated account ID and a loaded matching program", () => {
+test("instructors require their entered instructor ID and a loaded matching program", () => {
   const complete = {
     role: "instructor",
     userId: "staff-1",
+    schoolIdNumber: "FAC-2026-001",
     programId: "program-1",
     selectedProgramId: "program-1",
   };
 
   assert.equal(profileSetup.isProfileSetupReady(complete), true);
-  assert.equal(profileSetup.isProfileSetupReady({ ...complete, userId: "" }), false);
+  assert.equal(profileSetup.isProfileSetupReady({ ...complete, schoolIdNumber: "" }), false);
   assert.equal(profileSetup.isProfileSetupReady({ ...complete, selectedProgramId: "" }), false);
-  assert.equal(profileSetup.isProfileSetupReady({ ...complete, role: "program_head" }), true);
+  assert.equal(profileSetup.isProfileSetupReady({ ...complete, role: "program_head", schoolIdNumber: "" }), true);
   assert.equal(profileSetup.isProfileSetupReady({ ...complete, role: "admin" }), false);
 });
 
+test("preassigned instructors require confirmation while program heads skip setup", () => {
+  const values = new Map();
+  const storage = {
+    getItem: (key) => values.get(key) ?? null,
+    setItem: (key, value) => values.set(key, value),
+  };
+  const instructor = {
+    id: "instructor-1",
+    role: "instructor",
+    program_id: "program-1",
+    school_id_number: "FAC-2026-001",
+    programs: [{ id: "program-1" }],
+  };
+  const options = { sessionVersion: "session-one", storage };
+
+  assert.equal(profileSetup.isProfileSetupComplete(instructor, options), false);
+  assert.equal(profileSetup.needsProfileSetup(instructor, options), true);
+  assert.equal(profileSetup.confirmStaffProfileSetup(instructor, options), true);
+  assert.equal(profileSetup.isProfileSetupComplete(instructor, options), true);
+  assert.equal(profileSetup.isProfileSetupComplete(instructor, { ...options, sessionVersion: "session-two" }), false);
+
+  const programHead = { ...instructor, id: "head-1", role: "program_head" };
+  assert.equal(profileSetup.isProfileSetupComplete(programHead, options), true);
+  assert.equal(profileSetup.needsProfileSetup(programHead, options), false);
+});
+
+test("staff confirmation still requires assigned server data and tolerates blocked session storage", () => {
+  const blocked = {
+    getItem() { throw new Error("Storage blocked"); },
+    setItem() { throw new Error("Storage blocked"); },
+  };
+  const assigned = { id: "staff-blocked", role: "instructor", program_id: "program-1", school_id_number: "FAC-2026-002" };
+  const unassigned = { id: "staff-unassigned", role: "instructor", program_id: null, programs: [] };
+  const options = { sessionVersion: "session-blocked", storage: blocked };
+
+  assert.equal(profileSetup.confirmStaffProfileSetup(assigned, options), true);
+  assert.equal(profileSetup.isProfileSetupComplete(assigned, options), true);
+  assert.equal(profileSetup.confirmStaffProfileSetup(unassigned, options), true);
+  assert.equal(profileSetup.isProfileSetupComplete(unassigned, options), false);
+  assert.equal(profileSetup.isProfileSetupComplete({ id: "admin", role: "administrator" }, options), true);
+  assert.equal(profileSetup.isProfileSetupComplete({ id: "student", role: "student", program_id: "program-1", school_id_number: "24-001", year_level: "1st" }, options), true);
+});
+
 test("the form button is unavailable until the role-specific fields are complete", () => {
-  const incompleteStudent = renderProfile({ id: "student-1", role: "student", program_id: "", school_student_id: "", year_level: "" });
+  const incompleteStudent = renderProfile({ id: "student-1", role: "student", program_id: "", school_id_number: "", year_level: "" });
   assert.equal(isDisabled(submitButton(incompleteStudent)), true);
 
-  const completeStudent = renderProfile({ id: "student-1", role: "student", program_id: "program-1", school_student_id: "24-001", year_level: "1st" });
+  const completeStudent = renderProfile({ id: "student-1", role: "student", program_id: "program-1", school_id_number: "24-001", year_level: "1st" });
   assert.equal(isDisabled(submitButton(completeStudent)), false);
 
-  const staffWithoutId = renderProfile({ role: "instructor", program_id: "program-1" });
-  assert.equal(isDisabled(submitButton(staffWithoutId)), true);
+  const instructorWithoutId = renderProfile({ id: "database-uuid", role: "instructor", program_id: "program-1" });
+  assert.equal(isDisabled(submitButton(instructorWithoutId)), true);
+  assert.match(instructorWithoutId, /Instructor ID/);
+  assert.doesNotMatch(instructorWithoutId, /value="database-uuid"/);
+
+  const completeInstructor = renderProfile({ id: "database-uuid", role: "instructor", program_id: "program-1", school_id_number: "FAC-2026-001" });
+  assert.equal(isDisabled(submitButton(completeInstructor)), false);
+  assert.match(completeInstructor, /value="FAC-2026-001"/);
+  assert.doesNotMatch(completeInstructor, /value="database-uuid"/);
 
   const completeStaff = renderProfile({ id: "staff-1", role: "program_head", program_id: "program-1" });
   assert.equal(isDisabled(submitButton(completeStaff)), false);
-  assert.match(completeStaff, /Account ID/);
-  assert.match(completeStaff, /staff-1/);
+  assert.doesNotMatch(completeStaff, /Account ID/);
 });

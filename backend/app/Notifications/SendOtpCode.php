@@ -28,7 +28,7 @@ class SendOtpCode extends Notification
      *
      * Uses a fully custom Blade view (resources/views/emails/otp-code.blade.php)
      * instead of the default Markdown mail template, so we control the
-     * branding, layout, and the school's email signature/footer.
+     * ALRM branding, layout, and automated notification footer.
      */
     public function toMail(object $notifiable): MailMessage
     {

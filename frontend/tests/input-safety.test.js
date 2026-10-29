@@ -55,10 +55,10 @@ test('staff role changes reject values outside the staff role choices', () => {
 
 test('profile submission rejects invalid student data and removes unwanted surrounding whitespace', async () => {
   const fetch = capture();
-  await saveProfileSetup({ program_id: ' program-one ', school_student_id: ' 24-001 ', year_level: '3rd' });
-  assert.deepEqual(JSON.parse(fetch.mock.calls[0].arguments[1].body), { program_id: 'program-one', school_student_id: '24-001', year_level: '3rd' });
-  for (const changes of [{ program_id: '../admin' }, { school_student_id: 'A'.repeat(51) }, { year_level: '5th' }]) {
-    await assert.rejects(() => saveProfileSetup({ program_id: 'program-one', school_student_id: '24-001', year_level: '3rd', ...changes }), error => error.status === 422);
+  await saveProfileSetup({ program_id: ' program-one ', school_id_number: ' 24-001 ', year_level: '3rd' });
+  assert.deepEqual(JSON.parse(fetch.mock.calls[0].arguments[1].body), { program_id: 'program-one', school_id_number: '24-001', year_level: '3rd' });
+  for (const changes of [{ program_id: '../admin' }, { school_id_number: 'A'.repeat(51) }, { year_level: '5th' }]) {
+    await assert.rejects(() => saveProfileSetup({ program_id: 'program-one', school_id_number: '24-001', year_level: '3rd', ...changes }), error => error.status === 422);
   }
   assert.equal(fetch.mock.callCount(), 1);
 });

@@ -11,6 +11,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 
 class OtpController extends Controller
@@ -50,7 +51,7 @@ class OtpController extends Controller
             'expires_at' => now()->addMinutes(5),
         ]);
 
-        $user->notify(new SendOtpCode($code, otpId: $otp->id));
+        $user->notify(new SendOtpCode($code, otpId: $otp->id, expiresAt: $otp->expires_at));
     }
 
     /**
@@ -171,11 +172,11 @@ class OtpController extends Controller
             'expires_at' => now()->addMinutes(5),
         ])->save();
 
-        $user->notify(new SendOtpCode($code, otpId: $otp->id));
+        $user->notify(new SendOtpCode($code, otpId: $otp->id, expiresAt: $otp->expires_at));
 
         return response()->json([
             'success' => true,
-            'message' => 'A new code has been sent.',
+            'message' => 'A new code has been requested. Check your email shortly.',
             'data' => null,
         ]);
     }
@@ -223,7 +224,7 @@ class OtpController extends Controller
             ], 404);
         }
 
-        if ($otp->expires_at->isPast()) {
+        if ($otp->expires_at->lessThanOrEqualTo(now())) {
             return response()->json([
                 'success' => false,
                 'message' => 'This code has expired. Please log in again.',
@@ -239,7 +240,7 @@ class OtpController extends Controller
             ], 429);
         }
 
-        if (! hash_equals((string) $otp->code, $request->string('code')->toString())) {
+        if (! Hash::check($request->string('code')->toString(), (string) $otp->code)) {
             $otp->increment('attempts');
 
             return response()->json([

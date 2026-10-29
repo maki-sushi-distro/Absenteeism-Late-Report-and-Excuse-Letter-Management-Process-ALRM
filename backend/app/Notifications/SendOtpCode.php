@@ -3,6 +3,7 @@
 namespace App\Notifications;
 
 use App\Models\OtpCode;
+use Carbon\CarbonImmutable;
 use DateTimeInterface;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
@@ -24,8 +25,9 @@ class SendOtpCode extends Notification implements ShouldBeEncrypted, ShouldQueue
         private readonly string $code,
         private readonly int $expiresInMinutes = 5,
         private readonly ?string $otpId = null,
+        ?DateTimeInterface $expiresAt = null,
     ) {
-        $this->deliveryDeadline = now()->addMinutes($expiresInMinutes);
+        $this->deliveryDeadline = $expiresAt ?? now()->addMinutes($expiresInMinutes);
         $this->afterCommit();
     }
 
@@ -79,12 +81,18 @@ class SendOtpCode extends Notification implements ShouldBeEncrypted, ShouldQueue
      */
     public function toMail(object $notifiable): MailMessage
     {
+        $remainingMinutes = max(1, (int) ceil(
+            ($this->deliveryDeadline->getTimestamp() - now()->getTimestamp()) / 60
+        ));
+
         return (new MailMessage)
-            ->subject('[ALRM] Email verification code')
+            ->subject('Your ALRM verification code')
             ->view(['html' => 'emails.otp-code', 'text' => 'emails.otp-code-text'], [
                 'name' => $notifiable->name,
                 'code' => $this->code,
-                'expiresInMinutes' => $this->expiresInMinutes,
+                'expiresInMinutes' => $remainingMinutes,
+                'expiresAtUtc' => CarbonImmutable::instance($this->deliveryDeadline)
+                    ->utc()->toDateTimeString().' UTC',
             ]);
     }
 }

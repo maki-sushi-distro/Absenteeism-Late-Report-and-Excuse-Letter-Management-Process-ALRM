@@ -38,6 +38,12 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        if ($this->app->environment('production')
+            && ! $this->app->runningInConsole()
+            && in_array(config('mail.default'), ['log', 'array'], true)) {
+            throw new \LogicException('Production requires a delivery mailer; configure MAIL_MAILER.');
+        }
+
         // Guard evaluates this BEFORE it refreshes last_used_at. Persisted
         // activity survives cache expiry, redeploys, and multiple replicas.
         Sanctum::authenticateAccessTokensUsing(function (PersonalAccessToken $token, bool $valid): bool {

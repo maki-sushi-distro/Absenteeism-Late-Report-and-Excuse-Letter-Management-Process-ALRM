@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
+import { getSelectablePrograms } from "@/lib/programs";
 
 const years = ["1st", "2nd", "3rd", "4th"];
 const semesters = ["1st", "2nd"];
@@ -148,7 +149,7 @@ export default function ClassForm({ item = null, instructors, onCancel, onSave, 
     {(loadError || submitError) && <Alert variant="destructive" className="mb-5"><AlertCircle className="size-4" /><AlertTitle>Unable to continue</AlertTitle><AlertDescription>{submitError || loadError}</AlertDescription></Alert>}
     <form onSubmit={submit} className="grid gap-5" noValidate>
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        <Select name="program_id" label="Program" value={form.program_id} onChange={change} error={errors.program_id}><option value="">Select program</option>{programs.map((program) => <option key={program.id} value={program.id}>{program.program_name || program.name}</option>)}</Select>
+        <Select name="program_id" label="Program" value={form.program_id} onChange={change} error={errors.program_id}><option value="">Select program</option>{getSelectablePrograms(programs).map((program) => <option key={program.id} value={program.id}>{program.program_name || program.name}</option>)}</Select>
         <Select name="curriculum_id" label="Curriculum Version" value={form.curriculum_id} onChange={change} disabled={!form.program_id || loadingCurricula} error={errors.curriculum_id}><option value="">{item?.curriculum_subject_id ? "Keep current assigned subject" : loadingCurricula ? "Loading versions..." : "Select version"}</option>{curricula.map((entry) => <option key={entry.id} value={entry.id}>{entry.version}{entry.revision ? ` · Revision ${entry.revision}` : ""}</option>)}</Select>
         <Select name="year_level" label="Year Level" value={form.year_level} onChange={change} disabled={!form.curriculum_id && !currentSubjectKept} error={errors.year_level}><option value="">Select year</option>{years.map((year) => <option key={year} value={year}>{year} Year</option>)}</Select>
         <Select name="semester" label="Semester" value={form.semester} onChange={change} disabled={!form.curriculum_id && !currentSubjectKept} error={errors.semester}><option value="">Select semester</option>{semesters.map((semester) => <option key={semester} value={semester}>{semester} Semester</option>)}</Select>

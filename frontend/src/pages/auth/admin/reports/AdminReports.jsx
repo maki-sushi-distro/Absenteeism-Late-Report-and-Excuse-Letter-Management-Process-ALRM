@@ -6,6 +6,7 @@ import LoadingSkeleton from "@/components/loading/LoadingSkeleton";
 import { ErrorState } from "@/components/common/ErrorState";
 import RequestPagination from "@/pages/auth/instructor/InstructorRequests/RequestPagination";
 import { paginateRecords } from "@/pages/auth/student/records/pagination";
+import { getSelectablePrograms } from "@/lib/programs";
 import { reportHeadings as headings } from "./reportData.js";
 
 const emptyFilters = { program_id: "", status: "", date_from: "", date_to: "" };
@@ -18,13 +19,14 @@ export default function AdminReports({ programs }) {
   const [error, setError] = useState("");
   const [page, setPage] = useState(1);
   const pending = useRef(null);
+  const selectablePrograms = getSelectablePrograms(programs);
   useEffect(() => () => pending.current?.abort(), []);
   const pagination = paginateRecords(report?.rows || [], page);
   function change(event) { setFilters(current => ({ ...current, [event.target.name]: event.target.value })); }
   async function generate(event) {
     event.preventDefault();
     if (pending.current) return;
-    if (filters.program_id && !programs.some(program => String(program.id) === filters.program_id)) { setError("Select a program from the available list."); return; }
+    if (filters.program_id && !selectablePrograms.some(program => String(program.id) === filters.program_id)) { setError("Select a program from the available list."); return; }
     if (filters.date_from && filters.date_to && filters.date_from > filters.date_to) { setError("The end date must be on or after the start date."); return; }
     const controller = new AbortController();
     pending.current = controller;
@@ -42,7 +44,7 @@ export default function AdminReports({ programs }) {
     <section className="rounded-lg border border-slate-200 bg-white p-5">
       <h1 className="mb-5 text-lg font-semibold">Generate requests report</h1>
       <form className="grid items-end gap-4 md:grid-cols-2 xl:grid-cols-5" onSubmit={generate}>
-        <label className="grid gap-2 text-sm">Program<select name="program_id" value={filters.program_id} onChange={change} className={field}><option value="">All programs</option>{programs.map(program => <option key={program.id} value={program.id}>{program.program_name}</option>)}</select></label>
+        <label className="grid gap-2 text-sm">Program<select name="program_id" value={filters.program_id} onChange={change} className={field}><option value="">All programs</option>{selectablePrograms.map(program => <option key={program.id} value={program.id}>{program.program_name}</option>)}</select></label>
         <label className="grid gap-2 text-sm">Status<select name="status" value={filters.status} onChange={change} className={field}><option value="">All statuses</option>{["pending", "approved", "invalid"].map(status => <option key={status} value={status}>{status[0].toUpperCase() + status.slice(1)}</option>)}</select></label>
         <label className="grid gap-2 text-sm">From<Input name="date_from" type="date" value={filters.date_from} onChange={change} className="h-11" /></label>
         <label className="grid gap-2 text-sm">To<Input name="date_to" type="date" min={filters.date_from || undefined} value={filters.date_to} onChange={change} className="h-11" /></label>

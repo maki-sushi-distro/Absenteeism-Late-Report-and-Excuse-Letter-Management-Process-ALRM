@@ -25,6 +25,7 @@ import {
 } from "@/lib/profileSetup";
 import { normalizeRole } from "@/lib/roles";
 import { prepareProfileInput } from "@/lib/formInputs";
+import { getSelectablePrograms } from "@/lib/programs";
 import lvLogo from "@/assets/LV_Logo.png";
 
 const ROLE_LABELS = {
@@ -336,7 +337,7 @@ function ProfileSetup() {
                         ? "Programs unavailable"
                         : "Select program"}
                   </option>
-                  {programs.map((program) => (
+                  {getSelectablePrograms(programs).map((program) => (
                     <option key={programId(program)} value={programId(program)}>
                       {programLabel(program)}
                     </option>

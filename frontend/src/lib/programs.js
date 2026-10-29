@@ -1,5 +1,13 @@
 export function isGeneralEducationProgram(program) {
-  return String(program?.program_name || program?.name || "").trim().toLowerCase() === "general education";
+  return String(program?.program_name || program?.programName || program?.name || "").trim().toLowerCase() === "general education";
+}
+
+export function getSelectablePrograms(programs = []) {
+  return programs.filter(program => !isGeneralEducationProgram(program)).sort((left, right) => {
+    const leftName = String(left?.program_name || left?.programName || left?.name || "");
+    const rightName = String(right?.program_name || right?.programName || right?.name || "");
+    return leftName.localeCompare(rightName, undefined, { sensitivity: "base" });
+  });
 }
 
 export function programShortName(name) {

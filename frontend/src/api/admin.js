@@ -46,7 +46,7 @@ export function deleteProgram(programId) {
 }
 
 export function getClasses() {
-  return apiRequest("/admin/classes");
+  return getCollection("/admin/classes");
 }
 
 export function createClass(data) {

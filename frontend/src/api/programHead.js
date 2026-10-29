@@ -10,7 +10,7 @@ export function getFlaggedStudents(filters = {}) {
 }
 
 export function getProgramHeadRequests(filters = {}) {
-  return apiRequest(`/program-head/requests${buildQuery(filters)}`);
+  return getCollection(`/program-head/requests${buildQuery(filters)}`);
 }
 
 export function getProgramHeadAuditLogs() {

@@ -14,6 +14,7 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 import { Input } from "@/components/ui/input";
+import { getSelectablePrograms } from "@/lib/programs";
 import {
   Table,
   TableBody,
@@ -120,7 +121,7 @@ function StudentFilters({ filters, loadingPrograms, onChange, programs }) {
           onChange={(event) => onChange("programId", event.target.value)}
         >
           <option value="">Filter Course</option>
-          {programs.map((program, index) => (
+          {getSelectablePrograms(programs).map((program, index) => (
             <option key={programRecordId(program) || index} value={programRecordId(program)}>
               {programLabel(program)}
             </option>

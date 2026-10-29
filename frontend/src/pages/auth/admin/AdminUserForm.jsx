@@ -12,6 +12,7 @@ import { Separator } from "@/components/ui/separator";
 import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
 import { emailPattern, sanitizeText } from "@/lib/inputValidation";
+import { getSelectablePrograms } from "@/lib/programs";
 import AdminPageLayout from "./AdminPageLayout";
 
 const roleOptions = [
@@ -88,7 +89,7 @@ export default function AdminUserForm({
     return () => { alive = false; };
   }, []);
 
-  const programOptions = useMemo(() => programs.map((program) => ({
+  const programOptions = useMemo(() => getSelectablePrograms(programs).map((program) => ({
     label: program.program_name || program.name || `Program ${program.id}`,
     value: String(program.id),
   })), [programs]);

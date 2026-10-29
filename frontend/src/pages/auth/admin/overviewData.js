@@ -30,11 +30,13 @@ export function flagActivity(flags = [], classes = []) {
     return { ...info, id: flag.id, date: flag.flagged_date || flag.created_at, action: "Flagged", instructor, flaggedBy: instructor };
   }));
 }
-export function auditActivity(logs = []) {
+export function auditActivity(logs = [], classes = []) {
+  const classOwners = new Map(classes.map(item => item?.enrollment?.class || item).filter(course => course?.id)
+    .map(course => [String(course.id), course.instructor?.name || null]));
   return newest(logs.map(log => {
     const request = log.request || {};
     const course = request.class || {};
-    return { id: log.id, requestId: request.id || "", date: log.timestamp, student: request.student?.name || "Unavailable", studentId: "", email: "", subject: course.subject_name || "Unavailable", classId: course.id || "", type: request.type === "absence" ? "Absent" : request.type === "late" ? "Late" : "Unavailable", action: auditActions[log.action] || log.description || "Unavailable", instructor: log.actor?.name || "Unavailable", actor: log.actor?.name || "Unavailable", description: log.description || auditActions[log.action] || "Activity recorded" };
+    return { id: log.id, requestId: request.id || "", date: log.timestamp, student: request.student?.name || "Unavailable", studentId: "", email: "", subject: course.subject_name || "Unavailable", classId: course.id || "", type: request.type === "absence" ? "Absent" : request.type === "late" ? "Late" : "Unavailable", action: auditActions[log.action] || log.description || "Unavailable", instructor: course.instructor?.name || classOwners.get(String(course.id)) || "—", actor: log.actor?.name || "Unavailable", description: log.description || auditActions[log.action] || "Activity recorded" };
   }));
 }
 export function filterActivity(rows, { search = "", action = "", subject = "", date = "" } = {}) {

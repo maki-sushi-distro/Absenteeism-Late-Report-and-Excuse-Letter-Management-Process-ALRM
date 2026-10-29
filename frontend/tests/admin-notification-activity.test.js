@@ -83,13 +83,23 @@ test("new program-head audit activity links to the program activity log", async 
   assert.equal(item.readKey, `program-activity:${programUser.id}`);
 });
 
-test("a server submission notification replaces the matching audit-log notification", async () => {
+test("server notifications replace matching activity-log notifications for every audit action", async () => {
   const { mergeProgramAuditActivity } = await import("../src/components/notifications/notificationData.js");
-  const serverItem = { id: "server-request", type: "school_notice", requestId: "request-one", message: "Alex Student submitted a request: Alex Student's absence request for Information Management.", date: oldLog.timestamp, isRead: false, href: "/program-head/requests" };
-
-  const activity = mergeProgramAuditActivity([serverItem], [oldLog], programUser, new Set());
-
-  assert.deepEqual(activity, [serverItem]);
+  const cases = [
+    ["submitted_request", "Submitted a request", "Alex Student submitted a request"],
+    ["updated_request", "Updated a request", "Alex Student updated a request"],
+    ["cancelled_request", "Cancelled a request", "Alex Student cancelled a request"],
+    ["followed_up_request", "Followed up a request", "Alex Student followed up a request"],
+    ["decided_request_approved", "Approved a request", "Jamie Instructor approved a request"],
+    ["decided_request_noted", "Noted a request", "Jamie Instructor noted a request"],
+    ["decided_request_invalid", "Marked a request invalid", "Jamie Instructor marked a request invalid"],
+    ["resolved_followup_flag", "Resolved a follow-up", "Jamie Instructor resolved a follow-up"],
+  ];
+  for (const [action, description, message] of cases) {
+    const log = { ...oldLog, id: `audit-${action}`, action, description };
+    const serverItem = { id: `server-${action}`, type: "school_notice", requestId: "request-one", message, date: oldLog.timestamp, isRead: false, href: "/program-head/requests" };
+    assert.deepEqual(mergeProgramAuditActivity([serverItem], [log], programUser, new Set()), [serverItem], action);
+  }
 });
 
 test("reading an admin audit notification stays local and never PATCHes a server notification", async () => {

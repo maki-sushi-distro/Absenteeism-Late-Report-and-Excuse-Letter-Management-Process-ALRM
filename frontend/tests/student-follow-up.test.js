@@ -76,7 +76,10 @@ test("record actions enable pending follow-up only when a callback is supplied",
   assert.ok(followUp);
   assert.doesNotMatch(html, /disabled=""/);
   assert.match(html, /aria-busy="false"/);
-  assert.match(html, /w-24/);
+  assert.match(html, /flex-nowrap/);
+  assert.match(followUp, /h-7/);
+  assert.match(followUp, /text-xs/);
+  assert.doesNotMatch(followUp, /w-24/);
   const unavailable = renderToStaticMarkup(React.createElement(Actions, { ...props, onFollowUp: undefined }));
   assert.match(unavailable, /disabled=""/);
 });

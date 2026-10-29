@@ -49,15 +49,36 @@ export function notificationActivity(records, role, preferences, userId) {
   }).sort((a, b) => Date.parse(b.date) - Date.parse(a.date));
 }
 
-function isSubmissionActivity(item) {
-  return item.requestId && (["new_request", "submitted_request"].includes(item.type) || (!Object.hasOwn(recipients, item.type) && /\bsubmitted\b.*\brequest\b/i.test(item.message || "")));
+function activityAction(item) {
+  if (!item.requestId) return "";
+  if (["new_request", "submitted_request"].includes(item.type)) return "Submitted";
+  if (item.type === "request_updated") return "Updated";
+  if (item.type === "request_followup") return "Followed up";
+  if (Object.hasOwn(recipients, item.type) && !["request_decision", "followup_flag"].includes(item.type)) return "";
+  const message = item.message || "";
+  if (/\bsubmitted\b/i.test(message)) return "Submitted";
+  if (/\bupdated\b/i.test(message)) return "Updated";
+  if (/\bcancelled\b/i.test(message)) return "Cancelled";
+  if (/\bfollowed up\b/i.test(message)) return "Followed up";
+  if (/\bapproved\b/i.test(message)) return "Approved";
+  if (/\bnoted\b/i.test(message)) return "Noted";
+  if (/\b(invalid|denied)\b/i.test(message)) return "Denied";
+  if (/\bresolved\b.*\bfollow-up\b/i.test(message)) return "Resolved";
+  return "";
+}
+
+function isSameAuditEvent(item, row) {
+  const itemDate = Date.parse(item.date);
+  const rowDate = Date.parse(row.date);
+  return String(item.requestId) === String(row.requestId) && activityAction(item) === row.action
+    && Number.isFinite(itemDate) && Number.isFinite(rowDate) && Math.abs(itemDate - rowDate) <= 5 * 60 * 1000;
 }
 
 export function mergeRequestActivity(activity, requests, user, readIds = new Set()) {
   if (normalizeRole(user.role) !== "instructor") return activity;
   const seen = new Set();
   const combined = activity.filter(item => {
-    if (!isSubmissionActivity(item)) return true;
+    if (activityAction(item) !== "Submitted") return true;
     if (seen.has(String(item.requestId))) return false;
     seen.add(String(item.requestId));
     return true;
@@ -82,9 +103,8 @@ export function mergeRequestActivity(activity, requests, user, readIds = new Set
 
 function mergeAuditActivity(activity, logs, user, readIds, localKey, href) {
   const combined = [...activity];
-  const submitted = new Set(combined.filter(isSubmissionActivity).map(item => String(item.requestId)));
   for (const row of auditActivity(logs)) {
-    if (row.action === "Submitted" && row.requestId && submitted.has(String(row.requestId))) continue;
+    if (row.requestId && combined.some(item => isSameAuditEvent(item, row))) continue;
     const id = `audit-log:${row.id}`;
     const detail = row.subject === "Unavailable" ? "" : ` in ${row.subject}`;
     combined.push({ id, type: "audit_log", source: "audit", readKey: localKey, requestId: row.requestId,
@@ -93,7 +113,6 @@ function mergeAuditActivity(activity, logs, user, readIds, localKey, href) {
       readStatusTitle: "Activity log notification: read status is saved on this browser.",
       unreadTitle: "Unread admin activity on this browser",
     });
-    if (row.action === "Submitted" && row.requestId) submitted.add(String(row.requestId));
   }
   return combined.sort((a, b) => Date.parse(b.date) - Date.parse(a.date));
 }

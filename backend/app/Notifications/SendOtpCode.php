@@ -33,8 +33,8 @@ class SendOtpCode extends Notification
     public function toMail(object $notifiable): MailMessage
     {
         return (new MailMessage)
-            ->subject('Your ALRM Verification Code')
-            ->view('emails.otp-code', [
+            ->subject("{$this->code} is your ALRM verification code")
+            ->view(['html' => 'emails.otp-code', 'text' => 'emails.otp-code-text'], [
                 'name'              => $notifiable->name,
                 'code'              => $this->code,
                 'expiresInMinutes'  => $this->expiresInMinutes,

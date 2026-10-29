@@ -38,6 +38,7 @@
                         <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background-color:#f4f7fb; border:1px dashed #164a86; border-radius:10px;">
                             <tr>
                                 <td align="center" style="padding:22px 16px;">
+                                    <p style="margin:0 0 12px; font-family:Arial, Helvetica, sans-serif; font-size:14px; color:#4a5568;">Your ALRM verification code:</p>
                                     <span style="display:inline-block; font-family:'Courier New', Courier, monospace; font-size:34px; font-weight:bold; letter-spacing:10px; color:#0b2a52;">
                                         {{ $code }}
                                     </span>

@@ -61,6 +61,11 @@ class InstructorMailRedirectTest extends TestCase
         $messages = Mail::mailer()->getSymfonyTransport()->messages();
         $this->assertCount(1, $messages);
         $this->assertSame('otp-user@example.com', $messages->first()->getOriginalMessage()->getTo()[0]->getAddress());
+        $email = $messages->first()->getOriginalMessage();
+        $this->assertSame('123456 is your ALRM verification code', $email->getSubject());
+        $this->assertStringContainsString('Your ALRM verification code:', $email->getHtmlBody());
+        $this->assertStringContainsString("Your ALRM verification code:\n\n123456", $email->getTextBody());
+        $this->assertStringContainsString('This code expires in 5 minutes.', $email->getTextBody());
     }
 
     public function test_empty_test_recipient_restores_delivery_to_the_assigned_instructor(): void

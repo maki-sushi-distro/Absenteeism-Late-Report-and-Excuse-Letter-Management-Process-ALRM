@@ -1,9 +1,3 @@
-export const editOperations = [
-  { value: "change_instructor", label: "Change instructor" },
-  { value: "change_subject", label: "Change subject/class" },
-  { value: "swap", label: "Swap instructors" },
-];
-
 export function activeTeachingAssignment(row) {
   if (!row) return null;
   if (Object.hasOwn(row, "active_teaching_assignment")) return row.active_teaching_assignment;
@@ -27,19 +21,16 @@ export function classLabel(row) {
 export function assignmentSelection(source = null) {
   const assigned = Boolean(activeTeachingAssignment(source));
   return {
-    operation: source && assigned ? "change_instructor" : "assign",
     sourceClassId: source?.id || "",
     instructorId: "",
     programId: "",
     yearLevel: "",
     semester: "",
     targetClassId: source && !assigned ? String(source.id) : "",
-    reason: "",
   };
 }
 
 export function changeAssignmentSelection(selection, field, value) {
-  if (field === "operation") return { ...assignmentSelection(), operation: value, sourceClassId: selection.sourceClassId, reason: selection.reason };
   const next = { ...selection, [field]: value };
   if (field === "programId") {
     next.yearLevel = "";
@@ -48,14 +39,4 @@ export function changeAssignmentSelection(selection, field, value) {
     next.semester = "";
   }
   return next;
-}
-
-export function assignmentRevision(row) {
-  const revision = Number(row?.assignment_revision);
-  return Number.isInteger(revision) && revision >= 0 ? revision : null;
-}
-
-export function pendingRequestCount(row) {
-  const count = Number(row?.pending_requests_count || 0);
-  return Number.isInteger(count) && count > 0 ? count : 0;
 }

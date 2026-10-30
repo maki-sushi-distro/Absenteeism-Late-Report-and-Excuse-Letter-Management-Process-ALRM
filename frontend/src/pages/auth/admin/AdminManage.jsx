@@ -12,10 +12,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { getSelectablePrograms, isGeneralEducationProgram } from "@/lib/programs";
+import { getSelectablePrograms } from "@/lib/programs";
 import AssignmentDialog from "./manage/AssignmentDialog";
 import RemoveAssignmentDialog from "./manage/RemoveAssignmentDialog";
-import { activeTeachingAssignment, assignedInstructor, pendingRequestCount } from "./manage/assignments.js";
+import { activeTeachingAssignment, assignedInstructor } from "./manage/assignments.js";
 import { usePageViewState } from "@/hooks/usePageViewState";
 
 export default function AdminManage() {
@@ -49,8 +49,7 @@ export default function AdminManage() {
   }, [load]);
 
   const selectablePrograms = getSelectablePrograms(data?.programs || []);
-  const generalEducationIds = new Set((data?.programs || []).filter(isGeneralEducationProgram).map(program => String(program.id)));
-  const assignableClasses = (data?.classes || []).filter(row => !generalEducationIds.has(String(row.program_id)) && !isGeneralEducationProgram(row.program));
+  const assignableClasses = data?.classes || [];
   const query = search.trim().toLowerCase();
   const rows = assignableClasses.map(row => {
     const instructor = assignedInstructor(row, data?.instructors || []);
@@ -93,11 +92,10 @@ export default function AdminManage() {
       {notice && <p role="status" className="fixed right-6 top-6 z-50 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-900 shadow-lg">{notice}</p>}
       {error ? <div role="alert" className="space-y-3"><ErrorState title="Unable to load assignments" message={error} /><Button type="button" variant="outline" onClick={reload}>Retry loading</Button></div> : !rows.length ? <EmptyState title="No instructor assignments" message={search || programId ? "No assignments match the current search and filters." : "No classes are available. Create a class in Class Management before assigning an instructor."} /> : <div className="px-2.5"><Table className="min-w-[850px] table-fixed text-base"><TableHeader><TableRow className="h-[60px] border-[#172f6b]/40 hover:bg-transparent">{["Instructor", "Subject", "Program", "Section", "Action"].map(title => <TableHead key={title} className="w-1/5 px-2 py-3 font-bold text-[#172f6b]">{title}</TableHead>)}</TableRow></TableHeader><TableBody>{rows.map(row => {
         const assigned = Boolean(activeTeachingAssignment(row));
-        const pending = pendingRequestCount(row);
-        return <TableRow key={row.id} className="h-[70px] border-[#172f6b]/40 last:border-b!"><TableCell className="whitespace-normal px-2 py-4 font-medium">{row.displayInstructor}{pending > 0 && <span className="mt-1 block text-xs font-normal text-amber-700">{pending} pending {pending === 1 ? "request" : "requests"}</span>}</TableCell><TableCell className="whitespace-normal px-2 py-4 font-medium">{row.subject_name || "Subject unavailable"}</TableCell><TableCell className="whitespace-normal px-2 py-4 font-medium">{row.displayProgram}</TableCell><TableCell className="whitespace-normal px-2 py-4 font-medium">{row.section || "Section unavailable"}</TableCell><TableCell className="px-2 py-4"><div className="flex flex-wrap items-center gap-1">{assigned ? <><Button type="button" aria-label={`Edit ${row.subject_name}, section ${row.section}`} onClick={() => { setNotice(""); setDialog({ classId: row.id }); }} className="h-7 rounded-sm bg-[#284fac] px-2 text-sm text-white hover:bg-[#203f8a]">Edit</Button><Button type="button" size="sm" variant="destructive" aria-label={`Remove instructor assignment from ${row.subject_name}, section ${row.section}`} onClick={() => { setNotice(""); setRemovingId(row.id); }}>Remove</Button></> : <Button type="button" size="sm" onClick={() => { setNotice(""); setDialog({ classId: row.id }); }} className="bg-[#284fac] text-white hover:bg-[#203f8a]">Assign instructor</Button>}</div></TableCell></TableRow>;
+        return <TableRow key={row.id} className="h-[70px] border-[#172f6b]/40 last:border-b!"><TableCell className="whitespace-normal px-2 py-4 font-medium">{row.displayInstructor}</TableCell><TableCell className="whitespace-normal px-2 py-4 font-medium">{row.subject_name || "Subject unavailable"}</TableCell><TableCell className="whitespace-normal px-2 py-4 font-medium">{row.displayProgram}</TableCell><TableCell className="whitespace-normal px-2 py-4 font-medium">{row.section || "Section unavailable"}</TableCell><TableCell className="px-2 py-4"><div className="flex flex-wrap items-center gap-1">{assigned ? <><Button type="button" aria-label={`Edit ${row.subject_name}, section ${row.section}`} onClick={() => { setNotice(""); setDialog({ classId: row.id }); }} className="h-7 rounded-sm bg-[#284fac] px-2 text-sm text-white hover:bg-[#203f8a]">Edit</Button><Button type="button" size="sm" variant="destructive" aria-label={`Remove instructor assignment from ${row.subject_name}, section ${row.section}`} onClick={() => { setNotice(""); setRemovingId(row.id); }}>Remove</Button></> : <Button type="button" size="sm" onClick={() => { setNotice(""); setDialog({ classId: row.id }); }} className="bg-[#284fac] text-white hover:bg-[#203f8a]">Assign instructor</Button>}</div></TableCell></TableRow>;
       })}</TableBody></Table></div>}
     </>}
     {dialog && data && <AssignmentDialog row={dialogRow} data={{ ...data, classes: assignableClasses }} onClose={() => setDialog(null)} onConflict={refreshRows} onSaved={saved} />}
-    {removingRow && data && <RemoveAssignmentDialog row={removingRow} instructors={data.instructors} onClose={() => setRemovingId(null)} onConflict={refreshRows} onSaved={saved} />}
+    {removingRow && data && <RemoveAssignmentDialog row={removingRow} instructors={data.instructors} onClose={() => setRemovingId(null)} onSaved={saved} />}
   </section>;
 }

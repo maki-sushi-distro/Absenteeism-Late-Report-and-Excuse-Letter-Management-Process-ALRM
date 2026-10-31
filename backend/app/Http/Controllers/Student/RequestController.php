@@ -51,7 +51,6 @@ class RequestController extends Controller
             'type' => ['required', 'in:absence,late'],
             'subjects_missed' => ['required', 'string', 'max:255'],
             'minutes_late' => ['required_if:type,late', 'nullable', 'integer', 'min:1', 'max:999'],
-            // This existing field stores the occurrence date for both absence and late requests.
             'start_date_of_absence' => ['required', 'date'],
             'end_date_of_absence' => ['nullable', 'date', 'after_or_equal:start_date_of_absence'],
             'reason' => ['required', 'string', 'max:600'],

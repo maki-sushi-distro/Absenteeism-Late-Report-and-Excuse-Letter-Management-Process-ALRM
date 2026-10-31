@@ -161,7 +161,7 @@ class DevInstructorClassSeederTest extends SecurityTestCase
 
     public function test_admin_user_seeding_saves_bsis_as_dev_home_without_changing_other_staff_defaults(): void
     {
-        // Exercise persistence without calling the external Google Sheets roster.
+        // Exercise the local account defaults independently of class seeding.
         $seeder = new AdminUserSeeder;
         $saveUser = new \ReflectionMethod(AdminUserSeeder::class, 'saveUser');
         $programIds = Program::where('program_name', '!=', 'General Education')->pluck('id')->all();

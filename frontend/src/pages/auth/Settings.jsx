@@ -290,14 +290,6 @@ function AdminPolicyCard() {
           </div>
         ))}
       </div>
-      <Alert className="mt-4 border-slate-200 bg-white">
-        <AlertCircle className="size-4" />
-        <AlertTitle>Policy settings endpoint not exposed</AlertTitle>
-        <AlertDescription>
-          These values were verified from the existing backend attendance logic.
-          There is no registered API route for editing policy settings.
-        </AlertDescription>
-      </Alert>
     </SettingsCard>
   );
 }

@@ -3,8 +3,7 @@ import { Button } from "@/components/ui/button";
 import AdminUserForm from "./AdminUserForm";
 
 function openDialog(element) {
-  if (!element.open) element.showModal();
-  return () => { if (element.open) element.close(); };
+  if (element && !element.open) element.showModal();
 }
 
 export default function AddUserDialog({ onClose, onCreated }) {
@@ -14,7 +13,7 @@ export default function AddUserDialog({ onClose, onCreated }) {
     aria-modal="true"
     aria-labelledby="add-user-dialog-title"
     onCancel={(event) => { event.preventDefault(); onClose(); }}
-    onClose={onClose}
+    onClose={(event) => { if (!event.currentTarget.open) onClose(); }}
     onClick={(event) => { if (event.target === event.currentTarget) onClose(); }}
     className="fixed inset-0 m-auto max-h-[90dvh] w-[calc(100%-2rem)] max-w-5xl overflow-y-auto rounded-[16px] border border-slate-200 bg-white p-5 text-slate-950 shadow-xl backdrop:bg-black/40 sm:p-7"
   >

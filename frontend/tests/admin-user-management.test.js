@@ -160,15 +160,15 @@ test("program list uses the same complete collection reader", async () => {
   assert.ok(requested.includes("/api/admin/programs?"));
 });
 
-test("pending approval remains offered without google_id and surfaces the server's 409", async () => {
-  const message = "This account has not logged in yet (still pending).";
+test("pending approval is stored before the user's first Google sign-in", async () => {
+  const updated = { ...accounts[2], status: "approved", google_id: null };
   mockApiFetch(async (url, options) => {
     assert.ok(String(url).endsWith("/admin/users/staff1/status"));
     assert.equal(options.method, "PATCH");
     assert.deepEqual(JSON.parse(options.body), { status: "approved" });
-    return Response.json({ success: false, message, data: null }, { status: 409 });
+    return Response.json({ success: true, data: updated });
   });
-  await assert.rejects(changeManagedUser(accounts[2], "admin", "status", "approved"), (error) => error.status === 409 && userErrorMessage(error) === message);
+  assert.deepEqual(await changeManagedUser(accounts[2], "admin", "status", "approved"), updated);
 });
 
 test("status actions require a confirmed resource and never fabricate success from empty HTTP 200", async () => {
@@ -187,22 +187,22 @@ test("role assignment preserves account status and uses the existing staff endpo
   assert.deepEqual(await changeManagedUser(accounts[2], "admin", "role", "program_head"), updated);
 });
 
-test("self changes, student role changes, and pending deactivation issue no requests", async () => {
+test("self changes and student role changes issue no requests", async () => {
   const fetchMock = mockApiFetch(async () => { throw new Error("Unexpected mutation"); });
   await assert.rejects(changeManagedUser(accounts[2], "staff1", "role", "administrator"), /not available/);
   await assert.rejects(changeManagedUser(accounts[2], "staff1", "status", "approved"), /not available/);
   await assert.rejects(changeManagedUser(accounts[0], "admin", "role", "instructor"), /not available/);
-  await assert.rejects(changeManagedUser(accounts[2], "admin", "status", "deactivated"), /not available/);
   await assert.rejects(changeManagedUser(accounts[2], "admin", "role", "student"), /not available/);
   assert.equal(fetchMock.mock.callCount(), 0);
 });
 
 test("deactivation and reactivation require matching server status and resource identity", async () => {
   mockApiFetch(async (url, options) => {
-    const account = String(url).includes("staff2") ? accounts[3] : accounts[0];
+    const account = String(url).includes("staff2") ? accounts[3] : String(url).includes("staff1") ? accounts[2] : accounts[0];
     return Response.json({ success: true, data: { ...account, status: JSON.parse(options.body).status } });
   });
   assert.equal((await changeManagedUser(accounts[0], "admin", "status", "deactivated")).status, "deactivated");
+  assert.equal((await changeManagedUser(accounts[2], "admin", "status", "deactivated")).status, "deactivated");
   assert.equal((await changeManagedUser(accounts[3], "admin", "status", "approved")).status, "approved");
   mockApiFetch(async () => Response.json({ success: true, data: { ...accounts[0], status: "approved" } }));
   await assert.rejects(changeManagedUser(accounts[3], "admin", "status", "approved"), /did not confirm/);

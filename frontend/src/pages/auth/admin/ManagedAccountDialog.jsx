@@ -31,11 +31,14 @@ export default function ManagedAccountDialog({ user, currentUserId, programs, wo
         ))}
       </dl>
       {String(user.id) === String(currentUserId) && <p className="text-sm text-slate-600">You cannot change your own role or account status.</p>}
-      {status === "pending" && <p className="text-sm text-slate-600">{user.role === "student" ? "The server checks whether this student account can be approved." : "Pre-registered accounts activate on their first Google sign-in. The server checks whether this account can be approved."}</p>}
+      {status === "pending" && <p className="text-sm text-slate-600">Approve to keep this account ready for its first Google sign-in, or decline to keep it inactive.</p>}
       {actionError && <div role="alert"><ErrorState title="Account change failed" message={actionError} /></div>}
       <footer className="flex flex-wrap items-center justify-start gap-3 border-t border-slate-200 pt-5">
-        {permissions.changeStatus && <Button type="button" variant={status === "approved" ? "destructive" : "outline"} className={`h-10 rounded-lg px-4 ${status === "approved" ? "bg-[#e44343] font-semibold text-white hover:bg-red-600" : ""}`} disabled={working} onClick={() => onChange("status", status === "approved" ? "deactivated" : "approved")}>
-          {status === "pending" ? "Approve" : status === "approved" ? "Deactivate Account" : "Reactivate Account"}
+        {permissions.changeStatus && status === "pending" ? <>
+          <Button type="button" className="h-10 rounded-lg bg-green-600 px-4 font-semibold text-white hover:bg-green-700" disabled={working} onClick={() => onChange("status", "approved")}>Approve Account</Button>
+          <Button type="button" variant="destructive" className="h-10 rounded-lg px-4" disabled={working} onClick={() => onChange("status", "deactivated")}>Decline</Button>
+        </> : permissions.changeStatus && <Button type="button" variant={status === "approved" ? "destructive" : "outline"} className={`h-10 rounded-lg px-4 ${status === "approved" ? "bg-[#e44343] font-semibold text-white hover:bg-red-600" : ""}`} disabled={working} onClick={() => onChange("status", status === "approved" ? "deactivated" : "approved")}>
+          {status === "approved" ? "Deactivate Account" : "Activate Account"}
         </Button>}
         {working && <span role="status" className="text-sm text-slate-600">Saving account change…</span>}
       </footer>

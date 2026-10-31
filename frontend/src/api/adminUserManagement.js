@@ -22,7 +22,7 @@ export async function changeManagedUser(user, currentUserId, field, value) {
   const allowed = field === "role"
     ? permissions.changeRole && STAFF_ROLES.includes(value) && value !== user.role
     : field === "status" && permissions.changeStatus && value !== userStatus(user)
-      && (userStatus(user) === "pending" ? value === "approved" : ["approved", "deactivated"].includes(value));
+      && ["approved", "deactivated"].includes(value);
   if (!allowed) throw new Error("This account change is not available.");
 
   const response = await (field === "role"

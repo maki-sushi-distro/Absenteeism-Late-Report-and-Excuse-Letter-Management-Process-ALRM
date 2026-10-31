@@ -39,13 +39,25 @@ test("non-student details have a labeled native modal with actual account data",
 });
 
 test("status actions send the existing mutation field and value for each account state", () => {
-  for (const [status, label, value] of [["approved", "Deactivate Account", "deactivated"], ["pending", "Approve", "approved"], ["inactive", "Reactivate Account", "approved"]]) {
+  for (const [status, label, value] of [["approved", "Deactivate Account", "deactivated"], ["pending", "Approve Account", "approved"], ["deactivated", "Activate Account", "approved"], ["inactive", "Activate Account", "approved"]]) {
     const changes = [];
     const element = tree({ user: { ...account, status }, onChange: (...args) => changes.push(args) });
     action(element, label).props.onClick();
     assert.deepEqual(changes, [["status", value]]);
   }
   assert.match(render({ user: { ...account, status: "pending" } }), /first Google sign-in/);
+});
+
+test("pending accounts have a green approval action and a non-destructive decline action", () => {
+  const changes = [];
+  const element = tree({ user: { ...account, status: "pending" }, onChange: (...args) => changes.push(args) });
+  const approve = action(element, "Approve Account");
+  const decline = action(element, "Decline");
+  assert.match(approve.props.className, /bg-green-600/);
+  approve.props.onClick();
+  decline.props.onClick();
+  assert.deepEqual(changes, [["status", "approved"], ["status", "deactivated"]]);
+  assert.equal(action(element, "Delete Account"), undefined);
 });
 
 test("account roles are read-only and the modal has no role assignment controls", () => {
@@ -74,7 +86,7 @@ test("students use the same modal with their academic details and status action"
   for (const value of ["2026-001", "BSIS", "Year/Section", "3rd / BSIS 3", "Deactivate Account"]) assert.ok(html.includes(value), value);
   assert.doesNotMatch(html, /Assign role|<select/);
   const changes = [];
-  action(tree({ user: { ...student, status: "pending" }, onChange: (...args) => changes.push(args) }), "Approve").props.onClick();
+  action(tree({ user: { ...student, status: "pending" }, onChange: (...args) => changes.push(args) }), "Approve Account").props.onClick();
   assert.deepEqual(changes, [["status", "approved"]]);
 });
 

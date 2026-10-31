@@ -22,6 +22,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { historicalRequestClass } from "@/lib/requestHistory";
+import { normalizeRequestStatus } from "@/lib/requestStatus";
 import {
   Table,
   TableBody,
@@ -266,8 +267,7 @@ function requestStatus(request) {
 }
 
 function normalizeStatus(status) {
-  const normalized = String(status || "").toLowerCase();
-  if (normalized === "noted") return "valid";
+  const normalized = normalizeRequestStatus(status);
   if (normalized === "accepted") return "approved";
   if (normalized === "rejected" || normalized === "declined") return "invalid";
   return normalized;

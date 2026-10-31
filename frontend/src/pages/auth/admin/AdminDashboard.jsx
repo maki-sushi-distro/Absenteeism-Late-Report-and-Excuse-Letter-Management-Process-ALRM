@@ -30,6 +30,26 @@ const endpoints = { dashboard: getAdminDashboard, users: getUserManagementUsers,
 const resourceDefaults = { dashboard: false, users: false, pendingUsers: false, programs: false, classes: false };
 const viewResources = { dashboard: ["dashboard", "pendingUsers"], users: ["users"], programs: ["programs", "users"], classes: ["classes", "programs"], reports: ["programs"] };
 
+function hoursValue(value) {
+  if (value === null || value === undefined || value === "") return "Unavailable";
+  const hours = Number(value);
+  if (!Number.isFinite(hours)) return "Unavailable";
+  return hours;
+}
+
+function hoursLabel(value) {
+  const hours = hoursValue(value);
+  return hours === "Unavailable" ? hours : `${hours} ${hours === 1 ? "hour" : "hours"}`;
+}
+
+export function ClassHours({ item }) {
+  return <dl className="mt-3 grid gap-1 text-xs text-slate-600"><div><dt className="inline font-medium">Academic units:</dt> <dd className="inline">{hoursValue(item.weekly_hours)}</dd></div><div><dt className="inline font-medium">Class/contact hours:</dt> <dd className="inline">{hoursLabel(item.weekly_hours)}</dd></div></dl>;
+}
+
+export function CreateClassButton(props) {
+  return <Button type="button" className="h-10 bg-[#172f6b] px-4 text-white hover:bg-[#203f8a]" {...props}>Create Class</Button>;
+}
+
 function initialResources(view) {
   const cached = Object.fromEntries(Object.keys(endpoints).map((key) => [key, getResourceCacheEntry(`admin:${key}`)]));
   const requested = viewResources[view] || [];
@@ -215,12 +235,12 @@ export function AdminDashboard({ view = "dashboard" }) {
         {showClasses ? waiting("classes") || waiting("programs") || waiting("users") ? <SectionPlaceholder rows={3} /> : errors.classes ? resourceError("classes") : <div className="grid min-w-0 gap-6">
           {!showPrograms && errors.programs ? resourceError("programs") : null}
           {errors.users ? resourceError("users") : null}
-          <div className="flex justify-end"><Button type="button" onClick={() => setClassEditor({ item: null })} disabled={Boolean(working)} className="bg-[#172f6b] text-white hover:bg-[#203f8a]">Create Class</Button></div>
+          <div className="flex justify-end"><CreateClassButton onClick={() => setClassEditor({ item: null })} disabled={Boolean(working)} /></div>
           {classEditor && <ClassForm key={classEditor.item?.id || "new"} item={classEditor.item} programs={visiblePrograms} saving={working === "save-class"} onCancel={() => setClassEditor(null)} onSave={handleSaveClass} />}
           <section aria-labelledby="existing-classes-title" className="min-w-0 rounded-lg border border-slate-200 bg-white p-5">
           <h2 id="existing-classes-title" className="mb-4 text-lg font-semibold">Existing Classes</h2>
           {visibleClasses.length === 0 ? <EmptyState title="No classes found" /> : (
-            <div className="grid gap-3 lg:grid-cols-2">{visibleClasses.map((item) => <article key={item.id} className="min-w-0 rounded-lg border border-slate-200 p-4"><div className="flex items-start justify-between gap-3"><span className="min-w-0 break-words font-medium">{item.subject_name}</span><div className="flex shrink-0 gap-2"><Button size="sm" variant="outline" onClick={() => setClassEditor({ item })} disabled={Boolean(working)}>Edit</Button><Button size="sm" variant="destructive" onClick={() => { setWorking(`delete-class-${item.id}`); runAction(() => deleteClass(item.id), "Class deleted."); }}>Delete</Button></div></div><p className="mt-2 break-words text-xs text-slate-500">{item.program?.program_name || "Program"} · {item.year_level || "Year unavailable"} · {item.semester || "Semester unavailable"} Semester</p><dl className="mt-3 grid gap-1 text-xs text-slate-600"><div><dt className="inline font-medium">Academic units:</dt> <dd className="inline">{item.credit_units ?? "Unavailable"}</dd></div><div><dt className="inline font-medium">Class/contact hours:</dt> <dd className="inline">{item.weekly_hours ?? "Unavailable"} weekly</dd></div></dl></article>)}</div>
+            <div className="grid gap-3 lg:grid-cols-2">{visibleClasses.map((item) => <article key={item.id} className="min-w-0 rounded-lg border border-slate-200 p-4"><div className="flex items-start justify-between gap-3"><span className="min-w-0 break-words font-medium">{item.subject_name}</span><div className="flex shrink-0 gap-2"><Button size="sm" variant="outline" onClick={() => setClassEditor({ item })} disabled={Boolean(working)}>Edit</Button><Button size="sm" variant="destructive" onClick={() => { setWorking(`delete-class-${item.id}`); runAction(() => deleteClass(item.id), "Class deleted."); }}>Delete</Button></div></div><p className="mt-2 break-words text-xs text-slate-500">{item.program?.program_name || "Program"} · {item.year_level || "Year unavailable"} · {item.semester || "Semester unavailable"} Semester</p><ClassHours item={item} /></article>)}</div>
           )}
           </section>
         </div> : null}

@@ -341,6 +341,22 @@ test("Manage Classes shows existing classes without a create form", async () => 
   } finally { page.unmount(); }
 });
 
+test("Manage Class uses actual contact hours for both class-hour values", async () => {
+  const { ClassHours } = await server.ssrLoadModule(adminPath);
+  assert.equal(typeof ClassHours, "function");
+  const html = renderToStaticMarkup(React.createElement(ClassHours, { item: { credit_units: 1, weekly_hours: 3 } }));
+  assert.match(html, /Academic units:<\/dt> <dd[^>]*>3<\/dd>/);
+  assert.match(html, /Class\/contact hours:<\/dt> <dd[^>]*>3 hours<\/dd>/);
+  assert.doesNotMatch(html, /weekly|>1<\/dd>/i);
+});
+
+test("Manage Class create button uses the standard admin action size", async () => {
+  const { CreateClassButton } = await server.ssrLoadModule(adminPath);
+  assert.equal(typeof CreateClassButton, "function");
+  const html = renderToStaticMarkup(React.createElement(CreateClassButton));
+  assert.match(html, /class="[^"]*h-10[^"]*px-4[^"]*"/);
+});
+
 test("admin program failure leaves classes visible and report options recover without dashboard data", async () => {
   const { AdminDashboard } = await server.ssrLoadModule(adminPath);
   const api = network();

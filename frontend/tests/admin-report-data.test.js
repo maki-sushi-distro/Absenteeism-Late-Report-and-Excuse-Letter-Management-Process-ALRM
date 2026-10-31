@@ -9,6 +9,7 @@ test("report rows preserve server values as text and reject an unexpected spread
   assert.equal(rows[0]["End Date"], "");
   assert.throws(() => normalizeReportRows([["Unexpected"], ["value"]]), /report format/i);
   assert.deepEqual(normalizeReportRows([headings]), []);
+  assert.equal(normalizeReportRows([headings, ["r2", "Alex", "BSIS", "Math", "Ana", "absence", "2026-10-20", "", "Sick", "noted"]])[0].Status, "approved");
 });
 test("school weeks use Manila Monday boundaries including Sunday UTC and year changes", () => {
   assert.deepEqual(schoolWeek(new Date("2026-10-25T17:00:00Z")), { date_from: "2026-10-26", date_to: "2026-11-01" });

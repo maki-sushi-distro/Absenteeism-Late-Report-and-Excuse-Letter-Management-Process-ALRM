@@ -8,6 +8,7 @@ import RequestPagination from "@/pages/auth/instructor/InstructorRequests/Reques
 import { paginateRecords } from "@/pages/auth/student/records/pagination";
 import { getSelectablePrograms } from "@/lib/programs";
 import { reportHeadings as headings } from "./reportData.js";
+import { reportDatesComplete } from "./reportValidation.js";
 
 const emptyFilters = { program_id: "", status: "", date_from: "", date_to: "" };
 const field = "h-11 w-full rounded-md border border-slate-300 bg-white px-3 text-sm";
@@ -25,7 +26,7 @@ export default function AdminReports({ programs }) {
   function change(event) { setFilters(current => ({ ...current, [event.target.name]: event.target.value })); }
   async function generate(event) {
     event.preventDefault();
-    if (pending.current) return;
+    if (pending.current || !reportDatesComplete(filters)) return;
     if (filters.program_id && !selectablePrograms.some(program => String(program.id) === filters.program_id)) { setError("Select a program from the available list."); return; }
     if (filters.date_from && filters.date_to && filters.date_from > filters.date_to) { setError("The end date must be on or after the start date."); return; }
     const controller = new AbortController();
@@ -46,9 +47,9 @@ export default function AdminReports({ programs }) {
       <form className="grid items-end gap-4 md:grid-cols-2 xl:grid-cols-5" onSubmit={generate}>
         <label className="grid gap-2 text-sm">Program<select name="program_id" value={filters.program_id} onChange={change} className={field}><option value="">All programs</option>{selectablePrograms.map(program => <option key={program.id} value={program.id}>{program.program_name}</option>)}</select></label>
         <label className="grid gap-2 text-sm">Status<select name="status" value={filters.status} onChange={change} className={field}><option value="">All statuses</option>{["pending", "approved", "invalid"].map(status => <option key={status} value={status}>{status[0].toUpperCase() + status.slice(1)}</option>)}</select></label>
-        <label className="grid gap-2 text-sm">From<Input name="date_from" type="date" value={filters.date_from} onChange={change} className="h-11" /></label>
-        <label className="grid gap-2 text-sm">To<Input name="date_to" type="date" min={filters.date_from || undefined} value={filters.date_to} onChange={change} className="h-11" /></label>
-        <Button type="submit" disabled={loading} className="h-11 bg-[#172f6b] text-white hover:bg-[#203f8a]">Generate</Button>
+        <label className="grid gap-2 text-sm">From<Input name="date_from" type="date" required value={filters.date_from} onChange={change} className="h-11" /></label>
+        <label className="grid gap-2 text-sm">To<Input name="date_to" type="date" required min={filters.date_from || undefined} value={filters.date_to} onChange={change} className="h-11" /></label>
+        <Button type="submit" disabled={loading || !reportDatesComplete(filters)} className="h-11 bg-[#172f6b] text-white hover:bg-[#203f8a]">Generate</Button>
       </form>
     </section>
     {error && <ErrorState message={error} />}

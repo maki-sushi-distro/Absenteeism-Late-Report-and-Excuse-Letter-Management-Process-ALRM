@@ -1,9 +1,10 @@
 import { isGeneralEducationProgram } from "../../../lib/programs.js";
 import { historicalInstructor, historicalInstructorName, historicalRequestClass } from "../../../lib/requestHistory.js";
+import { normalizeRequestStatus, normalizeRequestStatusText } from "../../../lib/requestStatus.js";
 
 function eventDate(value) { return value && Number.isFinite(Date.parse(value)) ? value : null; }
 function newest(rows) { return rows.filter(row => eventDate(row.date)).sort((a, b) => Date.parse(b.date) - Date.parse(a.date)); }
-const auditActions = { submitted_request: "Submitted", updated_request: "Updated", cancelled_request: "Cancelled", followed_up_request: "Followed up", decided_request_approved: "Approved", decided_request_noted: "Noted", decided_request_invalid: "Denied", resolved_followup_flag: "Resolved" };
+const auditActions = { submitted_request: "Submitted", updated_request: "Updated", cancelled_request: "Cancelled", followed_up_request: "Followed up", decided_request_approved: "Approved", decided_request_noted: "Approved", decided_request_invalid: "Denied", resolved_followup_flag: "Resolved" };
 function requestInfo(request) {
   const course = historicalRequestClass(request);
   const student = request.enrollment?.student;
@@ -13,7 +14,7 @@ export function requestActivity(requests = []) {
   return newest(requests.flatMap(request => {
     const info = requestInfo(request);
     const events = [{ ...info, id: `${request.id}-submitted`, date: request.date_submitted || request.created_at, action: "Submitted" }];
-    const action = { approved: "Approved", noted: "Noted", invalid: "Denied" }[request.status];
+    const action = { approved: "Approved", invalid: "Denied" }[normalizeRequestStatus(request.status)];
     if (action && eventDate(request.date_reviewed)) events.push({ ...info, id: `${request.id}-reviewed`, date: request.date_reviewed, action });
     if (eventDate(request.followupFlag?.flagged_date || request.followup_flag?.flagged_date)) {
       const flag = request.followupFlag || request.followup_flag;
@@ -42,7 +43,7 @@ export function auditActivity(logs = [], { classes = [], requests = [], instruct
       || historicalInstructorName(matchingRequest, "", instructors)
       || historicalInstructor(matchingClass, instructors)?.name
       || "—";
-    return { id: log.id, requestId: request.id || "", date: log.timestamp, student: request.student?.name || request.enrollment?.student?.name || "Unavailable", studentId: "", email: "", subject: course.subject_name || "Unavailable", classId: course.id || "", type: request.type === "absence" ? "Absent" : request.type === "late" ? "Late" : "Unavailable", action: auditActions[log.action] || log.description || "Unavailable", instructor, actor: log.actor?.name || "Unavailable", description: log.description || auditActions[log.action] || "Activity recorded" };
+    return { id: log.id, requestId: request.id || "", date: log.timestamp, student: request.student?.name || request.enrollment?.student?.name || "Unavailable", studentId: "", email: "", subject: course.subject_name || "Unavailable", classId: course.id || "", type: request.type === "absence" ? "Absent" : request.type === "late" ? "Late" : "Unavailable", action: auditActions[log.action] || normalizeRequestStatusText(log.description) || "Unavailable", instructor, actor: log.actor?.name || "Unavailable", description: normalizeRequestStatusText(log.description || auditActions[log.action] || "Activity recorded") };
   }));
 }
 export function filterActivity(rows, { search = "", action = "", subject = "", date = "" } = {}) {

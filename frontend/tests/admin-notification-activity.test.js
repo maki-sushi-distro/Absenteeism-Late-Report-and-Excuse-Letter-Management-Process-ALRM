@@ -93,7 +93,7 @@ test("server notifications replace matching activity-log notifications for every
     ["cancelled_request", "Cancelled a request", "Alex Student cancelled a request"],
     ["followed_up_request", "Followed up a request", "Alex Student followed up a request"],
     ["decided_request_approved", "Approved a request", "Jamie Instructor approved a request"],
-    ["decided_request_noted", "Noted a request", "Jamie Instructor noted a request"],
+    ["decided_request_noted", "Noted a request", "Jamie Instructor approved a request"],
     ["decided_request_invalid", "Marked a request invalid", "Jamie Instructor marked a request invalid"],
     ["resolved_followup_flag", "Resolved a follow-up", "Jamie Instructor resolved a follow-up"],
   ];

@@ -1,4 +1,5 @@
 import { programShortName } from "../../../../lib/programs.js";
+import { absenceHours, attendancePercentage } from "./attendancePolicy.js";
 
 function courseRecord(source, programs) {
   const program = source.program || programs.find(item => item.id === source.program_id);
@@ -27,10 +28,15 @@ export function buildClassRecords(requests = [], programs = []) {
     const studentId = enrollment.student?.id || enrollment.student_id;
     if (!studentId) continue;
     if (!course.students.has(studentId)) {
-      course.students.set(studentId, { id: studentId, name: enrollment.student?.name || "Name unavailable", absences: 0, lates: 0 });
+      course.students.set(studentId, { id: studentId, name: enrollment.student?.name || "Name unavailable", absences: 0, lates: 0, invalidAbsenceHours: 0, invalidLates: 0, threshold: null });
     }
     const student = course.students.get(studentId);
     student[request.type === "absence" ? "absences" : "lates"] += 1;
+    if (request.status === "invalid") {
+      if (request.type === "absence") student.invalidAbsenceHours += absenceHours(source, request);
+      else student.invalidLates += 1;
+    }
+    student.threshold = attendancePercentage(source, student);
   }
   return [...classes.values()].map(course => ({ ...course, students: [...course.students.values()].sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id)) }))
     .sort((a, b) => a.subjectName.localeCompare(b.subjectName) || a.program.localeCompare(b.program) || a.section.localeCompare(b.section) || a.id.localeCompare(b.id));

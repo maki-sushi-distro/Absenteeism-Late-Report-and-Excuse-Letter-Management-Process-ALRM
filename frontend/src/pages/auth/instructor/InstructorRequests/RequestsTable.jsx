@@ -1,27 +1,32 @@
-import StatusBadge from "@/components/dashboard/StatusBadge";
+import { Fragment } from "react";
 import ClassRecordsTable from "../InstructorClassRecords/ClassRecordsTable";
-import { dueDate, formatDate, occurrenceDate, submittedDate } from "./requestData";
+import { formatDate, groupRequestsByMonth, occurrenceDate, requestCourse } from "./requestData";
 
 const columns = [
   { label: "Student" },
-  { label: "Date of Occurrence" },
-  { label: "Type" },
-  { label: "Submitted" },
-  { label: "Date of Due" },
-  { label: "Request" },
+  { label: "Subject" },
+  { label: "Date" },
+  { label: "Minutes Late" },
+  { label: "Threshold" },
   { label: "Action" },
 ];
 
-export default function RequestsTable({ records, onReview, caption = "Class requests" }) {
+const alertClass = { preventive: "bg-amber-50", critical: "bg-orange-50", "drop-limit": "bg-red-50" };
+
+export default function RequestsTable({ records, attendance = new Map(), onReview, caption = "Class requests" }) {
   return <ClassRecordsTable columns={columns} caption={caption} empty={!records.length && "No requests match these filters."}>
-    {records.map(record => <tr key={record.id} className="hover:bg-slate-50">
+    {groupRequestsByMonth(records).map(group => <Fragment key={group.key}>
+      <tr><th scope="rowgroup" colSpan={columns.length} className="bg-slate-100 px-3 py-2 text-left text-sm font-bold text-[#203B82]">{group.label}</th></tr>
+      {group.records.map(record => {
+        const alert = attendance.get(record.id);
+        return <tr key={record.id} aria-label={alert ? `Alert level: ${alert.label}` : undefined} className={`${alert ? alertClass[alert.level] || "" : ""} hover:bg-slate-50`}>
       <td className="break-words px-3 py-3">{record.enrollment?.student?.name || "Name unavailable"}</td>
+      <td className="break-words px-3 py-3">{requestCourse(record)?.subject_name || "Unavailable"}</td>
       <td className="px-3 py-3">{formatDate(occurrenceDate(record))}</td>
-      <td className="px-3 py-3">{record.type === "absence" ? "Absent" : "Late"}</td>
-      <td className="px-3 py-3">{formatDate(submittedDate(record))}</td>
-      <td className="px-3 py-3 text-sm font-normal text-slate-950">{formatDate(dueDate(record))}</td>
-      <td className="px-3 py-3"><StatusBadge value={record.status} /></td>
+      <td className="px-3 py-3">{record.type === "late" ? record.minutes_late ?? "—" : "—"}</td>
+      <td className="px-3 py-3">{alert ? <span>{alert.percentage}% · {alert.label}</span> : "Unavailable"}</td>
       <td className="px-3 py-3"><button type="button" onClick={() => onReview(record)} aria-label={`View request for ${record.enrollment?.student?.name || "student"}`} className="inline-flex min-h-8 w-24 items-center justify-center rounded-[4px] bg-[#203B82] px-3 text-xs font-semibold text-white hover:bg-[#172B63] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600">View</button></td>
-    </tr>)}
+    </tr>;})}
+    </Fragment>)}
   </ClassRecordsTable>;
 }

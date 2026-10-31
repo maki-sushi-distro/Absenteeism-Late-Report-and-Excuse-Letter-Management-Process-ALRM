@@ -141,21 +141,45 @@ test("course totals from the API remain in data but are not shown in the table",
   }
 });
 
-test("threshold percentages apply the twenty-percent semester-hours policy only to invalidated reports", async () => {
+test("threshold percentages use backend attendance units and count three invalid lates as one hour", async () => {
   const { buildClassRecords } = await helpers();
   const scheduled = { ...course, weekly_hours: 3, meetings_per_week: 1 };
   const request = (id, type, status) => report(id, type, status, { class: scheduled });
   const input = [request("one", "absence", "invalid"), request("two", "absence", "approved"), request("three", "absence", "pending"), request("four", "absence", "noted")];
   assert.equal(buildClassRecords(input, programs)[0].students[0].threshold, 6.25);
   const lates = [1, 2, 3].map(id => request(`late-${id}`, "late", "invalid"));
-  assert.equal(buildClassRecords([...input, ...lates, lates[0]], programs)[0].students[0].threshold, 12.5);
+  assert.equal(buildClassRecords([...input, ...lates, lates[0]], programs)[0].students[0].threshold, 8.33);
   assert.equal(buildClassRecords([request("pending", "absence", "pending")], programs)[0].students[0].threshold, 0);
 });
 
-test("thresholds respect class meeting frequency and do not cap absences at the policy limit", async () => {
+test("attendance alert levels match preventive, critical and rounded drop-limit boundaries", async () => {
+  const { attendanceAlert } = await import(new URL(`${directory}attendancePolicy.js`, import.meta.url));
+  const studentAt = (used) => ({ invalidAbsenceHours: used, invalidLates: 0 });
+  const threeHour = { weekly_hours: 3, meetings_per_week: 1 };
+  assert.equal(attendanceAlert(threeHour, studentAt(2)).level, "safe");
+  assert.equal(attendanceAlert(threeHour, studentAt(3)).level, "preventive");
+  assert.equal(attendanceAlert(threeHour, studentAt(6)).level, "critical");
+  assert.equal(attendanceAlert(threeHour, studentAt(9.99)).level, "critical");
+  assert.equal(attendanceAlert(threeHour, studentAt(10)).level, "drop-limit");
+  const fiveHour = { weekly_hours: 5, meetings_per_week: 2 };
+  assert.equal(attendanceAlert(fiveHour, studentAt(5)).level, "preventive");
+  assert.equal(attendanceAlert(fiveHour, studentAt(10)).level, "critical");
+  assert.equal(attendanceAlert(fiveHour, studentAt(16)).level, "drop-limit");
+  assert.equal(attendanceAlert({}, studentAt(4)), null);
+});
+
+test("threshold percentages use scheduled absence hours like the backend and fall back to meeting hours", async () => {
   const { buildClassRecords } = await helpers();
-  const twiceWeekly = { ...course, weekly_hours: "5", meetings_per_week: "2" };
-  assert.equal(buildClassRecords([report("one", "absence", "invalid", { class: twiceWeekly })], programs)[0].students[0].threshold, 3.13);
+  const twiceWeekly = { ...course, weekly_hours: "5", meetings_per_week: "2", schedule: [
+    { day: "Mon", start: "09:00", end: "11:00" },
+    { day: "Wed", start: "09:00", end: "12:00" },
+  ] };
+  const monday = { ...report("one", "absence", "invalid", { class: twiceWeekly }), start_date_of_absence: "2026-10-26", end_date_of_absence: "2026-10-26" };
+  const mondayToWednesday = { ...report("two", "absence", "invalid", { class: twiceWeekly }), start_date_of_absence: "2026-10-26", end_date_of_absence: "2026-10-28" };
+  assert.equal(buildClassRecords([monday], programs)[0].students[0].threshold, 2.5);
+  assert.equal(buildClassRecords([mondayToWednesday], programs)[0].students[0].threshold, 6.25);
+  const noDate = report("fallback", "absence", "invalid", { class: twiceWeekly });
+  assert.equal(buildClassRecords([noDate], programs)[0].students[0].threshold, 3.13);
   const scheduled = { ...course, weekly_hours: 3, meetings_per_week: 1 };
   const input = [1, 2, 3, 4].map(id => report(`invalid-${id}`, "absence", "invalid", { class: scheduled }));
   assert.equal(buildClassRecords(input, programs)[0].students[0].threshold, 25);

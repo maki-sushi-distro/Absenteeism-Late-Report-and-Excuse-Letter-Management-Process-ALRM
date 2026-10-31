@@ -3,7 +3,7 @@ import { requestStatuses } from "./requestData";
 
 const control = "h-9 max-w-full rounded-[5px] border border-[#A9B9D9] bg-white text-xs text-slate-900 focus:outline-blue-600 disabled:opacity-50";
 
-export default function RequestFilters({ search, subject, status, classes, onSearch, onChange, onExport, disabled, exportDisabled, showSubject = true }) {
+export default function RequestFilters({ search, subject, date, status, classes, onSearch, onChange, onExport, disabled, exportDisabled, showSubject = true }) {
   return <div className="flex flex-wrap items-center gap-3">
     <label className="relative min-w-40 flex-1 sm:max-w-72">
       <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-2.5 size-4 text-slate-400" />
@@ -14,6 +14,7 @@ export default function RequestFilters({ search, subject, status, classes, onSea
       {subject && !classes.some(course => course.id === subject) && <option value={subject}>Class unavailable</option>}
       {classes.filter(course => course.id).map(course => <option key={course.id} value={course.id}>{course.label}</option>)}
     </select>}
+    <input type="date" aria-label="Filter Date" value={date || ""} onChange={event => onChange({ date: event.target.value })} disabled={disabled} className={`${control} w-40 px-3`} />
     <select aria-label="Filter Request" value={status} onChange={event => onChange({ status: event.target.value })} disabled={disabled} className={`${control} w-40 pl-3 capitalize`}>
       <option value="">Filter Request</option>
       {requestStatuses.map(value => <option key={value} value={value}>{value.charAt(0).toUpperCase() + value.slice(1)}</option>)}

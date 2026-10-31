@@ -15,7 +15,7 @@ import RequestCoursesTable from "./RequestCoursesTable";
 import RequestsTable from "./RequestsTable";
 import RequestPagination from "./RequestPagination";
 import RequestDetailDialog from "./RequestDetailDialog";
-import { filterRequests, requestCourse, requestCourses, requestStatuses, updateRequestParams } from "./requestData";
+import { filterRequests, requestAttendance, requestCourse, requestCourses, requestStatuses, updateRequestParams } from "./requestData";
 import { loadRequests } from "./requestApi";
 import { exportRequests } from "./requestCsv";
 
@@ -32,6 +32,7 @@ export default function InstructorRequests() {
   const selected = records.find(record => String(record.id) === params.get("request") && (!classId || String(requestCourse(record)?.id) === classId));
   const type = ["absence", "late"].includes(params.get("type")) ? params.get("type") : selected?.type === "late" ? "late" : "absence";
   const subject = params.get("subject") || "";
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(params.get("date") || "") ? params.get("date") : "";
   const status = requestStatuses.includes(params.get("status")) ? params.get("status") : "";
   const programs = [...(programResource.data || []), ...(user?.programs || []), ...(user?.program ? [user.program] : [])];
   const allCourses = requestCourses(records, programs);
@@ -40,11 +41,15 @@ export default function InstructorRequests() {
   const activeClassId = classId || (requestCourse(selected)?.id ? String(requestCourse(selected).id) : "");
   const course = allCourses.find(item => item.id === activeClassId);
   const visibleCourses = subject ? courses.filter(item => item.id === subject) : courses;
-  const filtered = filterRequests(records, { type, subject: activeClassId, status, search });
+  const filterOptions = { subject: activeClassId, date, status, search };
+  const filtered = filterRequests(records, { ...filterOptions, type });
+  const typeCounts = { absence: filterRequests(records, { ...filterOptions, type: "absence" }).length, late: filterRequests(records, { ...filterOptions, type: "late" }).length };
+  const attendance = requestAttendance(records);
   const pagination = paginateRecords(filtered, page);
   const detailParams = new URLSearchParams();
   if (["absence", "late"].includes(params.get("type"))) detailParams.set("type", type);
   if (status) detailParams.set("status", status);
+  if (date) detailParams.set("date", date);
   const detailSearch = detailParams.toString() ? `?${detailParams}` : "";
   function change(changes) { setPage(1); setParams(current => updateRequestParams(current, changes)); }
   function download() { setExportError(""); try { exportRequests(filtered); } catch { setExportError("The CSV could not be exported. Please try again."); } }
@@ -59,11 +64,11 @@ export default function InstructorRequests() {
       {activeClassId ? course && <p className="text-sm text-slate-600">{course.program} · Year {course.year}{course.section ? ` · Section ${course.section}` : ""}</p> : <p className="text-xs leading-5 text-slate-500">Courses with submitted requests.</p>}
       {programResource.error && <p role="alert" className="text-sm text-slate-600">Program names could not be loaded. <button type="button" onClick={programResource.reload} className="text-[#203B82] underline">Retry</button></p>}
       <ResourceState error={resource.error} onRetry={resource.reload}>
-        {activeClassId ? course ? <RecordTypeTabs value={type} onValueChange={value => change({ type: value })}>
+        {activeClassId ? course ? <RecordTypeTabs value={type} counts={typeCounts} onValueChange={value => change({ type: value })}>
           <div className="grid min-w-0 gap-5">
             {exportError && <p role="alert" className="text-sm text-red-700">{exportError}</p>}
-            <RequestFilters search={search} status={status} onSearch={value => { setSearch(value); setPage(1); }} onChange={change} onExport={download} exportDisabled={!filtered.length} showSubject={false} />
-            <RequestsTable records={pagination.pageRecords} caption={`Requests for ${course.subjectName}, ${course.program}`} onReview={record => change({ request: String(record.id), type: record.type })} />
+            <RequestFilters search={search} date={date} status={status} onSearch={value => { setSearch(value); setPage(1); }} onChange={change} onExport={download} exportDisabled={!filtered.length} showSubject={false} />
+            <RequestsTable records={pagination.pageRecords} attendance={attendance} caption={`Requests for ${course.subjectName}, ${course.program}`} onReview={record => change({ request: String(record.id), type: record.type })} />
             <RequestPagination pagination={pagination} total={filtered.length} onPage={setPage} />
           </div>
         </RecordTypeTabs> : <p className="py-12 text-center text-sm text-slate-500">No request records found for this class.</p> : <RequestCoursesTable courses={visibleCourses} search={detailSearch} />}

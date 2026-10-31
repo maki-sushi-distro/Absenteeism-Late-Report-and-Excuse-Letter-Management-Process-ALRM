@@ -35,7 +35,7 @@ export default function useRequestReview(request, onReload) {
     working.current.opening = true;
     setOpening(true);
     setError("");
-    try { await openEvidence(encodeURIComponent(request.id)); }
+    try { await openEvidence(request.id); }
     catch (failure) { setError(failure.message || "The attachment could not be opened."); }
     finally { working.current.opening = false; setOpening(false); }
   }

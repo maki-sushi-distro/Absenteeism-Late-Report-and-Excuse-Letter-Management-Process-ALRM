@@ -32,13 +32,14 @@ afterEach(() => {
   else globalThis.window = originalWindow;
 });
 
-test("filters type, actual class ID, name and backend status, then sorts newest submission first", async () => {
+test("filters type, actual class ID, occurrence date, name and backend status, then sorts newest occurrence first", async () => {
   const { filterRequests, groupRequests } = await load("requestData.js");
   const otherClass = { ...course, id: "class-b", section: "B" };
   const rows = [request("old"), request("new", { date_submitted: "2026-10-23" }), request("late", { type: "late" }), request("invalid", { status: "invalid" }), request("other", { enrollment: { student: { name: "Alex Cruz" }, class: otherClass } })];
-  const options = { type: "absence", subject: "class-a", search: "  ALEX  ", status: "pending" };
+  const options = { type: "absence", subject: "class-a", date: "2026-10-19", search: "  ALEX  ", status: "pending" };
   assert.deepEqual(filterRequests(rows, options).map(row => row.id), ["new", "old"]);
   assert.deepEqual(filterRequests(rows, { ...options, status: "invalid" }).map(row => row.id), ["invalid"]);
+  assert.deepEqual(filterRequests([...rows, request("noted", { status: "noted" })], { ...options, status: "approved" }).map(row => row.id), ["noted"]);
   assert.deepEqual(filterRequests(rows, { ...options, type: "late" }).map(row => row.id), ["late"]);
   assert.equal(groupRequests(rows).length, 2);
   assert.deepEqual(groupRequests(rows).map(group => group.id), ["class-a", "class-b"]);
@@ -74,13 +75,22 @@ test("class request courses have separate View links and no student-count column
   assert.match(app, /path="\/instructor\/class-requests\/:classId"/);
 });
 
-test("occurrence dates never invent late dates and submission falls back to creation", async () => {
+test("occurrence dates use the shared request date and submission falls back to creation", async () => {
   const { occurrenceDate, submittedDate, formatDate } = await load("requestData.js");
   assert.equal(occurrenceDate(request("one")), "2026-10-19");
-  assert.equal(occurrenceDate(request("late", { type: "late" })), null);
+  assert.equal(occurrenceDate(request("late", { type: "late", start_date_of_absence: "2026-10-18" })), "2026-10-18");
   assert.equal(submittedDate(request("one", { date_submitted: null, created_at: "2026-10-21" })), "2026-10-21");
   assert.equal(formatDate(null), "Unavailable");
   assert.equal(formatDate("bad-date"), "Unavailable");
+});
+
+test("request month groups use Manila dates and keep records in deterministic order", async () => {
+  const { groupRequestsByMonth } = await load("requestData.js");
+  const groups = groupRequestsByMonth([
+    request("november", { start_date_of_absence: "2026-10-31T16:30:00Z" }),
+    request("january", { start_date_of_absence: "2027-01-02" }),
+  ]);
+  assert.deepEqual(groups.map(group => [group.label, group.records.map(record => record.id)]), [["January 2027", ["january"]], ["November 2026", ["november"]]]);
 });
 
 test("request deadlines are exactly 48 hours after submission for absence and late requests", async () => {
@@ -196,8 +206,9 @@ test("table and filters expose the requested labels with route-neutral review bu
   const Table = (await load("RequestsTable.jsx")).default;
   const Filters = (await load("RequestFilters.jsx")).default;
   const Tabs = (await server.ssrLoadModule("/src/components/records/RecordTypeTabs.jsx")).default;
-  const html = renderToStaticMarkup(React.createElement(MemoryRouter, null, React.createElement(Tabs, { value: "absence", onValueChange() {} }, React.createElement(Table, { records: [request("one", { status: "invalid" })], onReview() {} }))));
-  for (const text of ["Absent", "Late", "Student", "Date of Occurrence", "Type", "Submitted", "Date of Due", "Request", "Action", "Alex Cruz", "invalid", "Oct 22, 2026"]) assert.ok(html.includes(text), text);
+  const rowRecord = request("one", { status: "invalid" });
+  const html = renderToStaticMarkup(React.createElement(MemoryRouter, null, React.createElement(Tabs, { value: "absence", onValueChange() {} }, React.createElement(Table, { records: [rowRecord], attendance: new Map([[rowRecord.id, { percentage: 6.25, level: "preventive", label: "Preventive" }]]), onReview() {} }))));
+  for (const text of ["Absent", "Late", "Student", "Subject", "Date", "Minutes Late", "Threshold", "Action", "Alex Cruz", "Programming"]) assert.ok(html.includes(text), text);
   assert.match(html, />View<\/button>/);
   assert.match(html, /<td[^>]*>Alex Cruz<\/td>/);
   assert.doesNotMatch(html, /<td[^>]*text-\[#203B82\][^>]*>Alex Cruz/);
@@ -205,15 +216,38 @@ test("table and filters expose the requested labels with route-neutral review bu
   for (const type of ["absence", "late"]) {
     const record = request(type, { type });
     const onReview = mock.fn();
-    const row = Table({ records: [record], onReview }).props.children[0];
-    row.props.children.at(-1).props.children.props.onClick();
+    let viewButton;
+    function visit(node) {
+      if (!React.isValidElement(node)) return;
+      if (node.type === "button" && /^View request/.test(node.props["aria-label"] || "")) viewButton = node;
+      React.Children.forEach(node.props.children, visit);
+    }
+    visit(Table({ records: [record], onReview }));
+    viewButton.props.onClick();
     assert.equal(onReview.mock.calls[0].arguments[0], record);
   }
   assert.doesNotMatch(html, /Unavailable/);
   assert.match(html, /<button[^>]*type="button"/);
   assert.doesNotMatch(html, /href=/);
-  const filters = renderToStaticMarkup(React.createElement(Filters, { search: "", subject: "", status: "", classes: [], onSearch() {}, onChange() {}, onExport() {} }));
-  for (const text of ["Search Name...", "Filter Subject", "Filter Request", "Export", 'maxLength="50"', 'value="invalid"', 'value="noted"']) assert.ok(filters.includes(text), text);
+  const filters = renderToStaticMarkup(React.createElement(Filters, { search: "", subject: "", date: "", status: "", classes: [], onSearch() {}, onChange() {}, onExport() {} }));
+  for (const text of ["Search Name...", "Filter Subject", "Filter Date", "Filter Request", "Export", 'maxLength="50"', 'value="invalid"']) assert.ok(filters.includes(text), text);
+  assert.doesNotMatch(filters, /value="noted"/);
+});
+
+test("request tabs show counts and rows expose minutes plus accessible alert levels", async () => {
+  const Table = (await load("RequestsTable.jsx")).default;
+  const Tabs = (await server.ssrLoadModule("/src/components/records/RecordTypeTabs.jsx")).default;
+  const late = request("late", { type: "late", minutes_late: 17 });
+  const absent = request("absent", { type: "absence" });
+  const tabs = renderToStaticMarkup(React.createElement(Tabs, { value: "late", counts: { late: 1, absence: 1 }, onValueChange() {} }, "rows"));
+  assert.match(tabs, /Absent 1/);
+  assert.match(tabs, /Late 1/);
+  const alert = { percentage: 12.5, level: "critical", label: "Critical" };
+  const html = renderToStaticMarkup(React.createElement(Table, { records: [late, absent], attendance: new Map([[late.id, alert], [absent.id, alert]]), onReview() {} }));
+  assert.match(html, />17<\/td>/);
+  assert.match(html, />—<\/td>/);
+  assert.match(html, /12\.5%/);
+  assert.match(html, /Alert level: Critical/);
 });
 
 test("reviewed requests keep disabled decision buttons at the bottom without exposing raw attachments", async () => {
@@ -230,6 +264,7 @@ test("reviewed requests keep disabled decision buttons at the bottom without exp
   assert.ok(buttons.every(([, attributes]) => attributes.includes('disabled=""')));
   assert.match(html, /already been reviewed/i);
   assert.ok(html.indexOf('View Attachment') < html.indexOf('>Approve</button>'));
+  assert.match(html, /Evidence viewer/);
 });
 
 test("pending requests expose enabled approve and invalid decisions in the modal footer", async () => {
@@ -242,6 +277,24 @@ test("pending requests expose enabled approve and invalid decisions in the modal
   assert.ok(buttons.every(([, attributes]) => !/(?:^|\s)disabled(?:=|\s|$)/.test(attributes)));
   assert.ok(html.indexOf('Attachment unavailable') < html.indexOf('>Approve</button>'));
   assert.doesNotMatch(html, /already been reviewed/i);
+});
+
+test("program head request records expose evidence only when the server supplies an indicator", async () => {
+  const { RequestRecords } = await server.ssrLoadModule("/src/pages/auth/programHead/ProgramHeadRecords.jsx");
+  const withEvidence = renderToStaticMarkup(React.createElement(RequestRecords, { requests: [request("with", { evidence_file_url: "attachment-id" }), request("without")] }));
+  assert.equal((withEvidence.match(/View Evidence/g) || []).length, 1);
+  assert.match(withEvidence, /Evidence viewer/);
+  assert.doesNotMatch(withEvidence, /attachment-id/);
+});
+
+test("embedded evidence content renders only supported PDF and image elements", async () => {
+  const { EvidenceContent } = await server.ssrLoadModule("/src/components/evidence/EvidenceViewerDialog.jsx");
+  const render = state => renderToStaticMarkup(React.createElement(EvidenceContent, { state }));
+  assert.match(render({ status: "ready", mimeType: "application/pdf", url: "blob:pdf" }), /<object[^>]*type="application\/pdf"/);
+  assert.match(render({ status: "ready", mimeType: "image/png", url: "blob:image" }), /<img[^>]*alt="Uploaded evidence"/);
+  assert.match(render({ status: "unsupported" }), /not supported/);
+  assert.doesNotMatch(render({ status: "unsupported" }), /<object|<iframe|<img/);
+  assert.match(render({ status: "error", message: "Fetch failed" }), /role="alert"[^>]*>Fetch failed/);
 });
 
 test("default page mounts the instructor shell and full loading placeholder without sending a mutation", async () => {

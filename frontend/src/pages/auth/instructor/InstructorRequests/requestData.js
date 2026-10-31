@@ -1,9 +1,13 @@
 import { programShortName } from "../../../../lib/programs.js";
 import { historicalRequestClass } from "../../../../lib/requestHistory.js";
+import { formatManilaDate, groupByManilaMonth, manilaDateKey } from "../../../../lib/manilaDate.js";
+import { buildClassRecords } from "../InstructorClassRecords/recordData.js";
+import { attendanceAlert } from "../InstructorClassRecords/attendancePolicy.js";
+import { normalizeRequestStatus } from "../../../../lib/requestStatus.js";
 
-export const requestStatuses = ["pending", "approved", "noted", "invalid", "cancelled"];
+export const requestStatuses = ["pending", "approved", "invalid", "cancelled"];
 export const submittedDate = request => request.date_submitted || request.created_at || null;
-export const occurrenceDate = request => request.type === "absence" ? request.start_date_of_absence || null : null;
+export const occurrenceDate = request => request.start_date_of_absence || request.date_submitted || request.created_at || null;
 export const requestCourse = request => historicalRequestClass(request);
 export function dueDate(request) {
   const value = submittedDate(request);
@@ -14,9 +18,7 @@ export function dueDate(request) {
 }
 
 export function formatDate(value) {
-  if (!value) return "Unavailable";
-  const date = new Date(/^\d{4}-\d{2}-\d{2}$/.test(value) ? `${value}T00:00:00` : value);
-  return Number.isNaN(date.getTime()) ? "Unavailable" : date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  return formatManilaDate(value);
 }
 
 export function classLabel(course) {
@@ -24,14 +26,27 @@ export function classLabel(course) {
   return [course?.subject_name || "Subject unavailable", program?.program_code || programShortName(program?.program_name), course?.year_level && `Year ${course.year_level}`, course?.section && `Section ${course.section}`].filter(Boolean).join(" - ");
 }
 
-export function filterRequests(records, { type = "absence", subject = "", status = "", search = "" } = {}) {
+export function filterRequests(records, { type = "absence", subject = "", date = "", status = "", search = "" } = {}) {
   const name = search.slice(0, 50).trim().toLowerCase();
   const timestamp = record => Date.parse(submittedDate(record)) || 0;
   return records.filter(record => record?.id != null && record.type === type &&
     (!subject || String(requestCourse(record)?.id) === subject) &&
-    (!status || record.status === status) &&
+    (!date || manilaDateKey(occurrenceDate(record)) === date) &&
+    (!status || normalizeRequestStatus(record.status) === status) &&
     (!name || String(record.enrollment?.student?.name || "").toLowerCase().includes(name)))
-    .sort((a, b) => timestamp(b) - timestamp(a) || String(a.id).localeCompare(String(b.id)));
+    .sort((a, b) => Date.parse(occurrenceDate(b)) - Date.parse(occurrenceDate(a)) || timestamp(b) - timestamp(a) || String(a.id).localeCompare(String(b.id)));
+}
+
+export const groupRequestsByMonth = records => groupByManilaMonth(records, occurrenceDate);
+
+export function requestAttendance(records) {
+  const classes = new Map(buildClassRecords(records).map(course => [String(course.id), course]));
+  return new Map(records.map(record => {
+    const course = requestCourse(record);
+    const studentId = record.enrollment?.student?.id || record.enrollment?.student_id;
+    const student = classes.get(String(course?.id))?.students.find(item => String(item.id) === String(studentId));
+    return [record.id, course && student ? attendanceAlert(course, student) : null];
+  }));
 }
 
 export function groupRequests(records) {

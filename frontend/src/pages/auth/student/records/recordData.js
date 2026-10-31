@@ -1,5 +1,7 @@
 import { requestReason } from "../request-form/buildPayload.js";
-import { historicalRequestClass } from "../../../../lib/requestHistory.js";
+import { historicalInstructorName, historicalRequestClass } from "../../../../lib/requestHistory.js";
+import { requestStatusLabel } from "../../../../lib/requestStatus.js";
+import { groupByManilaMonth } from "../../../../lib/manilaDate.js";
 
 export function subjectOf(record) {
   return historicalRequestClass(record)?.subject_name || record.subjects_missed || "Unknown subject";
@@ -10,14 +12,15 @@ export function typeOf(record) {
 }
 
 export function recordDate(record) {
-  return record.type === "absence"
-    ? record.start_date_of_absence || record.date_submitted || record.created_at
-    : record.date_submitted || record.created_at;
+  return record.start_date_of_absence || record.date_submitted || record.created_at;
 }
 
+export const instructorOf = (record) => historicalInstructorName(record);
+
+export const groupRecordsByMonth = (records) => groupByManilaMonth(records, recordDate);
+
 export function reviewStatus(value) {
-  const labels = { pending: "Pending", approved: "Approved", noted: "Noted", invalid: "Invalid", cancelled: "Cancelled" };
-  return labels[value] || value || "\u2014";
+  return requestStatusLabel(value);
 }
 
 export function reasonOf(record) {
@@ -28,7 +31,7 @@ export function filterRecords(records, type, search = "", subject = "") {
   const query = search.trim().toLowerCase();
   return records.filter((record) => {
     const name = subjectOf(record);
-    return record.type === type && (!subject || name === subject)
+    return (type === "all" || record.type === type) && (!subject || name === subject)
       && (!query || `${name} ${reviewStatus(record.status)} ${typeOf(record)} ${reasonOf(record)}`.toLowerCase().includes(query));
   }).sort((a, b) => String(recordDate(b) || "").localeCompare(String(recordDate(a) || "")));
 }

@@ -247,11 +247,52 @@ test("role-specific events and recipients cannot cross into another role's inbox
   const rows = types.map(type => ({ id: type, type, user_id: "owner", message: type, date_sent: "2026-10-23", channel: "in_app" }));
   const preferences = { requestUpdates: true, thresholdAlerts: true };
   const visible = role => notificationActivity(rows, role, preferences, "owner").map(item => item.id);
-  assert.deepEqual(visible("student"), ["request_decision", "request_updated", "account_role_changed", "account_status_changed", "school_notice"]);
+  assert.deepEqual(visible("student"), ["request_decision", "request_updated", "threshold_warning", "threshold_critical", "ir_escalation", "account_role_changed", "account_status_changed", "school_notice"]);
   assert.deepEqual(visible("instructor"), ["new_request", "request_followup", "threshold_warning", "threshold_critical", "ir_escalation", "class_assignment", "program_head_assignment", "account_role_changed", "account_status_changed", "school_notice"]);
   assert.deepEqual(visible("program_head"), ["followup_flag", "threshold_warning", "threshold_critical", "ir_escalation", "program_head_assignment", "account_role_changed", "account_status_changed", "school_notice"]);
   assert.deepEqual(visible("administrator"), ["pending_staff_approval", "account_role_changed", "account_status_changed", "school_notice"]);
   assert.equal(notificationActivity(rows, "instructor", preferences, "another-user").length, 0);
+});
+
+test("threshold details use only canonical server values and retain raw messages when parsing fails", async () => {
+  const { notificationActivity } = await load("components/notifications/notificationData.js");
+  const canonical = "Alex reached the critical absence threshold in Math (12.5% of semester class hours; 6 of 10 allowable units; 8.33% of semester hours remaining before the IR limit). Consultation is required.";
+  const rows = [
+    { id: "parsed", type: "threshold_critical", user_id: "student", message: canonical, date_sent: "2026-10-30T08:00:00Z" },
+    { id: "raw", type: "threshold_warning", user_id: "student", message: "Attendance warning from the server", date_sent: "2026-10-29T08:00:00Z" },
+  ];
+  const activity = notificationActivity(rows, "student", { requestUpdates: true, thresholdAlerts: true }, "student");
+  assert.equal(activity[0].detail, "4 units and 8.33% remaining before the absence limit.");
+  assert.equal(activity[0].message, canonical);
+  assert.equal(activity[1].detail, undefined);
+  assert.equal(activity[1].message, rows[1].message);
+});
+
+test("notification presentation never rewrites a valid raw server message", async () => {
+  const { notificationActivity } = await load("components/notifications/notificationData.js");
+  const message = "Your absence request was noted by Prof. Reyes.";
+  const [item] = notificationActivity([{ id: "noted", type: "request_decision", user_id: "student", message, date_sent: "2026-10-30T08:00:00Z" }], "student", { requestUpdates: true, thresholdAlerts: true }, "student");
+  assert.equal(item.message, message);
+  assert.equal(item.label, "Absence approved");
+});
+
+test("decimal remaining units are presented without floating-point artifacts", async () => {
+  const { notificationActivity } = await load("components/notifications/notificationData.js");
+  const message = "Alex reached the preventive absence threshold (0.1 of 0.3 allowable units; 4.17% of semester hours remaining before the IR limit).";
+  const [item] = notificationActivity([{ id: "decimal", type: "threshold_warning", user_id: "student", message, date_sent: "2026-10-30T08:00:00Z" }], "student", { requestUpdates: true, thresholdAlerts: true }, "student");
+  assert.equal(item.detail, "0.2 units and 4.17% remaining before the absence limit.");
+});
+
+test("notification groups apply the unread filter first and use the Manila day boundary", async () => {
+  const { groupNotificationActivity } = await load("components/notifications/notificationData.js");
+  const activity = [
+    { id: "new", date: "2026-10-30T16:30:00Z", isRead: false },
+    { id: "read", date: "2026-10-30T15:30:00Z", isRead: true },
+    { id: "old", date: "2026-10-29T15:59:59Z", isRead: false },
+  ];
+  const now = new Date("2026-10-31T03:00:00+08:00");
+  assert.deepEqual(groupNotificationActivity(activity, "unread", now).map(group => [group.label, group.items.map(item => item.id)]), [["Today", ["new"]], ["Earlier", ["old"]]]);
+  assert.deepEqual(groupNotificationActivity(activity, "all", now).map(group => group.items.map(item => item.id)), [["new"], ["read", "old"]]);
 });
 
 test("an instructor's absence notification is retained alongside late notifications regardless of delivery channel", async () => {

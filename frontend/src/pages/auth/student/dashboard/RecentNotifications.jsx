@@ -4,8 +4,8 @@ import { Link } from "react-router-dom";
 import useStudentPreferences from "../useStudentPreferences";
 import { recentRequestActivity } from "./studentOverview";
 
-const icons = { approved: CheckCircle2, noted: CheckCircle2, invalid: XCircle, pending: Clock3 };
-const colors = { approved: "text-green-600 dark:text-green-400", noted: "text-green-600 dark:text-green-400", invalid: "text-red-600 dark:text-red-400", pending: "text-orange-600 dark:text-orange-400" };
+const icons = { approved: CheckCircle2, invalid: XCircle, pending: Clock3 };
+const colors = { approved: "text-green-600 dark:text-green-400", invalid: "text-red-600 dark:text-red-400", pending: "text-orange-600 dark:text-orange-400" };
 
 export default function RecentNotifications({ userId, requests }) {
   const { preferences } = useStudentPreferences(userId);

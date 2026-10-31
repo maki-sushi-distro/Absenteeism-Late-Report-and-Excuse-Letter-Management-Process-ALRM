@@ -1,6 +1,7 @@
 import { normalizeRole } from "../../lib/roles.js";
 import { historicalRequestClass } from "../../lib/requestHistory.js";
 import { auditActivity } from "../../pages/auth/admin/overviewData.js";
+import { manilaDateKey } from "../../lib/manilaDate.js";
 
 const recipients = {
   request_decision: ["student"],
@@ -8,9 +9,9 @@ const recipients = {
   new_request: ["instructor"],
   request_followup: ["instructor"],
   followup_flag: ["program"],
-  threshold_warning: ["instructor", "program"],
-  threshold_critical: ["instructor", "program"],
-  ir_escalation: ["instructor", "program"],
+  threshold_warning: ["student", "instructor", "program"],
+  threshold_critical: ["student", "instructor", "program"],
+  ir_escalation: ["student", "instructor", "program"],
   attendance_warning: ["instructor", "program"],
   attendance_ir: ["instructor", "program"],
   pending_staff_approval: ["admin"],
@@ -19,6 +20,30 @@ const recipients = {
   account_role_changed: ["student", "instructor", "program", "admin"],
   account_status_changed: ["student", "instructor", "program", "admin"],
 };
+
+function thresholdDetail(message) {
+  const match = String(message).match(/([\d.]+) of ([\d.]+) allowable units; ([\d.]+)% of semester hours remaining before the IR limit/i);
+  if (!match) return undefined;
+  const used = Number(match[1]);
+  const limit = Number(match[2]);
+  const percentage = Number(match[3]);
+  if (![used, limit, percentage].every(Number.isFinite)) return undefined;
+  const remaining = Math.round(Math.max(0, limit - used) * 100) / 100;
+  return `${remaining} units and ${percentage}% remaining before the absence limit.`;
+}
+
+function notificationLabel(type, message) {
+  if (type === "threshold_warning" || type === "attendance_warning") return "Preventive attendance alert";
+  if (type === "threshold_critical") return "Critical attendance alert";
+  if (type === "ir_escalation" || type === "attendance_ir") return "Drop-limit attendance alert";
+  if (type === "request_followup" || type === "followup_flag") return "Follow-up";
+  if (["request_decision", "new_request", "request_updated"].includes(type)) {
+    const requestType = /\blate\b/i.test(message) ? "Late" : /\babsence\b/i.test(message) ? "Absence" : "Request";
+    const outcome = /\b(approved|noted)\b/i.test(message) ? " approved" : /\b(invalid|denied)\b/i.test(message) ? " invalid" : " update";
+    return `${requestType}${outcome}`;
+  }
+  return undefined;
+}
 
 function destination(role, requestId, type) {
   const normalized = normalizeRole(role);
@@ -46,8 +71,21 @@ export function notificationActivity(records, role, preferences, userId) {
     seen.add(record.id);
     const threshold = ["threshold_warning", "threshold_critical", "ir_escalation", "attendance_warning", "attendance_ir"].includes(record.type);
     if (!(threshold ? preferences.thresholdAlerts : preferences.requestUpdates)) return [];
-    return [{ id: record.id, type: record.type, requestId: record.request_id, message: record.message, date: record.date_sent, isRead: record.is_read === true, href: destination(role, record.request_id, record.type) }];
+    const message = record.message;
+    return [{ id: record.id, type: record.type, requestId: record.request_id, message, detail: threshold ? thresholdDetail(message) : undefined,
+      label: notificationLabel(record.type, message), date: record.date_sent, isRead: record.is_read === true, href: destination(role, record.request_id, record.type) }];
   }).sort((a, b) => Date.parse(b.date) - Date.parse(a.date));
+}
+
+export function groupNotificationActivity(activity, filter = "all", now = new Date(), readIds) {
+  const read = readIds || new Set(activity.filter(item => item.isRead).map(item => item.id));
+  const visible = filter === "unread" ? activity.filter(item => !read.has(item.id)) : activity;
+  const today = manilaDateKey(now);
+  const groups = [
+    { label: "Today", items: visible.filter(item => manilaDateKey(item.date) === today) },
+    { label: "Earlier", items: visible.filter(item => manilaDateKey(item.date) !== today) },
+  ];
+  return groups.filter(group => group.items.length);
 }
 
 function activityAction(item) {
@@ -62,7 +100,7 @@ function activityAction(item) {
   if (/\bcancelled\b/i.test(message)) return "Cancelled";
   if (/\bfollowed up\b/i.test(message)) return "Followed up";
   if (/\bapproved\b/i.test(message)) return "Approved";
-  if (/\bnoted\b/i.test(message)) return "Noted";
+  if (/\bnoted\b/i.test(message)) return "Approved";
   if (/\b(invalid|denied)\b/i.test(message)) return "Denied";
   if (/\bresolved\b.*\bfollow-up\b/i.test(message)) return "Resolved";
   return "";

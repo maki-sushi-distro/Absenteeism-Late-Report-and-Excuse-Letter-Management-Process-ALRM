@@ -17,7 +17,7 @@ function StudentPageLayout({ children, contentPadding = "px-5 sm:px-8 lg:px-10" 
           </div>
 
           <div className="flex items-center gap-3 text-slate-950 dark:text-slate-100">
-            <StudentNotifications key={user?.id} userId={user?.id} />
+            <StudentNotifications key={user?.id} user={user} />
             <Link to="/settings" aria-label="Open profile settings" className="flex items-center gap-2 rounded-sm focus-visible:outline-2 focus-visible:outline-blue-500">
               <UserCircle className="size-7 text-slate-400 dark:text-slate-500" strokeWidth={1.75} />
               <div className="hidden max-w-44 leading-tight sm:block">

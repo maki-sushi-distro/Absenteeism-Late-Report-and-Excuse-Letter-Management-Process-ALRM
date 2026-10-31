@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { ChevronLeft, ChevronRight, Search, X } from "lucide-react";
 import { apiFetch } from "@/api/client";
@@ -12,7 +12,7 @@ import { LIMITS, proofOptions } from "./request-form/constants";
 import { TEXT_INPUT_MAX_LENGTH } from "@/lib/inputLimits";
 import { buildRequestEditForm, buildRequestUpdatePayload, proofTypeError } from "./request-form/buildPayload";
 import { paginateRecords } from "./records/pagination";
-import { filterRecords, reasonOf, recordDate, subjectOf, typeOf } from "./records/recordData";
+import { filterRecords, groupRecordsByMonth, instructorOf, reasonOf, recordDate, subjectOf, typeOf } from "./records/recordData";
 import RecordsTabs from "./records/RecordsTabs";
 import RecordActions from "./records/RecordActions";
 import FollowUpNotice from "./records/FollowUpNotice";
@@ -41,7 +41,7 @@ function formatDate(value) {
     : new Date(value);
   if (Number.isNaN(date.getTime())) return "—";
   return new Intl.DateTimeFormat("en-US", {
-    month: "short", day: "2-digit", year: "numeric", timeZone: "Asia/Singapore",
+    month: "short", day: "2-digit", year: "numeric", timeZone: "Asia/Manila",
   }).format(date);
 }
 
@@ -153,7 +153,7 @@ export default function StudentRecords() {
   const { loading, error } = resource;
   const [search, setSearch] = useState("");
   const [subject, setSubject] = useState("");
-  const [recordType, setRecordType] = useState("absence");
+  const [recordType, setRecordType] = useState("all");
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState(null);
   const [editing, setEditing] = useState(false);
@@ -177,14 +177,16 @@ export default function StudentRecords() {
     return () => window.clearTimeout(timer);
   }, [records, requestedId]);
 
-  const typeRecords = useMemo(() => records.filter((record) => record.type === recordType), [records, recordType]);
+  const typeRecords = useMemo(() => records.filter((record) => recordType === "all" || record.type === recordType), [records, recordType]);
   const subjects = useMemo(() => [...new Set(typeRecords.map(subjectOf))].sort(), [typeRecords]);
   const visibleRecords = useMemo(() => filterRecords(records, recordType, search, subject), [records, recordType, search, subject]);
 
   const { totalPages, currentPage, firstRecord, pageRecords, pageButtons } = paginateRecords(visibleRecords, page);
+  const pageGroups = groupRecordsByMonth(pageRecords);
+  const typeCounts = useMemo(() => ({ all: records.length, absence: records.filter(record => record.type === "absence").length, late: records.filter(record => record.type === "late").length }), [records]);
 
   function changeRecordType(value) {
-    if (!["absence", "late"].includes(value)) return;
+    if (!["all", "absence", "late"].includes(value)) return;
     setRecordType(value);
     setSubject("");
     setPage(1);
@@ -222,7 +224,7 @@ export default function StudentRecords() {
     <StudentPageLayout contentPadding="px-5 sm:px-[50px]">
       <section aria-label="My Records" className="grid min-w-0 w-full gap-2">
         <h1 className="sr-only">My Records</h1>
-        {loading ? <TablePageSkeleton layout="student-records" label="Loading your records..." /> : <RecordsTabs value={recordType} onValueChange={changeRecordType}>
+        {loading ? <TablePageSkeleton layout="student-records" label="Loading your records..." /> : <RecordsTabs value={recordType} onValueChange={changeRecordType} includeAll counts={typeCounts}>
         <div className="grid min-w-0 gap-2">
         <div className="flex flex-wrap items-center gap-3">
           <div className="relative w-[220px] max-w-full">
@@ -239,29 +241,33 @@ export default function StudentRecords() {
         {error && <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300">{error} <button type="button" onClick={refresh} className="ml-2 font-semibold underline">Try again</button></div>}
         <FollowUpNotice notice={notice} onDismiss={dismissNotice} />
         <div aria-busy={loading} className="overflow-x-auto">
-          <table className="w-full min-w-[820px] table-auto border-collapse text-left text-sm leading-5">
-            <colgroup><col /><col className="w-[20%]" /><col className="w-[18%]" /><col className="w-[228px]" /></colgroup>
+          <table className="w-full min-w-[1000px] table-auto border-collapse text-left text-sm leading-5">
             <thead className="text-sm font-bold text-[#101C4A] dark:text-blue-200">
               <tr className="border-b border-[#AEBBD5] dark:border-slate-700">
-                <th scope="col" className="px-4 py-3">Subject</th>
                 <th scope="col" className="px-4 py-3">Date</th>
-                <th scope="col" className="px-4 py-3">Status</th>
+                <th scope="col" className="px-4 py-3">Subject</th>
+                <th scope="col" className="px-4 py-3">Instructor</th>
+                <th scope="col" className="px-4 py-3">Type</th>
+                <th scope="col" className="px-4 py-3">Request Status</th>
                 <th scope="col" className="px-4 py-3">Action</th>
               </tr>
             </thead>
             <tbody>
               {error ? (
-                <tr><td colSpan={4} className="px-4 py-10 text-center text-slate-500">Records could not be loaded.</td></tr>
+                <tr><td colSpan={6} className="px-4 py-10 text-center text-slate-500">Records could not be loaded.</td></tr>
               ) : visibleRecords.length === 0 ? (
-                <tr><td colSpan={4} className="px-4 py-10 text-center text-slate-500">{typeRecords.length ? "No records match your search or subject filter." : `You have no submitted ${recordType === "absence" ? "absence" : "late"} requests yet.`}</td></tr>
-              ) : pageRecords.map((record) => (
-                <tr key={record.id} className="border-b border-[#C5CEE0] hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-900">
-                  <td className="break-words px-4 py-4">{subjectOf(record)}</td>
+                <tr><td colSpan={6} className="px-4 py-10 text-center text-slate-500">{typeRecords.length ? "No records match your search or subject filter." : recordType === "all" ? "You have no submitted requests yet." : `You have no submitted ${recordType === "absence" ? "absence" : "late"} requests yet.`}</td></tr>
+              ) : pageGroups.map((group) => <Fragment key={group.key}>
+                <tr><th scope="rowgroup" colSpan={6} className="bg-slate-50 px-4 py-2 text-sm font-bold text-[#173D83] dark:bg-slate-800 dark:text-blue-300">{group.label}</th></tr>
+                {group.records.map((record) => <tr key={record.id} className="border-b border-[#C5CEE0] hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-900">
                   <td className="whitespace-nowrap px-4 py-4">{formatDate(recordDate(record))}</td>
+                  <td className="break-words px-4 py-4">{subjectOf(record)}</td>
+                  <td className="break-words px-4 py-4">{instructorOf(record)}</td>
+                  <td className="px-4 py-4">{typeOf(record)}</td>
                   <td className="px-4 py-4"><StatusBadge value={record.status} /></td>
                   <td className="px-4 py-4"><RecordActions record={record} onView={viewRecord} description={`${subjectOf(record)}, ${formatDate(recordDate(record))}`} onFollowUp={followUp} followingUpId={followingUpId} cooldownSeconds={cooldownSecondsById[record.id] || 0} /></td>
-                </tr>
-              ))}
+                </tr>)}
+              </Fragment>)}
             </tbody>
           </table>
         </div>

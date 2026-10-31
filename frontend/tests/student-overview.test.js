@@ -53,7 +53,8 @@ test("recent activity excludes student submissions and keeps only recorded instr
   ]);
   assert.deepEqual(events.map((event) => event.id), ["r-4-reviewed", "r-1-reviewed"]);
   assert.equal(events[0].requestId, "r-4");
-  assert.match(events[0].message, /Science noted/);
+  assert.match(events[0].message, /Science approved/);
+  assert.equal(events[0].status, "approved");
   assert.match(events[1].message, /Math approved/);
   assert.deepEqual(recentRequestActivity([{ id: "pending", type: "absence", status: "pending", date_submitted: "2026-10-05" }]), []);
   assert.deepEqual(recentRequestActivity(), []);

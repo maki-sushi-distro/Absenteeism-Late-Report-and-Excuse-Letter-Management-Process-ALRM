@@ -3,6 +3,8 @@ import { EmptyState } from "@/components/common/EmptyState";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { resolveProgramHeadFlag } from "@/api/programHead";
 import { formatRiskPercentage, requestClass, requestStudent } from "./programHeadData";
+import { normalizeRequestStatus } from "@/lib/requestStatus";
+import EvidenceViewerDialog from "@/components/evidence/EvidenceViewerDialog";
 
 const panel = "overflow-x-auto rounded-md border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900";
 
@@ -34,9 +36,10 @@ export function FlaggedRecords({ flags, onRefresh }) {
 
 export function RequestRecords({ requests }) {
   const [status, setStatus] = useState("");
-  const visible = requests.filter((request) => !status || request.status === status);
-  return <section className="space-y-4"><header><h1 className="text-2xl font-bold">Program requests</h1><p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Late and absence requests in your program</p></header>
-    <label className="block text-sm font-medium">Status <select value={status} onChange={(event) => setStatus(event.target.value)} className="ml-2 rounded-md border border-slate-300 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-900"><option value="">All</option>{["pending", "approved", "noted", "invalid"].map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
-    {visible.length ? <div className={panel}><table className="w-full min-w-[650px] text-left text-sm"><thead className="bg-slate-50 text-slate-500 dark:bg-slate-800 dark:text-slate-300"><tr><th className="px-4 py-3">Student</th><th className="px-4 py-3">Class</th><th className="px-4 py-3">Type</th><th className="px-4 py-3">Status</th></tr></thead><tbody className="divide-y divide-slate-200 dark:divide-slate-800">{visible.map((request) => <tr key={request.id}><td className="px-4 py-3 font-medium">{requestStudent(request)}</td><td className="px-4 py-3">{requestClass(request)?.subject_name || "Unavailable"}</td><td className="px-4 py-3 capitalize">{request.type}</td><td className="px-4 py-3"><StatusBadge value={request.status} /></td></tr>)}</tbody></table></div> : <EmptyState title="No matching requests" />}
-  </section>;
+  const [evidenceRequestId, setEvidenceRequestId] = useState("");
+  const visible = requests.filter((request) => !status || normalizeRequestStatus(request.status) === status);
+  return <><section className="space-y-4"><header><h1 className="text-2xl font-bold">Program requests</h1><p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Late and absence requests in your program</p></header>
+    <label className="block text-sm font-medium">Status <select value={status} onChange={(event) => setStatus(event.target.value)} className="ml-2 rounded-md border border-slate-300 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-900"><option value="">All</option>{["pending", "approved", "invalid"].map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
+    {visible.length ? <div className={panel}><table className="w-full min-w-[720px] text-left text-sm"><thead className="bg-slate-50 text-slate-500 dark:bg-slate-800 dark:text-slate-300"><tr><th className="px-4 py-3">Student</th><th className="px-4 py-3">Class</th><th className="px-4 py-3">Type</th><th className="px-4 py-3">Status</th><th className="px-4 py-3">Action</th></tr></thead><tbody className="divide-y divide-slate-200 dark:divide-slate-800">{visible.map((request) => <tr key={request.id}><td className="px-4 py-3 font-medium">{requestStudent(request)}</td><td className="px-4 py-3">{requestClass(request)?.subject_name || "Unavailable"}</td><td className="px-4 py-3 capitalize">{request.type}</td><td className="px-4 py-3"><StatusBadge value={request.status} /></td><td className="px-4 py-3">{request.evidence_file_url ? <button type="button" aria-haspopup="dialog" aria-label="Open Evidence viewer" onClick={() => setEvidenceRequestId(request.id)} className="rounded-md border border-blue-200 px-3 py-1.5 font-medium text-blue-800 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-300 dark:hover:bg-slate-800">View Evidence</button> : "—"}</td></tr>)}</tbody></table></div> : <EmptyState title="No matching requests" />}
+  </section>{evidenceRequestId && <EvidenceViewerDialog requestId={evidenceRequestId} onClose={() => setEvidenceRequestId("")} />}</>;
 }

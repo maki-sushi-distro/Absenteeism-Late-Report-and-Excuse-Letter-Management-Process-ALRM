@@ -4,6 +4,7 @@ import { programShortName } from "@/lib/programs";
 import { generateAdminReport } from "@/api/adminReports";
 import { Skeleton } from "@/components/ui/skeleton";
 import { departmentWeekRows, schoolWeek } from "../reports/reportData.js";
+import { chartProgramTick } from "./chartLabels.js";
 
 export default function AdminDepartmentChart({ programs = [] }) {
   const [weeksAgo, setWeeksAgo] = useState(0);
@@ -38,7 +39,7 @@ export default function AdminDepartmentChart({ programs = [] }) {
     {report.loading || report.key !== key ? <div role="status" aria-label="Loading weekly reports" className="mt-4 h-64"><Skeleton className="h-full w-full" /></div> : report.error ? <div role="alert" className="flex h-64 flex-col items-center justify-center gap-3 text-center text-sm text-slate-600"><p>{report.error}</p><button type="button" onClick={() => { setReport(current => ({ ...current, loading: true })); setRevision(value => value + 1); }} className="text-blue-800 underline">Retry weekly reports</button></div> : <div className="relative mt-4 h-64">
       <ResponsiveContainer width="100%" height="100%" minWidth={0} initialDimension={{ width: 600, height: 256 }}>
         <BarChart data={data} margin={{ top: 10, right: 8, bottom: 10, left: -24 }}>
-          <XAxis dataKey="name" tickLine={false} axisLine={{ stroke: "#94A3B8" }} tick={{ fill: "#475569", fontSize: 11 }} interval={0} />
+          <XAxis dataKey="name" tickFormatter={chartProgramTick} tickLine={false} axisLine={{ stroke: "#94A3B8" }} tick={{ fill: "#475569", fontSize: 11 }} interval={0} />
           <YAxis domain={[0, dataMax => Math.max(3, dataMax)]} allowDecimals={false} tickLine={false} axisLine={false} tick={{ fill: "#64748B", fontSize: 11 }} />
           <Tooltip />
           <Bar dataKey="absences" name="Absences" fill="#ED2532" isAnimationActive={false} />

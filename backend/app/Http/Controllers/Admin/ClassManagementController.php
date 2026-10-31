@@ -24,7 +24,19 @@ class ClassManagementController extends Controller
      */
     public function index()
     {
-        $classes = ClassModel::with('instructor', 'program', 'activeTeachingAssignment.instructor')
+        $classes = ClassModel::query()
+            ->select([
+                'id', 'subject_name', 'section', 'semester', 'school_year',
+                'instructor_id', 'program_id', 'year_level', 'schedule',
+                'curriculum_subject_id', 'credit_units', 'weekly_hours',
+                'meetings_per_week', 'assignment_revision',
+            ])
+            ->with([
+                'instructor:id,name,email,role,status',
+                'program:id,program_name',
+                'activeTeachingAssignment:id,class_id,instructor_id,version,started_at,ended_at',
+                'activeTeachingAssignment.instructor:id,name,email,role,status',
+            ])
             ->withCount('enrollments')
             ->withCount(['requests as pending_requests_count' => fn ($query) => $query->where('status', 'pending')]);
 

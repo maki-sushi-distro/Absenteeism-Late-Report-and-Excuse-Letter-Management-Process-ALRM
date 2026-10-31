@@ -37,6 +37,7 @@ class AuditLogController extends Controller
 
         /** @var Builder<AuditLog> $query */
         $query = AuditLog::query()
+            ->select(['id', 'user_id', 'action', 'table_affected', 'record_id', 'timestamp'])
             ->whereIn('action', array_keys(AuditLogResource::ACTIONS))
             ->whereHas('user', function ($query) use ($filters) {
                 $query->whereIn('role', isset($filters['role']) ? [$filters['role']] : ['student', 'instructor']);
@@ -58,8 +59,13 @@ class AuditLogController extends Controller
             })
             ->with([
                 'user:id,name,role',
+                'excuseRequest:id,enrollment_id,type,status,class_snapshot',
+                'excuseRequest.enrollment:id,student_id,class_id',
                 'excuseRequest.enrollment.student:id,name',
                 'excuseRequest.enrollment.class:id,subject_name,program_id,instructor_id',
+                'followupFlag:id,request_id',
+                'followupFlag.request:id,enrollment_id,type,status,class_snapshot',
+                'followupFlag.request.enrollment:id,student_id,class_id',
                 'followupFlag.request.enrollment.student:id,name',
                 'followupFlag.request.enrollment.class:id,subject_name,program_id,instructor_id',
             ]);

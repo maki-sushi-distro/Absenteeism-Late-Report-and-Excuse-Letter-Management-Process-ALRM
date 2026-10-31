@@ -11,6 +11,7 @@ use App\Services\AcademicPeriod;
 use App\Services\AuditLoggerService;
 use App\Support\BoundedCollection;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class ClassManagementController extends Controller
@@ -22,8 +23,13 @@ class ClassManagementController extends Controller
     /**
      * GET /api/admin/classes
      */
-    public function index()
+    public function index(Request $request)
     {
+        $request->validate([
+            'program_id' => ['sometimes', 'uuid', 'exists:programs,id'],
+            'search' => ['sometimes', 'string', 'max:120'],
+        ]);
+
         $classes = ClassModel::query()
             ->select([
                 'id', 'subject_name', 'section', 'semester', 'school_year',
@@ -39,6 +45,23 @@ class ClassManagementController extends Controller
             ])
             ->withCount('enrollments')
             ->withCount(['requests as pending_requests_count' => fn ($query) => $query->where('status', 'pending')]);
+
+        if ($request->filled('program_id')) {
+            $classes->where('program_id', $request->query('program_id'));
+        }
+
+        if ($request->filled('search')) {
+            $search = trim((string) $request->query('search'));
+            $classes->where(function (Builder $searchQuery) use ($search) {
+                $searchQuery
+                    ->where('subject_name', 'like', "%{$search}%")
+                    ->orWhere('section', 'like', "%{$search}%")
+                    ->orWhereHas('instructor', fn (Builder $query) => $query
+                        ->where('name', 'like', "%{$search}%")
+                        ->orWhere('email', 'like', "%{$search}%"))
+                    ->orWhereHas('program', fn (Builder $query) => $query->where('program_name', 'like', "%{$search}%"));
+            });
+        }
 
         return BoundedCollection::respond($classes);
     }

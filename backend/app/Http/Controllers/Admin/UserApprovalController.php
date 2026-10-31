@@ -49,6 +49,9 @@ class UserApprovalController extends Controller
         $request->validate([
             'role' => ['sometimes', 'string', Rule::in(self::CREATABLE_ROLES)],
             'status' => ['sometimes', 'string', Rule::in(['pending', 'approved', 'deactivated', 'inactive'])],
+            'program_id' => ['sometimes', 'uuid'],
+            'year_level' => ['sometimes', 'string', Rule::in(['1st', '2nd', '3rd', '4th'])],
+            'search' => ['sometimes', 'string', 'max:120'],
         ]);
 
         /** @var Builder<User> $query */
@@ -66,9 +69,54 @@ class UserApprovalController extends Controller
             $query->where('status', $status);
         }
 
+        if ($request->filled('program_id')) {
+            $programId = $request->query('program_id');
+            $query->where(function (Builder $programQuery) use ($programId) {
+                $programQuery
+                    ->where('program_id', $programId)
+                    ->orWhereHas('headedProgram', fn (Builder $q) => $q->whereKey($programId))
+                    ->orWhereHas('additionalHeadedPrograms', fn (Builder $q) => $q->whereKey($programId))
+                    ->orWhereHas('programs', fn (Builder $q) => $q->whereKey($programId));
+            });
+        }
+
+        if ($request->filled('year_level')) {
+            $query->where('year_level', $request->query('year_level'));
+        }
+
+        if ($request->filled('search')) {
+            $search = trim((string) $request->query('search'));
+            $query->where(function (Builder $searchQuery) use ($search) {
+                $searchQuery
+                    ->where('name', 'like', "%{$search}%")
+                    ->orWhere('email', 'like', "%{$search}%")
+                    ->orWhere('school_id_number', 'like', "%{$search}%");
+            });
+        }
+
+        if ($request->query('role') === 'program_head') {
+            $query->where(function (Builder $roleQuery) {
+                $roleQuery
+                    ->where('role', 'program_head')
+                    ->orWhereHas('headedProgram')
+                    ->orWhereHas('additionalHeadedPrograms');
+            });
+        }
+
         /** @var Builder<User> $users */
-        $users = $query->with(['program', 'programs'])
-            ->withExists(['headedProgram as heads_program'])
+        $users = $query
+            ->select([
+                'id', 'name', 'email', 'role', 'program_id',
+                'school_id_number', 'status', 'year_level',
+            ])
+            ->with([
+                'program:id,program_name',
+                'programs:id,program_name',
+            ])
+            ->withExists([
+                'headedProgram as heads_program',
+                'additionalHeadedPrograms as additional_heads_program',
+            ])
             ->orderBy('name');
 
         return BoundedCollection::respond($users, UserResource::class);

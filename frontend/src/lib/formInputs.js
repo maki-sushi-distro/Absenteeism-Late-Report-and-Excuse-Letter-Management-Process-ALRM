@@ -113,7 +113,7 @@ export function prepareReportFilters(filters) {
     if (Object.hasOwn(payload, key)) payload[key] = sanitizeText(payload[key]);
   }
   if (payload.program_id && !isIdentifier(payload.program_id)) errors.program_id = 'Select a valid program.';
-  if (payload.status && !['pending', 'approved', 'noted', 'invalid'].includes(payload.status)) errors.status = 'Select an available request status.';
+  if (payload.status && !['pending', 'approved', 'invalid'].includes(payload.status)) errors.status = 'Select an available request status.';
   for (const [key, label] of [['date_from', 'start'], ['date_to', 'end']]) {
     if (payload[key] && !isValidDate(payload[key])) errors[key] = `Choose a valid ${label} date.`;
   }

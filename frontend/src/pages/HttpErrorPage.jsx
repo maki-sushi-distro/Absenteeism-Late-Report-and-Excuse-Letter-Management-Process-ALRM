@@ -183,7 +183,7 @@ function HttpErrorPage({ status = 404, description, onRetry }) {
                   type="button"
                   variant="outline"
                   size="lg"
-                  onClick={() => navigate(destination)}
+                  onClick={() => canRetry ? window.location.assign(destination) : navigate(destination)}
                   className="h-10 rounded-[6px] border-slate-300 px-4 font-bold dark:border-slate-700"
                 >
                   <DestinationIcon className="size-4" />

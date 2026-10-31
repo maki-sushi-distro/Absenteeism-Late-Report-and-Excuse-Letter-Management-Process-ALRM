@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { afterEach, beforeEach, mock, test } from "node:test";
 import {
   createStudentRequest,
+  fetchEvidence,
   getStudentRequest,
   openEvidence,
   updateStudentRequest,
@@ -72,6 +73,24 @@ test("evidence viewer rejects HTML attachment responses", async () => {
   assert.equal(popup.closed, true);
   assert.equal(popup.location.href, "");
   assert.equal(link.click.mock.callCount(), 0);
+});
+
+test("shared evidence fetch returns the blob and response MIME type", async () => {
+  const fetch = mockApiFetch(async (url) => {
+    assert.ok(String(url).endsWith("/api/requests/request%2Fone/evidence"));
+    return new Response("file bytes", { headers: { "Content-Type": "application/pdf" } });
+  });
+  const result = await fetchEvidence("request/one");
+  assert.equal(result.mimeType, "application/pdf");
+  assert.equal(result.blob.type, "application/pdf");
+  assert.equal(fetch.mock.callCount(), 1);
+});
+
+test("shared evidence fetch preserves unsupported MIME types and reports fetch failures", async () => {
+  const fetch = mockApiFetch(async () => new Response("<html></html>", { headers: { "Content-Type": "text/html" } }));
+  assert.equal((await fetchEvidence("request-one")).mimeType, "text/html");
+  fetch.mock.mockImplementation(async () => Response.json({ message: "Attachment unavailable." }, { status: 404 }));
+  await assert.rejects(fetchEvidence("request-one"), /Attachment unavailable/);
 });
 
 test("request edit reads proof selections from the detail endpoint", async () => {

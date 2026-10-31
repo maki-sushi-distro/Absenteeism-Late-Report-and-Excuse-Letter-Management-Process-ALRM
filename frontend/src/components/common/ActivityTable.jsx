@@ -12,7 +12,7 @@ import RequestPagination from "@/pages/auth/instructor/InstructorRequests/Reques
 import { usePageViewState } from "@/hooks/usePageViewState";
 
 const emptyFilters = { search: "", action: "", subject: "", date: "" };
-const actions = { Submitted: "border-orange-200 bg-orange-50 text-orange-700", Updated: "border-blue-200 bg-blue-50 text-blue-800", Cancelled: "border-slate-300 bg-slate-50 text-slate-700", "Followed up": "border-orange-200 bg-orange-50 text-orange-700", Flagged: "border-yellow-300 bg-yellow-50 text-yellow-900", Approved: "border-green-200 bg-green-50 text-green-700", Denied: "border-red-200 bg-red-50 text-red-700", Noted: "border-blue-200 bg-blue-50 text-blue-800", Resolved: "border-green-200 bg-green-50 text-green-700" };
+const actions = { Submitted: "border-orange-200 bg-orange-50 text-orange-700", Updated: "border-blue-200 bg-blue-50 text-blue-800", Cancelled: "border-slate-300 bg-slate-50 text-slate-700", "Followed up": "border-orange-200 bg-orange-50 text-orange-700", Flagged: "border-yellow-300 bg-yellow-50 text-yellow-900", Approved: "border-green-200 bg-green-50 text-green-700", Denied: "border-red-200 bg-red-50 text-red-700", Resolved: "border-green-200 bg-green-50 text-green-700" };
 
 export default function ActivityTable({ rows = [], loading, error, onRetry, updatedAt, viewKey = "activity", flagged = false, programLog = false }) {
   const [view, setView] = usePageViewState(viewKey, { filters: emptyFilters, page: 1 });

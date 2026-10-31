@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { afterEach, beforeEach, test } from "node:test";
 import { validateEvidenceFile } from "../src/pages/auth/student/request-form/evidenceValidation.js";
 import { compressImage } from "../src/pages/auth/student/request-form/imageCompress.js";
+import { createEvidenceObjectUrl, releaseEvidenceObjectUrl } from "../src/components/evidence/evidenceObjectUrl.js";
 
 beforeEach(() => { globalThis.createImageBitmap = async () => {}; });
 afterEach(() => {
@@ -96,4 +97,16 @@ test("images are re-encoded even when the new file is larger than the original",
   assert.equal(processed.type, "image/jpeg");
   assert.equal(processed.name, "photo.jpg");
   assert.equal(closed, true);
+});
+
+test("evidence object URLs are replaced and released without leaving stale URLs", (t) => {
+  const revoked = [];
+  t.mock.method(URL, "createObjectURL", (blob) => `blob:${blob.type}`);
+  t.mock.method(URL, "revokeObjectURL", (url) => revoked.push(url));
+  const pdfUrl = createEvidenceObjectUrl(new Blob(["pdf"], { type: "application/pdf" }));
+  const imageUrl = createEvidenceObjectUrl(new Blob(["image"], { type: "image/png" }), pdfUrl);
+  releaseEvidenceObjectUrl(imageUrl);
+  assert.equal(pdfUrl, "blob:application/pdf");
+  assert.equal(imageUrl, "blob:image/png");
+  assert.deepEqual(revoked, [pdfUrl, imageUrl]);
 });

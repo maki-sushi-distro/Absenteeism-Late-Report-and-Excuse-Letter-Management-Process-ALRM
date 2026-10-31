@@ -105,24 +105,30 @@ export async function uploadEvidence(file) {
   return body?.data;
 }
 
-// NEW: buksan ang attachment ng isang request (para sa instructor/program head/admin page).
-// Kailangan ng Authorization header, kaya hindi pwede ang plain link.
+export async function fetchEvidence(requestId, { signal } = {}) {
+  const res = await apiFetch(`/api/requests/${encodeURIComponent(requestId)}/evidence`, { signal });
+  if (!res.ok) {
+    const body = await readJson(res);
+    throw new Error(body?.message || "No attachment available.");
+  }
+  const blob = await res.blob();
+  return { blob, mimeType: blob.type.split(";", 1)[0].toLowerCase() };
+}
+
+// Existing student callers keep their current tab/download behavior.
 export async function openEvidence(requestId) {
   const popup = window.open("", "_blank"); // buksan agad para hindi ma-block ng browser
   if (popup) popup.opener = null;
 
   try {
-    const res = await apiFetch(`/api/requests/${requestId}/evidence`);
-    if (!res.ok) throw new Error("No attachment available.");
-
-    const file = await res.blob();
-    if (!["application/pdf", "image/jpeg", "image/png"].includes(file.type)) {
+    const { blob: file, mimeType } = await fetchEvidence(requestId);
+    if (!["application/pdf", "image/jpeg", "image/png"].includes(mimeType)) {
       throw new Error("Unsupported attachment type.");
     }
     const url = URL.createObjectURL(file);
     // Blob navigation does not carry the response's Content-Disposition header.
     try {
-      if (file.type === "application/pdf") {
+      if (mimeType === "application/pdf") {
         popup?.close();
         const link = document.createElement("a");
         link.href = url;

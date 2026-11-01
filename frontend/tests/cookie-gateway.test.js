@@ -212,3 +212,65 @@ test('the Node adapter serves actual cookie and multipart HTTP requests on local
     assert.equal((await upload.json()).data.path, 'evidence-id');
   } finally { await new Promise(resolve => server.close(resolve)); }
 });
+
+
+test('public session returns a non-cacheable guest response without contacting Laravel', async () => {
+  for (const headers of [{}, { cookie: '__Host-alrm_session=forged', authorization: 'Bearer attacker' }]) {
+    let calls = 0;
+    const response = await handleGateway(request('session', { headers }), {
+      ...options, fetch: async () => { calls++; throw new Error('Guest must not reach upstream'); },
+    });
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get('cache-control'), 'no-store');
+    assert.deepEqual(await response.json(), { success: true, data: { authenticated: false, user: null } });
+    assert.equal(calls, 0);
+    const protectedResponse = await handleGateway(request('me', { headers }), options);
+    assert.equal(protectedResponse.status, 401);
+  }
+});
+
+test('public session validates the encrypted cookie against protected backend me', async () => {
+  const { jar } = await login();
+  const user = { id: 'one', role: 'student' };
+  const response = await handleGateway(request('session', { headers: { cookie: cookies(jar) } }), {
+    ...options, fetch: async (url, init) => {
+      assert.equal(url, 'https://backend.example/api/me');
+      assert.equal(init.headers.get('authorization'), `Bearer ${token}`);
+      return Response.json({ success: true, data: user });
+    },
+  });
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get('cache-control'), 'no-store');
+  assert.deepEqual(await response.json(), { success: true, data: { authenticated: true, user } });
+});
+
+test('a revoked backend session becomes a guest and expires the browser cookies', async () => {
+  const { jar } = await login();
+  const response = await handleGateway(request('session', { headers: { cookie: cookies(jar) } }), {
+    ...options, fetch: async () => new Response('', { status: 401 }),
+  });
+  assert.equal(response.status, 200);
+  assert.equal((await response.json()).data.authenticated, false);
+  for (const name of ['session', 'csrf', 'seed']) {
+    assert.ok(response.headers.getSetCookie().some(value => value.startsWith(`__Host-alrm_${name}=`) && value.includes('Max-Age=0')));
+  }
+});
+
+test('session check keeps upstream outages and malformed success as errors', async () => {
+  const { jar } = await login();
+  for (const [fetch, status] of [
+    [async () => Response.json({ message: 'Unavailable' }, { status: 503 }), 503],
+    [async () => { throw new Error('offline'); }, 502],
+    [async () => Response.json({ data: {} }), 502],
+  ]) {
+    const response = await handleGateway(request('session', { headers: { cookie: cookies(jar) } }), { ...options, fetch });
+    assert.equal(response.status, status);
+  }
+});
+
+test('public session rejects mutations rather than forwarding them upstream', async () => {
+  const response = await handleGateway(request('session', { method: 'POST', headers: { origin } }), {
+    ...options, fetch: async () => { throw new Error('Must not forward'); },
+  });
+  assert.equal(response.status, 405);
+});

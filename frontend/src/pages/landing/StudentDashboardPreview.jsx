@@ -6,6 +6,7 @@ import RecentNotifications from "../auth/student/dashboard/RecentNotifications";
 
 // Presentation components only: no authenticated layout, account, or API loaders.
 const emptyResource = { data: [], loading: false, error: "" };
+const emptyThresholdResource = { data: {}, loading: false, error: "" };
 
 export default function StudentDashboardPreview() {
   return <figure className="landing-dashboard-preview" aria-label="Student dashboard preview with anonymous empty data">
@@ -19,7 +20,7 @@ export default function StudentDashboardPreview() {
           <header className="landing-preview-header"><span>Dashboard</span><div><Bell size={18} /><UserCircle size={26} /><span>Student</span></div></header>
           <div className="@container landing-preview-content">
             <StudentDashboardHeading user={null} classes={emptyResource} />
-            <StudentDashboardMetrics requests={emptyResource} attendance={emptyResource} classes={emptyResource} />
+            <StudentDashboardMetrics requests={emptyResource} threshold={emptyThresholdResource} classes={emptyResource} />
             <RecentNotifications requests={[]} />
           </div>
         </div>

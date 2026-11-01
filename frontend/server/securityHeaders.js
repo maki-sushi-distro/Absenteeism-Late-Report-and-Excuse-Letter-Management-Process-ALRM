@@ -6,6 +6,8 @@ export function contentSecurityPolicy({ development = false } = {}) {
     "default-src 'none'",
     `script-src 'self' ${development ? "'unsafe-inline'" : METADATA_HASH}`,
     "script-src-attr 'none'",
+    // Vite's reconnect ping uses a blob SharedWorker only in development.
+    ...(development ? ["worker-src 'self' blob:"] : []),
     // Base UI, Recharts and React use runtime style elements and style properties.
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob:",

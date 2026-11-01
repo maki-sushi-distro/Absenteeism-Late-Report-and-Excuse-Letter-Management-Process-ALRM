@@ -21,7 +21,7 @@ export function AuthProvider({ children }) {
       error: '', loading: !silent || !current.user }));
     return getSessionUser().then(user => {
       if (version !== getSessionVersion() || request !== requestVersion.current) return null;
-      clearPendingOtp();
+      if (user) clearPendingOtp();
       setSession({ version, user, error: '', loading: false });
       return user;
     }, error => {

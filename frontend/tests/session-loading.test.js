@@ -265,6 +265,8 @@ async function withCookieProvider(run, { hint = null } = {}) {
   globalThis.fetch = (path, options) => new Promise(resolve => calls.push({ path, options, resolve }));
   const { AuthProvider } = await server.ssrLoadModule('/src/context/AuthContext.jsx');
   const client = await server.ssrLoadModule('/src/api/client.js');
+  const session = await server.ssrLoadModule('/src/api/session.js');
+  session.clearSessionUserCache();
   client.resetCsrfToken?.();
   let page;
   try {
@@ -281,29 +283,31 @@ async function withCookieProvider(run, { hint = null } = {}) {
 }
 const cookieUser = { id: 'verified-student', role: 'student', program_id: 'one', year_level: '1st', school_id_number: '2026-001' };
 
-test('provider restores a cookie on startup with no marker and treats guest 401 normally', async () => {
+test('provider restores a cookie on startup with no marker and treats guest session normally', async () => {
   await withCookieProvider(async ({ page, calls, state }) => {
     assert.equal(state().loading, true);
     assert.equal(state().user, null);
-    assert.equal(calls[0].path, '/api/me');
+    assert.equal(calls[0].path, '/api/session');
     assert.equal(calls[0].options.headers.has('Authorization'), false);
-    calls[0].resolve(Response.json({ data: cookieUser }));
+    calls[0].resolve(Response.json({ data: { authenticated: true, user: cookieUser } }));
     await page.flush();
     assert.deepEqual(state().user, cookieUser);
     assert.equal(state().loading, false);
   });
-  await withCookieProvider(async ({ page, calls, state }) => {
-    calls[0].resolve(new Response('', { status: 401 }));
+  await withCookieProvider(async ({ page, calls, state, items }) => {
+    items.set('pending_otp_login', 'pending-guest-login');
+    calls[0].resolve(Response.json({ data: { authenticated: false, user: null } }));
     await page.flush();
     assert.equal(state().user, null);
     assert.equal(state().sessionError, '');
+    assert.equal(items.get('pending_otp_login'), 'pending-guest-login');
     assert.equal(state().loading, false);
   }, { hint: 'forged-admin' });
 });
 
 test('provider preserves a verified user during outage and supports retry', async () => {
   await withCookieProvider(async ({ page, calls, state }) => {
-    calls[0].resolve(Response.json({ data: cookieUser }));
+    calls[0].resolve(Response.json({ data: { authenticated: true, user: cookieUser } }));
     await page.flush();
     const refresh = state().refreshUser();
     calls.at(-1).resolve(new Response('', { status: 503 }));
@@ -312,7 +316,7 @@ test('provider preserves a verified user during outage and supports retry', asyn
     assert.deepEqual(state().user, cookieUser);
     assert.match(state().sessionError, /try again/i);
     const retry = state().refreshUser();
-    calls.at(-1).resolve(Response.json({ data: { ...cookieUser, name: 'Updated' } }));
+    calls.at(-1).resolve(Response.json({ data: { authenticated: true, user: { ...cookieUser, name: 'Updated' } } }));
     await retry;
     await page.flush();
     assert.equal(state().user.name, 'Updated');
@@ -331,7 +335,7 @@ test('another tab logging out invalidates a pending restoration without an exist
     await page.flush();
     assert.equal(state().loading, false);
     assert.equal(state().user, null);
-    restoration.resolve(Response.json({ data: cookieUser }));
+    restoration.resolve(Response.json({ data: { authenticated: true, user: cookieUser } }));
     await page.flush();
     assert.equal(state().user, null);
     assert.equal(state().sessionError, '');
@@ -345,7 +349,7 @@ test('provider rejects legacy bearer completion and ignores stale restoration af
     const old = calls[0];
     const sessionVersion = client.markSessionChanged();
     const completion = state().completeCookieLogin({ data: { authenticated: true, user: cookieUser }, sessionVersion });
-    calls.at(-1).resolve(Response.json({ data: cookieUser }));
+    calls.at(-1).resolve(Response.json({ data: { authenticated: true, user: cookieUser } }));
     assert.deepEqual(await completion, cookieUser);
     old.resolve(new Response('', { status: 401 }));
     await page.flush();
@@ -357,7 +361,7 @@ test('provider rejects legacy bearer completion and ignores stale restoration af
 
 test('logout awaits cookie clearance and late logout completion cannot erase a newer login', async () => {
   await withCookieProvider(async ({ page, calls, state, client, items }) => {
-    calls[0].resolve(Response.json({ data: cookieUser }));
+    calls[0].resolve(Response.json({ data: { authenticated: true, user: cookieUser } }));
     await page.flush();
     items.set('pending_otp_login', 'pending');
     let completed = false;
@@ -379,7 +383,7 @@ test('logout awaits cookie clearance and late logout completion cannot erase a n
     assert.equal(items.has('pending_otp_login'), false);
     const version = client.markSessionChanged();
     const login = state().completeCookieLogin({ data: { authenticated: true, user: cookieUser }, sessionVersion: version });
-    calls.at(-1).resolve(Response.json({ data: cookieUser }));
+    calls.at(-1).resolve(Response.json({ data: { authenticated: true, user: cookieUser } }));
     await login;
     await page.flush();
     assert.deepEqual(state().user, cookieUser);
@@ -388,7 +392,7 @@ test('logout awaits cookie clearance and late logout completion cannot erase a n
 
 test('OTP APIs use protected cookie requests, accept authenticated exchange and never retry mutations', async () => {
   await withCookieProvider(async ({ page, calls, state, items }) => {
-    calls[0].resolve(new Response('', { status: 401 }));
+    calls[0].resolve(Response.json({ data: { authenticated: false, user: null } }));
     await page.flush();
     const otp = await server.ssrLoadModule('/src/api/otp.js');
     const writes = [];
@@ -422,7 +426,7 @@ test('OTP APIs use protected cookie requests, accept authenticated exchange and 
 
 test('pending OTP state has a ten-minute lifetime and never retains obsolete pending bearer data', async () => {
   await withCookieProvider(async ({ calls, page, items }) => {
-    calls[0].resolve(new Response('', { status: 401 }));
+    calls[0].resolve(Response.json({ data: { authenticated: false, user: null } }));
     await page.flush();
     const otp = await server.ssrLoadModule('/src/api/otp.js');
     items.set('pending_otp_token', 'obsolete-bearer');
@@ -442,7 +446,7 @@ test('pending OTP state has a ten-minute lifetime and never retains obsolete pen
 
 test('OAuth callback removes credential params before exchange and refuses legacy bearer URLs', async () => {
   await withCookieProvider(async ({ calls, page }) => {
-    calls[0].resolve(new Response('', { status: 401 }));
+    calls[0].resolve(Response.json({ data: { authenticated: false, user: null } }));
     await page.flush();
     const { AuthCallback } = await server.ssrLoadModule('/src/pages/AuthCallback.jsx');
     const destinations = [];

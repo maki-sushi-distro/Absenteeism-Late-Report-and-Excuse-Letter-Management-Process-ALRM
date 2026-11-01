@@ -18,7 +18,7 @@ async function requestSessionUser(signal) {
 
   for (let attempt = 0; attempt < SESSION_ATTEMPTS; attempt += 1) {
     try {
-      return await apiFetch('/api/me', {
+      return await apiFetch('/api/session', {
         signal: AbortSignal.any([signal, AbortSignal.timeout(SESSION_TIMEOUT_MS)]),
       });
     } catch (error) {
@@ -52,11 +52,15 @@ export function getSessionUser() {
     }
 
     const { data } = await response.json();
-    if (!data?.id) throw new Error('Unable to check your session. Please try again.');
     if (version !== getSessionVersion()) throw new DOMException('This session request is no longer current.', 'AbortError');
+    if (data?.authenticated === false && data.user === null) {
+      resolvedUsers.clear();
+      return null;
+    }
+    if (data?.authenticated !== true || !data.user?.id) throw new Error('Unable to check your session. Please try again.');
     resolvedUsers.clear();
-    resolvedUsers.set(version, data);
-    return data;
+    resolvedUsers.set(version, data.user);
+    return data.user;
   })().finally(() => pendingRequests.delete(version));
 
   pendingRequests.set(version, { promise: request, controller });

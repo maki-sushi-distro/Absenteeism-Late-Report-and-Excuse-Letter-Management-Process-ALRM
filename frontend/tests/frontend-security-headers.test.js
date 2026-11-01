@@ -36,6 +36,8 @@ test('development allows only the Vite features that production excludes', () =>
   assert.match(policy, /ws:\/\/localhost:\*/);
   assert.doesNotMatch(policy, /unsafe-eval/);
   assert.doesNotMatch(policy, /upgrade-insecure-requests/);
+  assert.match(policy, /worker-src 'self' blob:/);
+  assert.doesNotMatch(contentSecurityPolicy(), /worker-src[^;]*blob:/);
 });
 
 test('the build validates inline metadata after Vite emits index.html', () => {

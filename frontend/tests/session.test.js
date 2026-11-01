@@ -1,11 +1,12 @@
 import assert from 'node:assert/strict';
 import { afterEach, beforeEach, mock, test } from 'node:test';
 import * as client from '../src/api/client.js';
-import { getSessionUser } from '../src/api/session.js';
+import { clearSessionUserCache, getSessionUser } from '../src/api/session.js';
 import { getPostLoginPath, rememberAuthenticatedPage } from '../src/api/authSecurity.js';
 const user = { id: 'student-one', role: 'student', program_id: 1, school_id_number: '2026-1001', year_level: '1st Year' };
 let items;
 beforeEach(() => {
+  clearSessionUserCache();
   items = new Map();
   const storage = { getItem: key => items.get(key) ?? null, setItem: (key, value) => items.set(key, String(value)), removeItem: key => items.delete(key) };
   for (const name of ['localStorage', 'sessionStorage']) Object.defineProperty(globalThis, name, { configurable: true, value: storage });
@@ -23,10 +24,10 @@ test('startup purges legacy credentials without reading them', async () => {
 });
 test('cookie restoration probes without a marker and shares concurrent validation', async () => {
   const calls = mock.method(globalThis, 'fetch', async (url, options) => {
-    assert.equal(url, '/api/me');
+    assert.equal(url, '/api/session');
     assert.equal(options.credentials, 'include');
     assert.equal(options.headers.has('Authorization'), false);
-    return Response.json({ data: user });
+    return Response.json({ data: { authenticated: true, user } });
   });
   const first = getSessionUser();
   assert.equal(getSessionUser(), first);
@@ -45,7 +46,7 @@ test('forged hints never authenticate without a successful me response', async (
 test('outages preserve the version and permit retry', async () => {
   items.set('alrm_session_version', 'version-one');
   let available = false;
-  mock.method(globalThis, 'fetch', async () => available ? Response.json({ data: user }) : new Response('', { status: 503 }));
+  mock.method(globalThis, 'fetch', async () => available ? Response.json({ data: { authenticated: true, user } }) : new Response('', { status: 503 }));
   await assert.rejects(getSessionUser(), { status: 503 });
   assert.equal(items.get('alrm_session_version'), 'version-one');
   available = true;
@@ -53,7 +54,7 @@ test('outages preserve the version and permit retry', async () => {
 });
 test('safe session validation retries a transient network failure', async () => {
   let attempts = 0;
-  mock.method(globalThis, 'fetch', async () => { if (++attempts === 1) throw new TypeError('offline'); return Response.json({ data: user }); });
+  mock.method(globalThis, 'fetch', async () => { if (++attempts === 1) throw new TypeError('offline'); return Response.json({ data: { authenticated: true, user } }); });
   assert.deepEqual(await getSessionUser(), user);
   assert.equal(attempts, 2);
 });
@@ -252,4 +253,21 @@ test('saved navigation cannot bypass login or incomplete profile setup', () => {
   rememberAuthenticatedPage(user, '/student/records');
   assert.equal(getPostLoginPath(null), '/login');
   assert.equal(getPostLoginPath({ id: user.id, role: 'student' }), '/complete-profile');
+});
+
+
+test('a guest session resolves to null without retrying or caching the guest result', async () => {
+  const calls = mock.method(globalThis, 'fetch', async url => {
+    assert.equal(url, '/api/session');
+    return Response.json({ success: true, data: { authenticated: false, user: null } });
+  });
+  assert.equal(await getSessionUser(), null);
+  assert.equal(calls.mock.callCount(), 1);
+  assert.equal(await getSessionUser(), null);
+  assert.equal(calls.mock.callCount(), 2);
+});
+
+test('malformed session success never authenticates a user', async () => {
+  mock.method(globalThis, 'fetch', async () => Response.json({ data: { authenticated: true, user: null } }));
+  await assert.rejects(getSessionUser(), /Unable to check your session/);
 });

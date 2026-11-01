@@ -5,10 +5,10 @@ import { ProtectedRoute } from "./routes/ProtectedRoute";
 import AppErrorBoundary from "./components/AppErrorBoundary";
 import AuthLoading from "./components/loading/AuthLoading";
 import SessionShellSkeleton from "./components/loading/SessionShellSkeleton";
+import Home from "./pages/Home";
 import "./App.css";
 
 const Login = lazy(() => import("./pages/login"));
-const Home = lazy(() => import("./pages/Home"));
 const SignedOut = lazy(() => import("./pages/auth/SignedOut"));
 const AuthCallback = lazy(() => import("./pages/AuthCallback").then(module => ({ default: module.AuthCallback })));
 const Dashboard = lazy(() => import("./pages/Dashboard").then(module => ({ default: module.Dashboard })));

@@ -42,24 +42,47 @@ test("anonymous home exposes reference sections and sign-in without requiring a 
 
 test("public preview renders actual student dashboard empty states without account identity", () => {
   const html = render(Preview);
-  for (const text of ["Absences Recorded", "Lates Recorded", "Attendance Threshold Used", "No Attendance Recorded", "Recent Notifications", "No recent request updates."]) assert.ok(html.includes(text), text);
+  for (const text of ["Absences Recorded", "Lates Recorded", "Attendance Threshold", "Unavailable", "Recent Notifications", "No recent request updates."]) assert.ok(html.includes(text), text);
   assert.match(html, /Student dashboard preview with anonymous empty data/);
   assert.doesNotMatch(html, /<figcaption/);
   assert.match(html, /inert=""/);
   assert.doesNotMatch(html, /MAC ROBERT|MARWIN|ANGELENE|@student\.|dashboard-skeleton|Loading student dashboard/);
 });
 
-test("session restoration does not flash the public landing page", () => {
+test("anonymous home stays visible while session restoration is pending", () => {
   const html = render(Home, { loading: true });
-  assert.doesNotMatch(html, /handled online|Key features|Anonymous preview/);
-  assert.match(html, /Loading ALRM System/);
+  assert.match(html, /handled online/);
+  assert.match(html, /href="\/login"/);
+  assert.doesNotMatch(html, /Loading ALRM System|dashboard-skeleton/);
+});
+
+test("a session-check outage does not block the anonymous home", () => {
+  const html = render(Home, { sessionError: "We could not reach your account. Please try again." });
+  assert.match(html, /handled online/);
+  assert.doesNotMatch(html, /Service Unavailable|dashboard-skeleton/);
+});
+
+test("a confirmed account keeps the protected root redirect", () => {
+  const html = render(Home, { user: { id: "student-one", role: "student" } });
+  assert.doesNotMatch(html, /handled online|landing-page/);
 });
 
 test("an unexpired pending OTP keeps the existing verification flow at the root", () => {
+    const originalStorage = globalThis.sessionStorage;
+    const items = new Map();
+    globalThis.sessionStorage = {
+      getItem: key => items.get(key) ?? null,
+      setItem: (key, value) => items.set(key, String(value)),
+      removeItem: key => items.delete(key),
+    };
     setPendingLogin("pending-test-otp");
     setPendingOtpSession({ userId: "student-one", email: "student@example.test" });
     try {
       const html = render(Home);
       assert.doesNotMatch(html, /handled online|Key features|Anonymous preview/);
-    } finally { clearPendingOtp(); }
+    } finally {
+      clearPendingOtp();
+      if (originalStorage === undefined) delete globalThis.sessionStorage;
+      else globalThis.sessionStorage = originalStorage;
+    }
   });

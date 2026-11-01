@@ -201,6 +201,21 @@ export async function handleGateway(
     "X-Content-Type-Options": "nosniff",
   });
 
+  const sessionCheck = path === "session";
+  function anonymousSession() {
+    if (cookies.has(names.session)) {
+      for (const name of Object.values(names))
+        responseHeaders.append("Set-Cookie", cookie(name, "", 0, production));
+    }
+    return json({ success: true, data: { authenticated: false, user: null } }, 200, responseHeaders);
+  }
+  if (sessionCheck) {
+    if (method !== "GET") return fail("Method not allowed.", 405);
+    if (!session) return anonymousSession();
+    // The backend remains the authority for every authenticated session.
+    path = "me";
+  }
+
   if (path === "auth/csrf") {
     if (method !== "GET") return fail("Method not allowed.", 405);
     const current = cookies.get(names.csrf);
@@ -302,6 +317,7 @@ export async function handleGateway(
   } catch {
     return fail("The API could not be reached. Please try again.", 502);
   }
+  if (sessionCheck && response.status === 401) return anonymousSession();
   for (const value of response.headers.getSetCookie()) {
     if (!/^(alrm_device|alrm_oauth)=/.test(value)) continue;
     const clean = value
@@ -353,6 +369,11 @@ export async function handleGateway(
       payload = await response.json();
     } catch {
       return fail("The API returned an invalid response.", 502);
+    }
+    if (sessionCheck && response.ok) {
+      if (!payload?.data?.id)
+        return fail("The server did not confirm your session.", 502);
+      return json({ success: true, data: { authenticated: true, user: payload.data } }, 200, responseHeaders);
     }
     if (path === "auth/exchange" && response.ok) {
       const token = payload?.data?.token;

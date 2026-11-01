@@ -7,6 +7,7 @@ use App\Http\Controllers\Admin\ProgramController;
 use App\Http\Controllers\Admin\ReportController;
 use App\Http\Controllers\Admin\TeachingAssignmentController;
 use App\Http\Controllers\Admin\UserApprovalController;
+use App\Http\Controllers\AcademicPeriodController;
 use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Auth\OtpController;
@@ -47,6 +48,7 @@ Route::prefix('auth')->middleware('throttle:login')->group(function () {
 });
 
 Route::middleware(['auth:sanctum', 'active'])->group(function () {
+    Route::get('/academic-period', [AcademicPeriodController::class, 'show']);
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/me', [AuthController::class, 'me']);
     Route::patch('/me/notification-preferences', [ProfileController::class, 'updateNotificationPreferences']);
@@ -133,6 +135,7 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     |----------------------------------------------------------------
     */
     Route::prefix('admin')->middleware('role:administrator')->group(function () {
+        Route::put('/academic-period', [AcademicPeriodController::class, 'update']);
         Route::get('/audit-logs', [AuditLogController::class, 'index']);
         Route::get('/dashboard', [AdminDashboardController::class, 'index']);
         Route::apiResource('users', UserApprovalController::class)->only(['index', 'store', 'destroy']);

@@ -68,7 +68,7 @@ export default function InstructorRequests() {
           <div className="grid min-w-0 gap-5">
             {exportError && <p role="alert" className="text-sm text-red-700">{exportError}</p>}
             <RequestFilters search={search} date={date} status={status} onSearch={value => { setSearch(value); setPage(1); }} onChange={change} onExport={download} exportDisabled={!filtered.length} showSubject={false} />
-            <RequestsTable records={pagination.pageRecords} attendance={attendance} caption={`Requests for ${course.subjectName}, ${course.program}`} onReview={record => change({ request: String(record.id), type: record.type })} />
+            <RequestsTable type={type} records={pagination.pageRecords} attendance={attendance} caption={`Requests for ${course.subjectName}, ${course.program}`} onReview={record => change({ request: String(record.id), type: record.type })} />
             <RequestPagination pagination={pagination} total={filtered.length} onPage={setPage} />
           </div>
         </RecordTypeTabs> : <p className="py-12 text-center text-sm text-slate-500">No request records found for this class.</p> : <RequestCoursesTable courses={visibleCourses} search={detailSearch} />}

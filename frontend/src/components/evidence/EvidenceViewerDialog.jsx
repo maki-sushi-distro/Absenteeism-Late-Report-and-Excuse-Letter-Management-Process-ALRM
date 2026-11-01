@@ -10,7 +10,7 @@ export function EvidenceContent({ state }) {
   if (state.status === "error") return <p role="alert" className="py-12 text-center text-sm text-red-700">{state.message}</p>;
   if (state.status === "unsupported") return <p role="alert" className="py-12 text-center text-sm text-slate-600">This attachment type is not supported.</p>;
   if (state.status !== "ready") return <p className="py-12 text-center text-sm text-slate-500">Evidence is unavailable.</p>;
-  if (state.mimeType === "application/pdf") return <object data={state.url} type="application/pdf" aria-label="PDF evidence" className="h-[65dvh] min-h-80 w-full"><p>PDF preview is unavailable in this browser.</p></object>;
+  if (state.mimeType === "application/pdf") return <object data={state.url} type="application/pdf" aria-label="PDF evidence" className="h-[65dvh] min-h-80 w-full"><p className="py-12 text-center text-sm text-slate-600">PDF preview is unavailable in this browser. <a href={state.url} download="attachment.pdf" className="ml-2 inline-flex min-h-9 items-center rounded bg-[#203B82] px-4 font-semibold text-white hover:bg-[#172B63]">Download PDF</a></p></object>;
   return <img src={state.url} alt="Uploaded evidence" className="max-h-[65dvh] w-full object-contain" />;
 }
 

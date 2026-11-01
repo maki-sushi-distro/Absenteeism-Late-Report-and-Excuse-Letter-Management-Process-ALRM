@@ -45,7 +45,8 @@ export function requestAttendance(records) {
     const course = requestCourse(record);
     const studentId = record.enrollment?.student?.id || record.enrollment?.student_id;
     const student = classes.get(String(course?.id))?.students.find(item => String(item.id) === String(studentId));
-    return [record.id, course && student ? attendanceAlert(course, student) : null];
+    const alert = course && student ? attendanceAlert(course, student) : null;
+    return [record.id, course && student ? { ...(alert || {}), absences: student.absences, lates: student.lates } : null];
   }));
 }
 

@@ -207,8 +207,9 @@ test("table and filters expose the requested labels with route-neutral review bu
   const Filters = (await load("RequestFilters.jsx")).default;
   const Tabs = (await server.ssrLoadModule("/src/components/records/RecordTypeTabs.jsx")).default;
   const rowRecord = request("one", { status: "invalid" });
-  const html = renderToStaticMarkup(React.createElement(MemoryRouter, null, React.createElement(Tabs, { value: "absence", onValueChange() {} }, React.createElement(Table, { records: [rowRecord], attendance: new Map([[rowRecord.id, { percentage: 6.25, level: "preventive", label: "Preventive" }]]), onReview() {} }))));
-  for (const text of ["Absent", "Late", "Student", "Subject", "Date", "Minutes Late", "Threshold", "Action", "Alex Cruz", "Programming"]) assert.ok(html.includes(text), text);
+  const html = renderToStaticMarkup(React.createElement(MemoryRouter, null, React.createElement(Tabs, { value: "absence", onValueChange() {} }, React.createElement(Table, { type: "absence", records: [rowRecord], attendance: new Map([[rowRecord.id, { absences: 1, percentage: 6.25, level: "preventive", label: "Preventive" }]]), onReview() {} }))));
+  for (const text of ["Absent", "Late", "Student", "Subject", "Date", "Number of Absences", "Threshold", "Action", "Alex Cruz", "Programming"]) assert.ok(html.includes(text), text);
+  assert.doesNotMatch(html, /Minutes Late/);
   assert.match(html, />View<\/button>/);
   assert.match(html, /<td[^>]*>Alex Cruz<\/td>/);
   assert.doesNotMatch(html, /<td[^>]*text-\[#203B82\][^>]*>Alex Cruz/);
@@ -222,7 +223,7 @@ test("table and filters expose the requested labels with route-neutral review bu
       if (node.type === "button" && /^View request/.test(node.props["aria-label"] || "")) viewButton = node;
       React.Children.forEach(node.props.children, visit);
     }
-    visit(Table({ records: [record], onReview }));
+    visit(Table({ type, records: [record], onReview }));
     viewButton.props.onClick();
     assert.equal(onReview.mock.calls[0].arguments[0], record);
   }
@@ -234,7 +235,7 @@ test("table and filters expose the requested labels with route-neutral review bu
   assert.doesNotMatch(filters, /value="noted"/);
 });
 
-test("request tabs show counts and rows expose minutes plus accessible alert levels", async () => {
+test("request tabs show counts and type-specific request metrics", async () => {
   const Table = (await load("RequestsTable.jsx")).default;
   const Tabs = (await server.ssrLoadModule("/src/components/records/RecordTypeTabs.jsx")).default;
   const late = request("late", { type: "late", minutes_late: 17 });
@@ -243,11 +244,29 @@ test("request tabs show counts and rows expose minutes plus accessible alert lev
   assert.match(tabs, /Absent 1/);
   assert.match(tabs, /Late 1/);
   const alert = { percentage: 12.5, level: "critical", label: "Critical" };
-  const html = renderToStaticMarkup(React.createElement(Table, { records: [late, absent], attendance: new Map([[late.id, alert], [absent.id, alert]]), onReview() {} }));
-  assert.match(html, />17<\/td>/);
-  assert.match(html, />—<\/td>/);
-  assert.match(html, /12\.5%/);
-  assert.match(html, /Alert level: Critical/);
+  const lateHtml = renderToStaticMarkup(React.createElement(Table, { type: "late", records: [late], attendance: new Map([[late.id, alert]]), onReview() {} }));
+  assert.match(lateHtml, /Minutes Late/);
+  assert.match(lateHtml, />17<\/td>/);
+  assert.match(lateHtml, /12\.5%/);
+  assert.match(lateHtml, /Alert level: Critical/);
+  const absenceHtml = renderToStaticMarkup(React.createElement(Table, { type: "absence", records: [absent], attendance: new Map([[absent.id, { ...alert, absences: 2 }]]), onReview() {} }));
+  assert.match(absenceHtml, /Number of Absences/);
+  assert.doesNotMatch(absenceHtml, /Minutes Late/);
+  assert.match(absenceHtml, /<td[^>]*>2<\/td>/);
+});
+
+test("absence counts include non-cancelled requests for the same student and class", async () => {
+  const { requestAttendance } = await load("requestData.js");
+  const records = [
+    request("absence-one"),
+    request("absence-two", { status: "approved" }),
+    request("cancelled", { status: "cancelled" }),
+    request("late", { type: "late", minutes_late: 10 }),
+  ];
+  const attendance = requestAttendance(records);
+  assert.equal(attendance.get("absence-one").absences, 2);
+  assert.equal(attendance.get("absence-two").absences, 2);
+  assert.equal(attendance.get("late").lates, 1);
 });
 
 test("reviewed requests keep disabled decision buttons at the bottom without exposing raw attachments", async () => {
@@ -290,7 +309,11 @@ test("program head request records expose evidence only when the server supplies
 test("embedded evidence content renders only supported PDF and image elements", async () => {
   const { EvidenceContent } = await server.ssrLoadModule("/src/components/evidence/EvidenceViewerDialog.jsx");
   const render = state => renderToStaticMarkup(React.createElement(EvidenceContent, { state }));
-  assert.match(render({ status: "ready", mimeType: "application/pdf", url: "blob:pdf" }), /<object[^>]*type="application\/pdf"/);
+  const pdf = render({ status: "ready", mimeType: "application/pdf", url: "blob:pdf" });
+  assert.match(pdf, /<object[^>]*type="application\/pdf"/);
+  assert.match(pdf, /href="blob:pdf"/);
+  assert.match(pdf, /download="attachment\.pdf"/);
+  assert.match(pdf, />Download PDF<\/a>/);
   assert.match(render({ status: "ready", mimeType: "image/png", url: "blob:image" }), /<img[^>]*alt="Uploaded evidence"/);
   assert.match(render({ status: "unsupported" }), /not supported/);
   assert.doesNotMatch(render({ status: "unsupported" }), /<object|<iframe|<img/);

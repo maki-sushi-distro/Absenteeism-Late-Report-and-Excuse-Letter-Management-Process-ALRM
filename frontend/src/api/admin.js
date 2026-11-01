@@ -1,6 +1,10 @@
 import { apiDownload, apiRequest, buildQuery } from "./client.js";
-import { getCollection } from "./collections.js";
-import { prepareClassInput, prepareProgramInput, prepareReportFilters } from "../lib/formInputs.js";
+import { getCollection, getCollectionPage } from "./collections.js";
+import {
+  prepareClassInput,
+  prepareProgramInput,
+  prepareReportFilters,
+} from "../lib/formInputs.js";
 import { assertValidInputs } from "../lib/inputValidation.js";
 
 export function getAdminDashboard() {
@@ -10,13 +14,34 @@ export function getAdminDashboard() {
 export function getAdminAuditLogs() {
   return getCollection("/admin/audit-logs");
 }
+export function getAdminAuditLogsPage({
+  signal,
+  page = 1,
+  perPage = 10,
+  filters = {},
+} = {}) {
+  const query = new URLSearchParams();
+  if (filters.search?.trim()) query.set("search", filters.search.trim());
+  if (filters.action) query.set("action", filters.action);
+  if (filters.subject) query.set("class_id", filters.subject);
+  if (filters.date) {
+    query.set("from", filters.date);
+    query.set("to", filters.date);
+  }
+  const path = `/admin/audit-logs${query.toString() ? `?${query}` : ""}`;
+  return getCollectionPage(path, { signal, page, perPage });
+}
 
 export function getAdminUsers() {
   return apiRequest("/admin/users");
 }
 
 export function updateStaffRole(userId, role) {
-  assertValidInputs({ role: ["instructor", "program_head", "administrator"].includes(role) ? "" : "Select an available staff role." });
+  assertValidInputs({
+    role: ["instructor", "program_head", "administrator"].includes(role)
+      ? ""
+      : "Select an available staff role.",
+  });
   return apiRequest(`/admin/users/${encodeURIComponent(userId)}/role`, {
     method: "PATCH",
     body: JSON.stringify({ role }),
@@ -42,7 +67,9 @@ export function updateProgram(programId, data) {
 }
 
 export function deleteProgram(programId) {
-  return apiRequest(`/admin/programs/${encodeURIComponent(programId)}`, { method: "DELETE" });
+  return apiRequest(`/admin/programs/${encodeURIComponent(programId)}`, {
+    method: "DELETE",
+  });
 }
 
 export function getClasses() {
@@ -64,8 +91,12 @@ export function updateClass(classId, data) {
 }
 
 export async function deleteClass(classId) {
-  const result = await apiRequest(`/admin/classes/${encodeURIComponent(classId)}`, { method: "DELETE" });
-  if (result?.success === false) throw new Error(result.message || "The class could not be removed.");
+  const result = await apiRequest(
+    `/admin/classes/${encodeURIComponent(classId)}`,
+    { method: "DELETE" },
+  );
+  if (result?.success === false)
+    throw new Error(result.message || "The class could not be removed.");
   return result;
 }
 

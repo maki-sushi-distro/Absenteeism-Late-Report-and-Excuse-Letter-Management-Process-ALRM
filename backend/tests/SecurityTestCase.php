@@ -9,12 +9,11 @@ use App\Models\Program;
 use App\Models\RequestAttachment;
 use App\Models\User;
 use App\Services\RequestSnapshot;
-use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Notification;
-use Illuminate\Support\Facades\Schema;
+use Tests\Support\PdfFixture;
 
 abstract class SecurityTestCase extends TestCase
 {
@@ -36,32 +35,8 @@ abstract class SecurityTestCase extends TestCase
         Mail::fake();
         Notification::fake();
         foreach (glob(database_path('migrations/*.php')) as $path) {
-            if (in_array(basename($path), [
-                '2026_09_27_151031_add_cancelled_to_requests_status_enum.php',
-                '2026_10_02_233731_make_users_status_not_null.php',
-                '2026_10_12_084015_create_request_attachments_table.php',
-            ], true)) {
-                if (basename($path) === '2026_10_02_233731_make_users_status_not_null.php') {
-                    Schema::table('users', function (Blueprint $table) {
-                        $table->enum('status', ['approved', 'pending', 'deactivated'])
-                            ->nullable(false)->default('pending')->change();
-                    });
-                }
-
-                continue; // Equivalent portable schema for MySQL-only ALTER statements.
-            }
             (require $path)->up();
         }
-        Schema::create('request_attachments', function (Blueprint $table) {
-            $table->uuid('id')->primary();
-            $table->uuid('user_id');
-            $table->uuid('excuse_request_id')->nullable();
-            $table->string('original_name');
-            $table->string('mime_type');
-            $table->integer('size');
-            $table->binary('data');
-            $table->timestamps();
-        });
     }
 
     protected function user(string $role = 'student', array $attributes = []): User
@@ -105,7 +80,7 @@ abstract class SecurityTestCase extends TestCase
 
     protected function unusedEvidence(User $user): RequestAttachment
     {
-        $pdf = \Tests\Support\PdfFixture::make();
+        $pdf = PdfFixture::make();
 
         return RequestAttachment::create([
             'user_id' => $user->id, 'original_name' => 'proof.pdf',

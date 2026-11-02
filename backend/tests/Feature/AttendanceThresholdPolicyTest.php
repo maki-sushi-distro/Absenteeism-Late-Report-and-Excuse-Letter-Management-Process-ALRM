@@ -127,18 +127,15 @@ class AttendanceThresholdPolicyTest extends SecurityTestCase
             ->assertJsonPath('data.critical_count', 1)->assertJsonPath('data.ir_count', 0);
     }
 
-    public function test_migration_preserves_historical_consultation_delivery_without_suppressing_drop_alert(): void
+    public function test_critical_and_ir_notification_timestamps_are_stored_independently(): void
     {
         $request = $this->requestFor($this->user());
         $tracker = AttendanceTracker::create([
             'enrollment_id' => $request->enrollment_id, 'total_absences' => 4,
-            'total_lates' => 0, 'converted_absences' => 4, 'status' => 'IR',
-            'ir_notified_at' => now()->startOfSecond(),
+            'total_lates' => 0, 'converted_absences' => 4, 'status' => 'critical',
+            'critical_notified_at' => now()->startOfSecond(),
         ]);
-        $deliveredAt = $tracker->ir_notified_at->toDateTimeString();
-        $migration = require database_path('migrations/2026_10_28_120000_add_critical_attendance_stage.php');
-        $migration->down();
-        $migration->up();
+        $deliveredAt = $tracker->critical_notified_at->toDateTimeString();
 
         $tracker->refresh();
         $this->assertSame('critical', $tracker->status);
@@ -146,5 +143,6 @@ class AttendanceThresholdPolicyTest extends SecurityTestCase
         $this->assertNull($tracker->ir_notified_at);
         $tracker->recompute();
         $this->assertSame('IR', $tracker->status);
+        $this->assertSame($deliveredAt, $tracker->fresh()->critical_notified_at->toDateTimeString());
     }
 }

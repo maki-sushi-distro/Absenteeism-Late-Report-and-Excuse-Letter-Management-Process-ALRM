@@ -229,7 +229,7 @@ Staff pre-dashboard forms can submit to the same endpoint:
 }
 ```
 
-Use `data.school_id_number` in the completion response and `/me` response. `year_level` is required only for students. Run `php artisan migrate` when deploying this change: the new migration renames the existing ID column in place and preserves data and uniqueness. API clients must use the new field name.
+Use `data.school_id_number` in the completion response and `/me` response. `year_level` is required only for students. The consolidated users migration creates `school_id_number` directly with a unique index. API clients must use the new field name.
 
 `GET /complete-profile/programs` returns `data: [{id, program_name}]`, ordered by name, excluding `General Education`.
 
@@ -597,8 +597,7 @@ The checked-in academic catalog is portable and needs no Google account, network
 download, Excel installation, or source-folder access at seed time.
 
 ```sh
-php artisan migrate --path=database/migrations/2026_10_29_100000_create_curriculum_catalog.php
-php artisan migrate --path=database/migrations/2026_10_29_100001_add_absence_hours_to_attendance_tracker.php
+php artisan migrate
 php artisan db:seed --class=AcademicCatalogSeeder
 ```
 

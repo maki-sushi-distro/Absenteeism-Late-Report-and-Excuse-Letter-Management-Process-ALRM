@@ -46,22 +46,13 @@ return new class extends Migration
             $table->timestamps();
             $table->unique(['curriculum_id', 'school_year', 'year_level', 'semester', 'code'], 'program_offering_identity');
         });
-        Schema::table('classes', function (Blueprint $table) {
-            $table->foreignUuid('curriculum_subject_id')->nullable()->constrained()->restrictOnDelete();
-            $table->decimal('credit_units', 6, 2)->nullable();
-            $table->decimal('weekly_hours', 7, 2)->default(3)->change();
-        });
+
     }
 
     public function down(): void
     {
-        Schema::table('classes', function (Blueprint $table) {
-            $table->dropConstrainedForeignId('curriculum_subject_id');
-            $table->dropColumn('credit_units');
-        });
         Schema::dropIfExists('program_offerings');
         Schema::dropIfExists('curriculum_subjects');
         Schema::dropIfExists('curricula');
-        // Keep decimal weekly_hours to avoid truncating existing fractional hours.
     }
 };

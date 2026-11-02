@@ -287,25 +287,16 @@ class TeachingAssignmentTest extends SecurityTestCase
         $this->assertSame('Rhea', $mapped[4]);
     }
 
-    public function test_migration_backfills_legacy_rows_and_marks_their_provenance(): void
+    public function test_new_classes_start_without_legacy_assignment_revisions(): void
     {
-        $record = $this->requestFor($this->user());
-        $classId = $record->enrollment->class_id;
-        $unassigned = $this->requestFor($this->user());
-        $unassignedClass = $unassigned->enrollment->class_id;
-        $migration = require database_path('migrations/2026_10_30_000001_version_teaching_assignments.php');
-        $migration->down();
-        DB::table('classes')->where('id', $classId)->update(['subject_name' => 'Current legacy subject']);
-        DB::table('classes')->where('id', $unassignedClass)->update(['instructor_id' => null]);
-        $migration->up();
+        $class = $this->classroom();
+        $this->assertSame(0, $class->fresh()->assignment_revision);
+        $this->assertSame(0, $class->teachingAssignments()->count());
 
-        $legacy = $record->fresh();
-        $this->assertSame('legacy_backfill', $legacy->snapshot_source);
-        $this->assertSame('Current legacy subject', $legacy->class_snapshot['subject_name']);
-        $this->assertNotNull($legacy->teaching_assignment_id);
-        $this->assertSame(1, ClassModel::findOrFail($classId)->assignment_revision);
-        $this->assertSame('legacy_backfill', $unassigned->fresh()->snapshot_source);
-        $this->assertNull($unassigned->fresh()->teaching_assignment_id);
-        $this->assertNull($unassigned->fresh()->class_snapshot['instructor']);
+        $record = $this->requestFor($this->user());
+        $this->assertNotNull($record->teaching_assignment_id);
+        $this->assertNotEmpty($record->class_snapshot);
+        $this->assertNotSame('legacy_backfill', $record->snapshot_source);
+        $this->assertSame(1, $record->enrollment->class->assignment_revision);
     }
 }

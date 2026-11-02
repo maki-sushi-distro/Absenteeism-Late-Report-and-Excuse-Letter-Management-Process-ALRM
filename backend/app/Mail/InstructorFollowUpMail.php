@@ -36,6 +36,9 @@ class InstructorFollowUpMail extends Mailable implements ShouldQueue
 
     public function content(): Content
     {
+        // Resolve again when delivered so queued localhost links are replaced.
+        $this->reviewUrl = rtrim(config('app.frontend_url_prod'), '/').'/instructor/class-requests';
+
         return new Content(
             view: 'mail.instructor-followup',
         );

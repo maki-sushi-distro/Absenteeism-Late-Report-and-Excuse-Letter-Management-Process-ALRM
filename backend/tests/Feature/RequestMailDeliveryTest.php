@@ -10,13 +10,14 @@ use App\Models\UserNotification;
 use Illuminate\Mail\MailManager;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Str;
 use Tests\SecurityTestCase;
 
 class RequestMailDeliveryTest extends SecurityTestCase
 {
     protected function user(string $role = 'student', array $attributes = []): User
     {
-        $user = parent::user($role, ['google_id' => 'google-'.\Illuminate\Support\Str::uuid(), ...$attributes]);
+        $user = parent::user($role, ['google_id' => 'google-'.Str::uuid(), ...$attributes]);
         $user->forceFill(['email_notifications_enabled' => true])->save();
 
         return $user;
@@ -83,7 +84,7 @@ class RequestMailDeliveryTest extends SecurityTestCase
         Mail::assertQueued(InstructorFollowUpMail::class, 1);
         Mail::assertQueued(InstructorFollowUpMail::class, fn ($mail) => $mail->hasTo('instructor-tester@example.com') && $mail->followupCount === 1
             && $mail->tries === 3 && $mail->afterCommit
-            && str_ends_with($mail->reviewUrl, '/instructor/class-requests')
+            && $mail->reviewUrl === rtrim(config('app.frontend_url_prod'), '/').'/instructor/class-requests'
         );
         $this->assertDatabaseHas('notifications', [
             'user_id' => $instructor->id, 'type' => 'request_followup', 'channel' => 'in_app',

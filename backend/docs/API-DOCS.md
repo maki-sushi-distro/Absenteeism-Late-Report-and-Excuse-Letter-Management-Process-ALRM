@@ -744,6 +744,8 @@ The notifications API, unread count, mark-read actions, and student dashboard on
 
 Program head threshold alerts retain their dedicated `AttendanceThresholdNotifier`, which handles stage deduplication and uses the same queued, after-commit approach for its email. Request mail recipient rules do not change program head routing.
 
+Request email buttons use `FRONTEND_URL_PROD` so instructor review links and student dashboard links open the deployed system even when `FRONTEND_URL` points to a local development server. Follow-up links are resolved again during delivery to replace localhost links stored in older queued emails. Messages already delivered retain their original links.
+
 Tests use isolated databases and fake or array mail transports. `RequestMailDeliveryTest` covers request submission, repeated decisions, follow-up cooldown, redirects and allowlists, cancellation and inactive recipients, transaction rollback/commit, and separation of historical email records from in-app feeds.
 
 ## Program-head and test-data maintenance

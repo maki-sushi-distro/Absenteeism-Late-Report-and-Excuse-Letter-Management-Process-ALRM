@@ -85,7 +85,7 @@ class FollowUpController extends Controller
                 student: $enrollment->student,
                 class: $class,
                 excuseRequest: $request,
-                reviewUrl: rtrim(config('app.frontend_url'), '/').'/instructor/class-requests',
+                reviewUrl: rtrim(config('app.frontend_url_prod'), '/').'/instructor/class-requests',
                 followupCount: $count,
             ), 'instructor');
 

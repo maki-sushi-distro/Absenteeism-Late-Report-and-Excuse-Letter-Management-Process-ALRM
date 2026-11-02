@@ -18,7 +18,7 @@ class ProgramHeadAttendanceAlertsTest extends SecurityTestCase
 {
     protected function user(string $role = 'student', array $attributes = []): User
     {
-        $user = parent::user($role, ['google_id' => 'google-linked', ...$attributes]);
+        $user = parent::user($role, ['google_id' => 'google-'.\Illuminate\Support\Str::uuid(), ...$attributes]);
         $user->forceFill(['email_notifications_enabled' => true])->save();
 
         return $user;

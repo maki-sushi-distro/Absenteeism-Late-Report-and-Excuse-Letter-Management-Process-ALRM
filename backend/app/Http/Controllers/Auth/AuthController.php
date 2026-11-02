@@ -184,7 +184,12 @@ class AuthController extends Controller
         $isStaff = $domain === $staffDomain;
         $isInstitutional = $isStudent || $isStaff;
 
-        $user = User::where('email', $email)->first();
+        $user = User::where('google_id', $googleId)->first();
+        if (! $user) {
+            // TODO: Require explicit account-link confirmation after a product/frontend decision.
+            // Preserve existing first-time email/roster linking until that workflow is approved.
+            $user = User::where('email', $email)->first();
+        }
         if (! $user) {
             $user = new User;
             $user->email = $email;

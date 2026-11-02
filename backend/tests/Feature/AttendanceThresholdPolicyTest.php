@@ -5,10 +5,71 @@ namespace Tests\Feature;
 use App\Models\AttendanceTracker;
 use App\Models\FollowupFlag;
 use App\Models\UserNotification;
+use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\TestWith;
 use Tests\SecurityTestCase;
 
 class AttendanceThresholdPolicyTest extends SecurityTestCase
 {
+    public static function decisionCases(): array
+    {
+        return [
+            ['absence', 'approved', 1, 0],
+            ['absence', 'noted', 1, 0],
+            ['absence', 'invalid', 1, 0],
+            ['late', 'approved', 0, 0],
+            ['late', 'noted', 0, 0],
+            ['late', 'invalid', 0, 1],
+        ];
+    }
+
+    #[DataProvider('decisionCases')]
+    public function test_decisions_count_all_absences_but_only_invalid_lates(string $type, string $status, int $absences, int $lates): void
+    {
+        $request = $this->requestFor($this->user());
+        $request->update(['type' => $type]);
+        $endpoint = '/api/instructor/requests/'.$request->id.'/decision';
+        $this->assertFalse(AttendanceTracker::where('enrollment_id', $request->enrollment_id)->exists());
+
+        $this->bearer($request->enrollment->class->instructor)->patchJson($endpoint, ['status' => $status])->assertOk();
+        $this->patchJson($endpoint, ['status' => $status])->assertConflict();
+
+        $tracker = AttendanceTracker::where('enrollment_id', $request->enrollment_id)->first();
+        $this->assertSame($absences, $tracker?->total_absences ?? 0);
+        $this->assertSame($lates, $tracker?->total_lates ?? 0);
+        $this->assertSame($absences * 3.0, $tracker?->unitsUsed() ?? 0.0);
+        if ($absences > 0) {
+            $this->assertSame('warning', $tracker->status);
+            $this->assertDatabaseHas('notifications', [
+                'request_id' => $request->id, 'type' => 'threshold_warning',
+            ]);
+        }
+        $this->bearer($request->enrollment->student)->getJson('/api/dashboard')->assertOk()
+            ->assertJsonPath('data.unexcused_absences', $type === 'absence' && $status === 'invalid' ? 1 : 0)
+            ->assertJsonPath('data.excused_absences', $type === 'absence' && $status !== 'invalid' ? 1 : 0);
+    }
+
+    #[TestWith(['approved', 2, 0])]
+    #[TestWith(['noted', 2, 0])]
+    #[TestWith(['invalid', 3, 1])]
+    public function test_only_an_invalid_third_late_converts_to_an_absence(string $status, int $lates, int $converted): void
+    {
+        $request = $this->requestFor($this->user());
+        $request->update(['type' => 'late']);
+        $tracker = AttendanceTracker::create([
+            'enrollment_id' => $request->enrollment_id, 'total_lates' => 2,
+            'total_absences' => 0, 'converted_absences' => 0, 'status' => 'safe',
+        ]);
+
+        $this->bearer($request->enrollment->class->instructor)
+            ->patchJson('/api/instructor/requests/'.$request->id.'/decision', ['status' => $status])->assertOk();
+
+        $tracker->refresh();
+        $this->assertSame($lates, $tracker->total_lates);
+        $this->assertSame($converted, $tracker->converted_absences);
+        $this->assertSame((float) $converted, $tracker->unitsUsed());
+    }
+
     public function test_subject_hours_determine_all_three_stages_and_remaining_percentages(): void
     {
         $request = $this->requestFor($this->user());
@@ -80,10 +141,13 @@ class AttendanceThresholdPolicyTest extends SecurityTestCase
         $this->assertSame('critical', $tracker->status);
     }
 
-    public function test_automation_creates_a_critical_consultation_flag_once_even_when_warning_was_skipped(): void
+    #[TestWith(['invalid'])]
+    #[TestWith(['approved'])]
+    #[TestWith(['noted'])]
+    public function test_automation_creates_a_critical_consultation_flag_once_even_when_warning_was_skipped(string $status): void
     {
         $request = $this->requestFor($this->user());
-        $request->update(['status' => 'invalid', 'date_reviewed' => now()]);
+        $request->update(['status' => $status, 'date_reviewed' => now()]);
         $head = $this->user('program_head', ['program_id' => $request->enrollment->class->program_id]);
         $tracker = AttendanceTracker::create([
             'enrollment_id' => $request->enrollment_id, 'total_absences' => 2,

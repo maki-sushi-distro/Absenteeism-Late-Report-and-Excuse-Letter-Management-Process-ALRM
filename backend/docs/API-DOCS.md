@@ -696,7 +696,11 @@ Academic units and lecture/lab units are catalog data, **not** contact hours.
 No lecture/laboratory conversion multiplier is assumed. The existing configured
 warning, critical, IR, and three-lates-to-one-hour policies remain in effect.
 
-Newly invalidated absence requests use the scheduled hours on their actual
+All decided absence requests (`approved`, `noted`, or `invalid`) count toward
+attendance thresholds. Valid lates do not count; only invalid late requests
+increment the late counter. Pending requests do not count.
+
+Newly decided absence requests use the scheduled hours on their actual
 occurrence date or inclusive date range, including unequal meeting lengths.
 For example, missing the Monday meeting above adds two absent hours; Thursday
 adds one. Those hours are stored in `attendance_tracker.absence_hours` so a later

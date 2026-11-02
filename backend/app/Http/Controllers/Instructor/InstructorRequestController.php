@@ -34,8 +34,8 @@ class InstructorRequestController extends Controller
 
     /**
      * Approve, Note, or Invalidate a request (per BPM flowchart: Approved/Noted
-     * both resolve to "VALID" — student is excused; Invalid counts against
-     * the attendance tracker).
+     * both resolve to "VALID" — student is excused). All decided absences
+     * count toward attendance thresholds; only invalid lates are counted.
      */
     public function decide(HttpRequest $httpRequest, ExcuseRequest $request)
     {
@@ -61,7 +61,7 @@ class InstructorRequestController extends Controller
                 $request->id
             );
 
-            if ($validated['status'] === 'invalid') {
+            if ($request->type === 'absence' || $validated['status'] === 'invalid') {
                 $this->applyToTracker($request);
             }
 

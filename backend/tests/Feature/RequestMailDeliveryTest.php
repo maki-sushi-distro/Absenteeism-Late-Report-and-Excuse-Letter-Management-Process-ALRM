@@ -63,9 +63,11 @@ class RequestMailDeliveryTest extends SecurityTestCase
         Mail::assertQueued(StudentRequestUpdatedMail::class, fn ($mail) => $mail->hasTo('student-tester@example.com') && ! $mail->hasTo($student->email)
             && $mail->tries === 3 && $mail->afterCommit
         );
-        $this->assertDatabaseCount('notifications', 1);
-        $this->bearer($student)->getJson('/api/notifications')->assertOk()
-            ->assertJsonCount(1, 'data')->assertJsonPath('data.0.type', 'request_decision');
+        // The approved absence also reaches the preventive attendance threshold.
+        $this->assertDatabaseCount('notifications', 3);
+        $notifications = $this->bearer($student)->getJson('/api/notifications')->assertOk()
+            ->assertJsonCount(2, 'data')->json('data');
+        $this->assertEqualsCanonicalizing(['request_decision', 'threshold_warning'], array_column($notifications, 'type'));
     }
 
     public function test_followup_queues_once_with_the_same_case_insensitive_recipient_rules(): void

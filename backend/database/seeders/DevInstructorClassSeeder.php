@@ -69,7 +69,8 @@ class DevInstructorClassSeeder extends Seeder
 
                 // Their student/home program stays BSIS; teaching membership spans all six programs.
                 if ($dev->program_id !== $homeProgramId) {
-                    $dev->update(['program_id' => $homeProgramId]);
+                    $dev->program_id = $homeProgramId;
+                    $dev->save();
                 }
             }
 

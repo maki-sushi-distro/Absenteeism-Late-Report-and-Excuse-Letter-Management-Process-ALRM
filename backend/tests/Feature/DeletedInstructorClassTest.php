@@ -18,8 +18,8 @@ class DeletedInstructorClassTest extends SecurityTestCase
 {
     public function test_instructor_history_prevents_deletion_and_removed_assignment_hides_class_without_deleting_enrollments(): void
     {
-        $student = User::create(['name' => 'Student', 'email' => 'student@example.com', 'role' => 'student']);
-        $instructor = User::create(['name' => 'Instructor', 'email' => 'instructor@example.com', 'role' => 'instructor']);
+        $student = User::factory()->create(['name' => 'Student', 'email' => 'student@example.com', 'role' => 'student']);
+        $instructor = User::factory()->create(['name' => 'Instructor', 'email' => 'instructor@example.com', 'role' => 'instructor']);
         $program = Program::create(['program_name' => 'Test Program']);
         $class = ClassModel::create([
             'subject_name' => 'Test Subject',

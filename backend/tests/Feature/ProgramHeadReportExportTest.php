@@ -102,7 +102,8 @@ class ProgramHeadReportExportTest extends SecurityTestCase
         $head = $this->user('program_head');
         $first = $this->requestFor($this->user());
         $second = $this->requestFor($this->user());
-        $head->update(['program_id' => $first->enrollment->class->program_id]);
+        $head->program_id = $first->enrollment->class->program_id;
+        $head->save();
         $head->additionalHeadedPrograms()->attach($second->enrollment->class->program_id);
         $this->assertCount(3, $this->csv($this->bearer($head)->getJson(self::URL)->assertOk()));
         $rows = $this->csv($this->bearer($head)->getJson(self::URL.'?program_id='.$second->enrollment->class->program_id)->assertOk());

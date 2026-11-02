@@ -89,7 +89,8 @@ class AdminUserSeeder extends Seeder
         $isNew = $model === null;
 
         if ($isNew) {
-            $model = new User(['email' => $user->email]);
+            $model = new User;
+            $model->email = $user->email;
         }
 
         $hasLoggedInWithGoogle = ! $isNew && $model->google_id !== null;

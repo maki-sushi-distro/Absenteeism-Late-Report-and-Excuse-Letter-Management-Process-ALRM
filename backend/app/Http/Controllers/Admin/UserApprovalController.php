@@ -178,15 +178,15 @@ class UserApprovalController extends Controller
                 throw ValidationException::withMessages(['program_id' => 'This program already has a program head. Manage its assignment in Programs.']);
             }
 
-            $user = User::create([
-                'name' => $validated['name'],
-                'email' => $email,
-                'role' => $validated['role'],
-                'program_id' => $validated['role'] === 'student' ? $program?->id : null,
-                'school_id_number' => $validated['school_id_number'] ?? null,
-                'status' => 'pending',
-                'password' => null,
-            ]);
+            $user = new User;
+            $user->name = $validated['name'];
+            $user->email = $email;
+            $user->role = $validated['role'];
+            $user->program_id = $validated['role'] === 'student' ? $program?->id : null;
+            $user->school_id_number = $validated['school_id_number'] ?? null;
+            $user->status = 'pending';
+            $user->password = null;
+            $user->save();
 
             if ($program && $validated['role'] === 'instructor') {
                 $user->programs()->attach($program->id);

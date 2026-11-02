@@ -72,7 +72,8 @@ class ProgramHeadAttendanceAlertsTest extends SecurityTestCase
         $primary = $this->user('program_head');
         $program = $class->program;
         $program->update(['program_head_id' => $primary->id]);
-        $primary->update(['program_id' => $program->id]);
+        $primary->program_id = $program->id;
+        $primary->save();
         $primary->additionalHeadedPrograms()->attach($program); // Three matching paths, one recipient.
         $coHead = $this->user('instructor');
         $coHead->additionalHeadedPrograms()->attach($program);

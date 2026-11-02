@@ -184,7 +184,11 @@ class AuthController extends Controller
         $isStaff = $domain === $staffDomain;
         $isInstitutional = $isStudent || $isStaff;
 
-        $user = User::query()->firstOrNew(['email' => $email]);
+        $user = User::where('email', $email)->first();
+        if (! $user) {
+            $user = new User;
+            $user->email = $email;
+        }
 
         $isNewUser = ! $user->exists;
 

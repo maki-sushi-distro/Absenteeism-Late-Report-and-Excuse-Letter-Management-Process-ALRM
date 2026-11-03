@@ -62,6 +62,11 @@ class ProfileController extends Controller
     {
         $user = $request->user();
         $isStudent = $user->role === 'student';
+        $isInstructor = $user->role === 'instructor';
+        $assignedProgramIds = $isInstructor
+            ? $user->programs()->pluck('programs.id')->push($user->program_id)->filter()->unique()->all()
+            : [];
+        $hasInstructorProgram = $assignedProgramIds !== [];
 
         if ($isStudent && $user->program_id !== null && $user->school_id_number !== null && $user->year_level !== null) {
             return response()->json([
@@ -71,19 +76,21 @@ class ProfileController extends Controller
             ], 409);
         }
 
-        // Pre-registration may supply any subset. Keep assigned values immutable
-        // while allowing the student to submit only the fields still missing.
+        // Preserve pre-registered fields when only missing details are submitted.
         if ($isStudent) {
             $request->mergeIfMissing($user->only(['program_id', 'school_id_number', 'year_level']));
+        } elseif ($isInstructor) {
+            $request->mergeIfMissing($user->only(['school_id_number']));
         }
 
         $validated = $request->validate([
             'program_id' => [
-                'required', 'string', 'uuid', 'exists:programs,id',
+                Rule::requiredIf(! $hasInstructorProgram), 'string', 'uuid', 'exists:programs,id',
                 Rule::when($isStudent && $user->program_id !== null, [Rule::in([$user->program_id])]),
+                Rule::when($hasInstructorProgram, [Rule::in($assignedProgramIds)]),
             ],
             'school_id_number' => [
-                Rule::requiredIf($isStudent),
+                Rule::requiredIf($isStudent || $isInstructor),
                 'nullable',
                 'string',
                 'max:50',
@@ -115,11 +122,13 @@ class ProfileController extends Controller
                 );
             });
         } else {
-            DB::transaction(function () use ($user, $validated) {
+            DB::transaction(function () use ($user, $validated, $hasInstructorProgram) {
                 if (array_key_exists('school_id_number', $validated)) {
                     $user->forceFill(['school_id_number' => $validated['school_id_number']])->save();
                 }
-                $user->programs()->syncWithoutDetaching([$validated['program_id']]);
+                if (! $hasInstructorProgram) {
+                    $user->programs()->syncWithoutDetaching([$validated['program_id']]);
+                }
             });
         }
 

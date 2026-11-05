@@ -35,11 +35,6 @@ export function getUserManagementUsersPage({ signal, page = 1, perPage = 10, fil
   return getCollectionPage(endpoint, { signal, page, perPage, allowOutOfRange: true });
 }
 
-export async function getPendingUserPreview(options) {
-  const page = await getCollectionPage("/api/admin/users?status=pending", { ...options, page: 1, perPage: 4 });
-  return page.data;
-}
-
 export function getUserManagementPrograms(options) {
   return getCollection("/api/admin/programs", options);
 }

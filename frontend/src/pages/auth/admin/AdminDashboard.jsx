@@ -10,7 +10,7 @@ import {
   updateClass,
   updateStaffRole,
 } from "@/api/admin";
-import { getPendingUserPreview, getUserManagementUsers } from "@/api/adminUserManagement";
+import { getUserManagementUsers } from "@/api/adminUserManagement";
 import { getResourceCacheEntry, requestCachedResource } from "@/api/resourceCache";
 import AdminOverview from "./dashboard/AdminOverview";
 import AdminClassManagement from "./AdminClassManagement";
@@ -27,9 +27,9 @@ import { isGeneralEducationProgram } from "@/lib/programs";
 import ClassForm from "./classes/ClassForm";
 
 const emptyProgramForm = { program_name: "", program_head_id: "" };
-const endpoints = { dashboard: getAdminDashboard, users: getUserManagementUsers, pendingUsers: getPendingUserPreview, programs: getPrograms, classes: getClasses };
-const resourceDefaults = { dashboard: false, users: false, pendingUsers: false, programs: false, classes: false };
-const viewResources = { dashboard: ["dashboard", "pendingUsers"], users: ["users"], programs: ["programs", "users"], classes: [], reports: ["programs"] };
+const endpoints = { dashboard: getAdminDashboard, users: getUserManagementUsers, programs: getPrograms, classes: getClasses };
+const resourceDefaults = { dashboard: false, users: false, programs: false, classes: false };
+const viewResources = { dashboard: ["dashboard"], users: ["users"], programs: ["programs", "users"], classes: [], reports: ["programs"] };
 
 function hoursValue(value) {
   if (value === null || value === undefined || value === "") return "Unavailable";
@@ -56,7 +56,7 @@ function initialResources(view) {
   const requested = viewResources[view] || [];
   return {
     dashboard: cached.dashboard?.data || null,
-    users: cached.users?.data || [], pendingUsers: cached.pendingUsers?.data || [],
+    users: cached.users?.data || [],
     programs: cached.programs?.data || [], classes: cached.classes?.data || [],
     loading: { ...resourceDefaults, ...Object.fromEntries(requested.map((key) => [key, !cached[key]])) }, errors: {},
     ready: Object.fromEntries(Object.entries(cached).map(([key, entry]) => [key, Boolean(entry)])),

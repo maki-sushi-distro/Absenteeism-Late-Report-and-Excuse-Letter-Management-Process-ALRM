@@ -1,4 +1,4 @@
-<p align="center"><img src="./docs/assets/readme-header.svg" alt="ALRM System — La Verdad Christian College" width="100%"></p>
+<p align="center"><img src="docs/assets/readme-header.svg" alt="ALRM System — La Verdad Christian College" width="100%"></p>
 
 ### Absenteeism, Late Report, and Excuse Letter Management System
 
@@ -26,50 +26,50 @@ The assigned **Instructor retains authority over request validity**. The system 
 
 ## Team Hierarchy
 
-<p align="center"><img src="./docs/assets/team/team-header.svg" alt="The team behind ALRM — six people, one shared project" width="1000"></p>
+<p align="center"><img src="docs/assets/team/team-header.svg" alt="The team behind ALRM — six people, one shared project" width="1000"></p>
 
 <table>
   <tr>
     <td colspan="5" align="center">
       <br>
-      <img src="./docs/assets/team/jimuel-jarina-portrait.svg" alt="Jimuel Jarina" width="120" height="120"><br>
+      <img src="docs/assets/team/jimuel-jarina-portrait.svg" alt="Jimuel Jarina" width="120" height="120"><br>
       <h3>Jimuel Jarina</h3>
-      <img src="./docs/assets/team/project-manager-badge.svg" alt="Project Manager" height="26">
+      <img src="docs/assets/team/project-manager-badge.svg" alt="Project Manager" height="26">
       <p>Leads planning, schedules, and team coordination.<br>Oversees the project charter, Gantt chart, RACI matrix, and requirements review.</p>
     </td>
   </tr>
   <tr>
-    <td colspan="5" align="center"><img src="./docs/assets/team/hierarchy-connectors.svg" alt="Project Manager leads five equal team roles" width="100%" height="64"></td>
+    <td colspan="5" align="center"><img src="docs/assets/team/hierarchy-connectors.svg" alt="Project Manager leads five equal team roles" width="100%" height="64"></td>
   </tr>
   <tr>
     <td width="20%" align="center" valign="top">
-      <img src="./docs/assets/team/mac-robert-savandal-portrait.svg" alt="Mac Robert Savandal" width="100" height="100">
+      <img src="docs/assets/team/mac-robert-savandal-portrait.svg" alt="Mac Robert Savandal" width="100" height="100">
       <p><sub><strong>Mac Robert Savandal</strong></sub></p>
-      <img src="./docs/assets/team/frontend-developer-badge.svg" alt="Frontend Developer" height="26">
+      <img src="docs/assets/team/frontend-developer-badge.svg" alt="Frontend Developer" height="26">
       <p align="left">Builds React interfaces, reusable components, and styling, and integrates the API.</p>
     </td>
     <td width="20%" align="center" valign="top">
-      <img src="./docs/assets/team/marwin-mandocdoc-portrait.svg" alt="Marwin Mandocdoc" width="100" height="100">
+      <img src="docs/assets/team/marwin-mandocdoc-portrait.svg" alt="Marwin Mandocdoc" width="100" height="100">
       <p><sub><strong>Marwin Mandocdoc</strong></sub></p>
       <img src="docs/assets/team/backend-developer-badge.svg" alt="Backend Developer" height="26">
       <p align="left">Develops the Laravel API, database, Google SSO, access control, and request workflows.</p>
     </td>
     <td width="20%" align="center" valign="top">
-      <img src="./docs/assets/team/janice-agnote-portrait.svg" alt="Janice Agnote" width="100" height="100">
+      <img src="docs/assets/team/janice-agnote-portrait.svg" alt="Janice Agnote" width="100" height="100">
       <p><sub><strong>Janice Agnote</strong></sub></p>
-      <img src="./docs/assets/team/business-analyst-badge.svg" alt="Business Analyst" height="26">
+      <img src="docs/assets/team/business-analyst-badge.svg" alt="Business Analyst" height="26">
       <p align="left">Gathers requirements, prepares the BRD, and conducts DMAIC analysis and requirements review.</p>
     </td>
     <td width="20%" align="center" valign="top">
-      <img src="./docs/assets/team/angelene-ariate-portrait.svg" alt="Angelene Ariate" width="100" height="100">
+      <img src="docs/assets/team/angelene-ariate-portrait.svg" alt="Angelene Ariate" width="100" height="100">
       <p><sub><strong>Angelene Ariate</strong></sub></p>
-      <img src="./docs/assets/team/ui-ux-designer-badge.svg" alt="UI/UX Designer" height="26">
+      <img src="docs/assets/team/ui-ux-designer-badge.svg" alt="UI/UX Designer" height="26">
       <p align="left">Creates user flows, wireframes, and Figma prototypes for the four system roles.</p>
     </td>
     <td width="20%" align="center" valign="top">
-      <img src="./docs/assets/team/rancel-cuervo-portrait.svg" alt="Rancel Cuervo" width="100" height="100">
+      <img src="docs/assets/team/rancel-cuervo-portrait.svg" alt="Rancel Cuervo" width="100" height="100">
       <p><sub><strong>Rancel Cuervo</strong></sub></p>
-      <img src="./docs/assets/team/sqa-badge.svg" alt="Software Quality Assurance (SQA)" height="26">
+      <img src="docs/assets/team/sqa-badge.svg" alt="Software Quality Assurance (SQA)" height="26">
       <p align="left">Prepares test plans and cases, records test results, and tracks defects.</p>
     </td>
   </tr>

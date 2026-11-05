@@ -6,6 +6,7 @@ import { saveEmailNotificationPreference } from "@/api/notifications";
 
 export default function NotificationPreferences({ user, userId = user?.id, role = "student", onEmailSaved }) {
   const student = role === "student";
+  const administrator = role === "administrator";
   const prefix = student ? "student" : "notification";
   const { preferences, updatePreference, error } = useNotificationPreferences(userId, role);
   const emailAvailable = typeof user?.email_notifications_enabled === "boolean";
@@ -48,14 +49,14 @@ export default function NotificationPreferences({ user, userId = user?.id, role 
   }
 
   const options = [
-    { key: "requestUpdates", label: student ? "Excuse letter status updates" : "Request activity updates", description: student ? "Get notified immediately when an instructor approves, denies, or notes your excuse letter." : "Show class requests, instructor decisions, and follow-up notifications." },
-    { key: "thresholdAlerts", label: student ? "Threshold warning alerts" : "Attendance threshold alerts", description: student ? "Receive alerts when approaching the 20% absence threshold limit in any enrolled subject." : "Show attendance warnings and incident report notifications for your classes or program." },
+    { key: "requestUpdates", label: student ? "Excuse letter status updates" : administrator ? "New requests from students" : "Request activity updates", description: student ? "Get notified immediately when an instructor approves, denies, or notes your excuse letter." : administrator ? "Receive updates when students submit absence or late requests and when staff review them." : "Show class requests, instructor decisions, and follow-up notifications." },
+    { key: "thresholdAlerts", label: student ? "Threshold warning alerts" : administrator ? "Attendance threshold warnings" : "Attendance threshold alerts", description: student ? "Receive alerts when approaching the 20% absence threshold limit in any enrolled subject." : administrator ? "Receive attendance warnings and incident report notifications across academic programs." : "Show attendance warnings and incident report notifications for your classes or program." },
     { key: "email", label: "Email notifications", description: student ? "Send copies of official portal notifications and clinic clearances to your registered email." : "Send copies of official portal notifications to your registered email." },
   ];
-  return <section aria-labelledby={`${prefix}-preferences-title`} className="pl-0 pr-3 pb-8 pt-[50px] sm:pl-8 sm:pr-12">
+  return <section aria-labelledby={`${prefix}-preferences-title`} className={`pl-0 pr-3 pb-8 pt-[50px] sm:pl-8 sm:pr-12 ${administrator ? "border-b border-[#9eb2d4]" : ""}`}>
     <div className="flex items-start gap-[7px]">
       <BellRing className="mt-[9px] h-[18px] w-5 shrink-0 translate-x-px text-[#3186ff]" strokeWidth={1.75} aria-hidden="true" />
-      <div className="relative left-px"><h2 id={`${prefix}-preferences-title`} className="relative -top-px text-[14px] font-medium leading-5 text-[#171717]">Notification Preferences</h2><p className="text-[12.35px] font-normal leading-[18px] text-[#464646]">{student ? "Choose which attendance alerts and excuse request decisions you want to receive." : "Choose which attendance alerts and request updates you want to receive."}</p></div>
+      <div className="relative left-px"><h2 id={`${prefix}-preferences-title`} className="relative -top-px text-[14px] font-medium leading-5 text-[#171717]">Notification Preferences</h2><p className="text-[12.35px] font-normal leading-[18px] text-[#464646]">{student ? "Choose which attendance alerts and excuse request decisions you want to receive." : administrator ? "Choose how and when you receive automated updates regarding student attendance and excuses." : "Choose which attendance alerts and request updates you want to receive."}</p></div>
     </div>
     <div className="mt-2.5 grid gap-[15px] pl-[26px]">
       {options.map(option => <div key={option.key} className="flex min-h-9 items-center justify-between gap-4">

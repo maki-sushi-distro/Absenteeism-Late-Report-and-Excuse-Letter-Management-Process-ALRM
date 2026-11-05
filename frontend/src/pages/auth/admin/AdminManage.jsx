@@ -268,12 +268,14 @@ export default function AdminManage() {
                 loading={loading}
                 onRefresh={reload}
               />
-              <Link
-                to="/classes"
-                className="inline-flex h-10 items-center rounded-lg border border-[#172f6b]/60 px-3 text-[13px] font-medium text-[#172f6b] hover:bg-slate-50"
+              <Button
+                variant="outline"
+                nativeButton={false}
+                render={<Link to="/classes" />}
+                className="h-10 w-[130px] rounded-lg border-slate-300 bg-white text-[13px] text-[#172f6b] shadow-none hover:bg-slate-50"
               >
                 Manage classes
-              </Link>
+              </Button>
               <Button
                 type="button"
                 disabled={!unassignedCount}
@@ -315,7 +317,7 @@ export default function AdminManage() {
           ) : (
             <>
               <div className="px-2.5">
-                <Table className="min-w-[850px] table-fixed text-base">
+                <Table className="min-w-[850px] table-fixed text-sm">
                   <TableHeader>
                     <TableRow className="h-[60px] border-[#172f6b]/40 hover:bg-transparent">
                       {[
@@ -327,7 +329,7 @@ export default function AdminManage() {
                       ].map((title) => (
                         <TableHead
                           key={title}
-                          className="w-1/5 px-2 py-3 font-bold text-[#172f6b]"
+                          className="w-1/5 px-2 py-3 text-[13px] font-bold text-[#172f6b]"
                         >
                           {title}
                         </TableHead>
@@ -340,7 +342,7 @@ export default function AdminManage() {
                       return (
                         <TableRow
                           key={row.id}
-                          className="h-[70px] border-[#172f6b]/40 last:border-b!"
+                          className="h-16 border-[#172f6b]/40 last:border-b! hover:bg-transparent"
                         >
                           <TableCell className="whitespace-normal px-2 py-4 font-medium">
                             {row.displayInstructor}
@@ -372,12 +374,13 @@ export default function AdminManage() {
                                   <Button
                                     type="button"
                                     size="sm"
-                                    variant="destructive"
+                                    variant="ghost"
                                     aria-label={`Remove instructor assignment from ${row.subject_name}, section ${row.section}`}
                                     onClick={() => {
                                       setNotice("");
                                       setRemovingId(row.id);
                                     }}
+                                    className="h-7 rounded-sm bg-red-50 px-2 text-sm text-red-500 hover:bg-red-100 hover:text-red-600"
                                   >
                                     Remove
                                   </Button>

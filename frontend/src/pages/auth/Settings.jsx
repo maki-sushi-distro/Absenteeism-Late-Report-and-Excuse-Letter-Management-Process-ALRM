@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import {
   AlertCircle,
+  LockKeyhole,
   Settings as SettingsIcon,
   UserRound,
 } from "lucide-react";
@@ -29,7 +30,8 @@ import LoadingSkeleton from "@/components/loading/LoadingSkeleton";
 const ROLE_CONFIG = {
   administrator: {
     pageTitle: "Settings",
-    pageDescription: "Manage your administrator profile and system settings.",
+    pageDescription:
+      "Manage your faculty profile information, notification preferences, and attendance settings.",
     profileTitle: "Admin Profile",
     profileDescription: "Your ALRM administrator account details.",
     preferencesTitle: "Notification Channel",
@@ -163,6 +165,57 @@ function ReadOnlyField({ label, value }) {
         className="h-10 rounded-[5px] border-slate-300 bg-slate-50 text-sm font-medium text-slate-800"
       />
     </div>
+  );
+}
+
+function AdminProfileField({ id, label, value }) {
+  const displayValue = valueOrFallback(value);
+  return (
+    <div className="grid min-w-0 gap-2">
+      <Label htmlFor={id} className="text-[13px] font-medium text-[#171717]">
+        {label}
+      </Label>
+      <div className="relative min-w-0">
+        <Input
+          id={id}
+          readOnly
+          title={displayValue}
+          value={displayValue}
+          className="h-9 rounded-[5px] border-0 bg-[#e6efff] pr-9 text-[13px] font-normal text-[#46546a] shadow-none"
+        />
+        <LockKeyhole
+          aria-hidden="true"
+          className="pointer-events-none absolute right-2.5 top-1/2 size-4 -translate-y-1/2 text-[#6d7c91]"
+        />
+      </div>
+    </div>
+  );
+}
+
+function AdminProfileSection({ user }) {
+  const fields = [
+    { id: "admin-full-name", label: "Full Name", value: user?.name },
+    { id: "admin-faculty-id", label: "Faculty ID", value: user?.school_id_number },
+    { id: "admin-department", label: "Department", value: programLabel(user) },
+    { id: "admin-email", label: "Email Address", value: user?.email },
+  ];
+
+  return (
+    <section
+      aria-labelledby="admin-profile-title"
+      className="border-b border-[#9eb2d4] px-0 pb-12 pt-9 sm:px-8"
+    >
+      <h2
+        id="admin-profile-title"
+        className="mb-4 flex h-7 items-center gap-2 rounded-[5px] bg-[#e6efff] px-2 text-[14px] font-medium text-[#26364f]"
+      >
+        <UserRound aria-hidden="true" className="size-4 text-[#3186ff]" strokeWidth={1.9} />
+        Faculty Profile
+      </h2>
+      <div className="grid gap-x-4 gap-y-4 md:grid-cols-2">
+        {fields.map((field) => <AdminProfileField key={field.id} {...field} />)}
+      </div>
+    </section>
   );
 }
 
@@ -356,7 +409,7 @@ function Settings() {
     <SettingsLayout role={user?.role}>
       <div className="mx-auto grid max-w-6xl gap-5">
         <div>
-          <h1 className="text-2xl font-black tracking-normal text-slate-950">
+          <h1 className={`${normalizedRole === "administrator" ? "text-xl font-bold" : "text-2xl font-black"} tracking-normal text-slate-950`}>
             {config.pageTitle}
           </h1>
           <p className="mt-1 text-sm font-medium text-slate-600">
@@ -364,16 +417,14 @@ function Settings() {
           </p>
         </div>
 
-        <div className="grid gap-5">
-          <ProfileCard
-            user={user}
-            role={user?.role}
-            config={config}
-          />
-
-          {normalizedRole === "administrator" && <AdminPolicyCard />}
-
+        <div className={normalizedRole === "administrator" ? "grid gap-0" : "grid gap-5"}>
+          {normalizedRole === "administrator" ? (
+            <AdminProfileSection user={user} />
+          ) : (
+            <ProfileCard user={user} role={user?.role} config={config} />
+          )}
           <NotificationPreferences key={user?.id} user={user} role={normalizedRole} onEmailSaved={() => refreshUser({ silent: true })} />
+          {normalizedRole === "administrator" && <div className="pt-5"><AdminPolicyCard /></div>}
         </div>
       </div>
     </SettingsLayout>

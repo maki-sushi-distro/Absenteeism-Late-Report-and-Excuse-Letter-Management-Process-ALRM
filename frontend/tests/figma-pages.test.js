@@ -37,11 +37,8 @@ test("overview renders only database-backed program row values", () => {
   for (const heading of ["Department", "Students", "Classes", "Instructors"]) assert.match(html, new RegExp(`>${heading}<`));
   assert.doesNotMatch(html, /No data yet|Students at Risk/);
   assert.doesNotMatch(html, /<th[^>]*>Pending Requests<\/th>/);
-  const managePrograms = html.match(/<a\b[^>]*>Manage programs<\/a>/)?.[0];
-  assert.ok(managePrograms);
-  assert.match(managePrograms, /bg-\[#172f6b\]/);
-  assert.match(managePrograms, /text-white/);
-  assert.match(html, /href="\/programs"/);
+  assert.doesNotMatch(html, />Manage classes<\/a>|>Manage programs<\/a>/);
+  assert.doesNotMatch(html, /href="\/(?:classes|programs)"/);
 });
 test("administrator activity renders real recent flags without the informational notice", () => {
   const html = render(AdminLog);

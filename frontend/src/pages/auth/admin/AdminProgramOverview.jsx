@@ -1,4 +1,3 @@
-import { Link } from "react-router-dom";
 import { getAdminDashboard } from "@/api/admin";
 import { getCollection } from "@/api/collections";
 import { useApiResource } from "@/hooks/useApiResource";
@@ -16,7 +15,7 @@ export default function AdminProgramOverview() {
   const rows = programOverviewRows(dashboard.data, classes.data || []);
   const counts = dashboard.data;
   return <div className="space-y-6">
-    <header className="flex flex-wrap items-start justify-between gap-4"><div><h1 className="text-2xl font-bold">Program Overview</h1><p className="mt-1 text-sm text-slate-500">Summary of academic programs and student attendance compliance.</p></div><Button className="h-11 bg-[#172f6b] px-6 py-3 text-white hover:bg-[#203f8a]" nativeButton={false} render={<Link to="/programs" />}>Manage programs</Button></header>
+    <header><h1 className="text-2xl font-bold">Program Overview</h1><p className="mt-1 text-sm text-slate-500">Summary of academic programs and student attendance compliance.</p></header>
     {dashboard.loading ? <LoadingSkeleton variant="dashboard" label="Loading program overview" /> : dashboard.error ? <div className="space-y-3"><ErrorState message={dashboard.error} /><Button variant="outline" onClick={dashboard.reload}>Retry</Button></div> : <>
       <section aria-label="Program summary" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard label="Total Programs" value={rows.length} />

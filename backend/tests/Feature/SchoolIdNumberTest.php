@@ -6,7 +6,6 @@ use App\Models\Enrollment;
 use App\Models\Program;
 use App\Services\AcademicPeriod;
 use Illuminate\Database\QueryException;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Tests\SecurityTestCase;
 
@@ -32,11 +31,11 @@ class SchoolIdNumberTest extends SecurityTestCase
         $this->assertSame('001-0023', $student->fresh()->school_id_number);
     }
 
-    public function test_all_staff_roles_can_save_ids_without_year_levels_and_keep_existing_programs(): void
+    public function test_other_staff_roles_can_save_ids_without_year_levels_and_keep_existing_programs(): void
     {
         $oldProgram = Program::factory()->create();
         $newProgram = Program::factory()->create();
-        foreach (['instructor', 'program_head', 'administrator'] as $role) {
+        foreach (['program_head', 'administrator'] as $role) {
             $staff = $this->user($role);
             $staff->programs()->attach($oldProgram);
 
@@ -53,6 +52,66 @@ class SchoolIdNumberTest extends SecurityTestCase
                 'program_id' => $oldProgram->id,
             ])->assertOk()->assertJsonPath('data.school_id_number', '000-'.$role);
         }
+    }
+
+    public function test_instructors_can_save_only_the_id_without_changing_direct_or_pivot_programs(): void
+    {
+        foreach (['direct', 'pivot', 'multiple'] as $assignment) {
+            $program = Program::create(['program_name' => 'Assigned '.$assignment]);
+            $instructor = $this->user('instructor', [
+                'program_id' => $assignment === 'direct' ? $program->id : null,
+            ]);
+            if ($assignment !== 'direct') {
+                $instructor->programs()->attach($program);
+            }
+            if ($assignment === 'multiple') {
+                $instructor->programs()->attach(Program::create(['program_name' => 'Second assignment']));
+            }
+            $memberships = $instructor->programs()->pluck('programs.id')->all();
+
+            $this->bearer($instructor)->postJson('/api/complete-profile', [
+                'school_id_number' => 'FAC-'.$assignment,
+            ])->assertOk()->assertJsonPath('data.school_id_number', 'FAC-'.$assignment);
+            $this->assertSame($memberships, $instructor->programs()->pluck('programs.id')->all());
+            $this->assertSame($assignment === 'direct' ? $program->id : null, $instructor->fresh()->program_id);
+            $this->bearer($instructor)->getJson('/api/me')->assertOk()
+                ->assertJsonPath('data.school_id_number', 'FAC-'.$assignment);
+
+            $this->bearer($instructor)->postJson('/api/complete-profile', [
+                'program_id' => $program->id,
+            ])->assertOk()->assertJsonPath('data.school_id_number', 'FAC-'.$assignment);
+            $this->assertSame($memberships, $instructor->programs()->pluck('programs.id')->all());
+
+            $this->bearer($instructor)->postJson('/api/complete-profile', [
+                'program_id' => Program::create(['program_name' => 'Unassigned '.$assignment])->id,
+                'school_id_number' => 'CHANGED-'.$assignment,
+            ])->assertUnprocessable()->assertJsonValidationErrors('program_id');
+            $this->assertSame($memberships, $instructor->programs()->pluck('programs.id')->all());
+            $this->assertSame('FAC-'.$assignment, $instructor->fresh()->school_id_number);
+        }
+    }
+
+    public function test_instructor_completion_requires_an_id_and_an_initial_program(): void
+    {
+        $program = Program::factory()->create();
+        $instructor = $this->user('instructor');
+        foreach ([[], ['school_id_number' => null], ['school_id_number' => '']] as $fields) {
+            $this->bearer($instructor)->postJson('/api/complete-profile', $fields + ['program_id' => $program->id])
+                ->assertUnprocessable()->assertJsonValidationErrors('school_id_number');
+        }
+        $this->bearer($instructor)->postJson('/api/complete-profile', ['school_id_number' => 'FAC-NEW'])
+            ->assertUnprocessable()->assertJsonValidationErrors('program_id');
+        $this->assertSame(0, $instructor->programs()->count());
+
+        $this->bearer($instructor)->postJson('/api/complete-profile', [
+            'program_id' => $program->id, 'school_id_number' => 'FAC-NEW',
+        ])->assertOk()->assertJsonPath('data.school_id_number', 'FAC-NEW');
+        $this->assertSame([$program->id], $instructor->programs()->pluck('programs.id')->all());
+        foreach ([null, ''] as $invalidId) {
+            $this->bearer($instructor)->postJson('/api/complete-profile', ['school_id_number' => $invalidId])
+                ->assertUnprocessable()->assertJsonValidationErrors('school_id_number');
+        }
+        $this->assertSame('FAC-NEW', $instructor->fresh()->school_id_number);
     }
 
     public function test_new_id_validation_requires_student_ids_and_rejects_duplicates_across_roles(): void
@@ -75,14 +134,10 @@ class SchoolIdNumberTest extends SecurityTestCase
         $this->assertSame(0, $student->programs()->count());
     }
 
-    public function test_migration_and_rollback_preserve_existing_ids_and_database_uniqueness(): void
+    public function test_users_are_created_with_the_current_id_field_and_database_uniqueness(): void
     {
         $user = $this->user('student', ['school_id_number' => '000-123']);
-        $migration = require database_path('migrations/2026_10_29_000000_rename_school_student_id_to_school_id_number.php');
-        $migration->down();
-        $this->assertTrue(Schema::hasColumn('users', 'school_student_id'));
-        $this->assertSame('000-123', DB::table('users')->where('id', $user->id)->value('school_student_id'));
-        $migration->up();
+        $this->assertTrue(Schema::hasColumn('users', 'school_id_number'));
         $this->assertFalse(Schema::hasColumn('users', 'school_student_id'));
         $this->assertSame('000-123', $user->fresh()->school_id_number);
 

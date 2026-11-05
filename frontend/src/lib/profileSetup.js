@@ -68,6 +68,14 @@ function hasValue(value) {
   return value !== undefined && value !== null && String(value).trim() !== "";
 }
 
+export function hasAssignedProgram(user) {
+  return hasValue(user?.program_id) || (
+    normalizeRole(user?.role) === "instructor" &&
+    Array.isArray(user?.programs) &&
+    user.programs.length > 0
+  );
+}
+
 export function isProfileSetupReady({
   role,
   userId,
@@ -113,11 +121,17 @@ export function isProfileSetupComplete(user) {
     );
   }
 
-  const hasAssignedProgram = (
-    hasValue(user.program_id) ||
-    (Array.isArray(user.programs) && user.programs.length > 0)
-  );
-  return hasAssignedProgram && hasValue(user.school_id_number);
+  return hasAssignedProgram(user) && hasValue(user.school_id_number);
+}
+
+export async function saveAndConfirmProfile({ saved, payload, save, refresh }) {
+  if (!saved) await save(payload);
+  try {
+    const user = await refresh({ fresh: true });
+    return { saved: true, user, complete: isProfileSetupComplete(user) };
+  } catch (error) {
+    return { saved: true, user: null, complete: false, error };
+  }
 }
 
 export function needsProfileSetup(user) {

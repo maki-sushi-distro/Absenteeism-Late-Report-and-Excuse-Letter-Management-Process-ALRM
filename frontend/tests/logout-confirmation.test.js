@@ -37,3 +37,14 @@ test("only the logout confirmation action invokes the existing logout handler", 
   confirm.props.onClick();
   assert.equal(calls, 1);
 });
+
+test("logout confirmation remains visible and locks its actions while signing out", async () => {
+  const { LogoutConfirmationBody } = await server.ssrLoadModule("/src/components/navigation/RoleSidebar/LogoutConfirmation.jsx");
+  const { AlertDialog } = await server.ssrLoadModule("/src/components/ui/alert-dialog.jsx");
+  const html = renderToStaticMarkup(React.createElement(AlertDialog, null,
+    React.createElement(LogoutConfirmationBody, { onLogout() {}, loggingOut: true })));
+
+  assert.match(html, /Signing out…/);
+  assert.match(html, /lucide-loader-circle[^>]*animate-spin/);
+  assert.equal((html.match(/<button[^>]*disabled=""/g) || []).length, 2);
+});

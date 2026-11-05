@@ -13,6 +13,7 @@ import {
 import { getPendingUserPreview, getUserManagementUsers } from "@/api/adminUserManagement";
 import { getResourceCacheEntry, requestCachedResource } from "@/api/resourceCache";
 import AdminOverview from "./dashboard/AdminOverview";
+import AdminClassManagement from "./AdminClassManagement";
 import AdminReports from "./reports/AdminReports";
 import PageBreadcrumbs from "@/components/navigation/PageBreadcrumbs";
 import { EmptyState } from "@/components/common/EmptyState";
@@ -28,7 +29,7 @@ import ClassForm from "./classes/ClassForm";
 const emptyProgramForm = { program_name: "", program_head_id: "" };
 const endpoints = { dashboard: getAdminDashboard, users: getUserManagementUsers, pendingUsers: getPendingUserPreview, programs: getPrograms, classes: getClasses };
 const resourceDefaults = { dashboard: false, users: false, pendingUsers: false, programs: false, classes: false };
-const viewResources = { dashboard: ["dashboard", "pendingUsers"], users: ["users"], programs: ["programs", "users"], classes: ["classes", "programs"], reports: ["programs"] };
+const viewResources = { dashboard: ["dashboard", "pendingUsers"], users: ["users"], programs: ["programs", "users"], classes: [], reports: ["programs"] };
 
 function hoursValue(value) {
   if (value === null || value === undefined || value === "") return "Unavailable";
@@ -180,6 +181,7 @@ export function AdminDashboard({ view = "dashboard" }) {
   const programHeads = users.filter((user) => ["instructor", "program_head"].includes(user.role));
 
   if (view === "dashboard") return <AdminOverview resources={resources} onRetry={() => loadData({ force: true })} />;
+  if (showClasses) return <AdminClassManagement />;
 
   return (
     <div className="space-y-6" data-slot={view === "dashboard" && loading ? "dashboard-skeleton" : undefined} data-variant={view === "dashboard" ? "admin" : undefined}>

@@ -28,11 +28,11 @@ export default function RemoveAssignmentDialog({ row, instructors, onClose, onSa
   }
 
   return <AlertDialog open onOpenChange={open => { if (!open && !lock.current) onClose(); }}>
-    <AlertDialogContent aria-busy={busy} className="rounded-[20px] bg-white">
+    <AlertDialogContent aria-busy={busy} className="gap-5 rounded-[20px] bg-white p-6 sm:p-7">
       <AlertDialogTitle>Remove instructor assignment?</AlertDialogTitle>
-      <AlertDialogDescription>{removeAssignmentDescription(row, instructors)}</AlertDialogDescription>
+      <AlertDialogDescription className="leading-6">{removeAssignmentDescription(row, instructors)}</AlertDialogDescription>
       {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
-      <AlertDialogFooter><AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel><Button type="button" disabled={busy} onClick={remove} className="bg-[#e44343] text-white hover:bg-red-600">{busy && <LoaderCircle className="size-4 animate-spin" />}{busy ? "Removing…" : "Remove assignment"}</Button></AlertDialogFooter>
+      <AlertDialogFooter className="border-t border-slate-200 pt-5"><AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel><Button type="button" disabled={busy} onClick={remove} className="bg-[#e44343] text-white hover:bg-red-600">{busy && <LoaderCircle className="size-4 animate-spin" />}{busy ? "Removing…" : "Remove assignment"}</Button></AlertDialogFooter>
     </AlertDialogContent>
   </AlertDialog>;
 }

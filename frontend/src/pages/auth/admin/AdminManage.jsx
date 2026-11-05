@@ -132,9 +132,6 @@ export default function AdminManage() {
   const selectedProgram = selectablePrograms.find(
     (program) => String(program.id) === String(programId),
   );
-  const unassignedCount = assignableClasses.filter(
-    (row) => !activeTeachingAssignment(row),
-  ).length;
   const dialogRow = dialog?.classId
     ? assignableClasses.find((row) => String(row.id) === String(dialog.classId))
     : null;
@@ -278,7 +275,6 @@ export default function AdminManage() {
               </Button>
               <Button
                 type="button"
-                disabled={!unassignedCount}
                 onClick={() => {
                   setNotice("");
                   setDialog({ classId: null });

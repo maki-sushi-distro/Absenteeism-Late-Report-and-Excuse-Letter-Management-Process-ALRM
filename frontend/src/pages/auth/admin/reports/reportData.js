@@ -2,6 +2,7 @@ import { normalizeRequestStatus } from "../../../../lib/requestStatus.js";
 
 const schoolDay = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila", year: "numeric", month: "2-digit", day: "2-digit" });
 export const reportHeadings = ["Request ID", "Student", "Program", "Subject", "Instructor", "Type", "Start Date", "End Date", "Reason", "Status", "Reviewed By", "Date Reviewed", "Flagged (IR)"];
+export const visibleReportHeadings = reportHeadings.filter(heading => heading !== "Request ID");
 
 export function schoolWeek(now = new Date(), weeksAgo = 0) {
   const monday = new Date(`${schoolDay.format(now)}T00:00:00Z`);

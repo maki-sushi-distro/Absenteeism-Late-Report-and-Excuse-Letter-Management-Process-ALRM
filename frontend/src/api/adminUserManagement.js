@@ -8,6 +8,33 @@ export function getUserManagementUsers(options) {
   return getCollection("/api/admin/users", options);
 }
 
+const yearLevels = { 1: "1st", 2: "2nd", 3: "3rd", 4: "4th" };
+
+export function userManagementPageCacheKey(page, filters = {}) {
+  const normalized = {
+    search: String(filters.search || "").trim(),
+    status: filters.status || "",
+    role: filters.role || "",
+    program: filters.program || "",
+    year: filters.year || "",
+    userId: filters.userId || "",
+  };
+  return `admin:user-management:users:${page}:${JSON.stringify(normalized)}`;
+}
+
+export function getUserManagementUsersPage({ signal, page = 1, perPage = 10, filters = {} } = {}) {
+  const query = new URLSearchParams();
+  const search = String(filters.search || "").trim();
+  if (search) query.set("search", search);
+  if (filters.role) query.set("role", filters.role);
+  if (filters.status) query.set("status", filters.status);
+  if (filters.program) query.set("program_id", filters.program);
+  if (filters.year) query.set("year_level", yearLevels[filters.year] || filters.year);
+  if (filters.userId) query.set("user_id", filters.userId);
+  const endpoint = query.size ? `/api/admin/users?${query}` : "/api/admin/users";
+  return getCollectionPage(endpoint, { signal, page, perPage, allowOutOfRange: true });
+}
+
 export async function getPendingUserPreview(options) {
   const page = await getCollectionPage("/api/admin/users?status=pending", { ...options, page: 1, perPage: 4 });
   return page.data;

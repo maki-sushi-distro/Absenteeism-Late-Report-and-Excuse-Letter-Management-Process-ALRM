@@ -32,12 +32,35 @@ function thresholdDetail(message) {
   return `${remaining} units and ${percentage}% remaining before the absence limit.`;
 }
 
+function submissionMessage(type, message) {
+  if (!["new_request", "activity_submitted_request"].includes(type)) return message;
+  const text = String(message).trim();
+  const match = text.match(/^(.+?) (?:just submitted an?|submitted a new) (absence|late) request for (.+?)(?:\.)?$/i)
+    || text.match(/^(.+?) submitted a request: .+?'s (absence|late) request for (.+?)(?:\.)?$/i);
+  if (!match) return message;
+  const [, student, requestType, subject] = match;
+  const article = requestType.toLowerCase() === "absence" ? "an" : "a";
+  return `${student} just submitted ${article} ${requestType.toLowerCase()} request for ${subject}.`;
+}
+
+function followupMessage(type, message) {
+  if (!["request_followup", "activity_followed_up_request"].includes(type)) return message;
+  const text = String(message).trim();
+  const match = text.match(/^(.+?) just followed up the (absence|late) request on (.+?)(?:\.)?$/i)
+    || text.match(/^(.+?) followed up on their (absence|late) request for (.+?)(?:\.)?$/i)
+    || text.match(/^(.+?) followed up a request: .+?'s (absence|late) request for (.+?)(?:\.)?$/i);
+  if (!match) return message;
+  const [, student, requestType, subject] = match;
+  return `${student} just followed up the ${requestType.toLowerCase()} request on ${subject}.`;
+}
+
 function notificationLabel(type, message) {
   if (type === "threshold_warning" || type === "attendance_warning") return "Preventive attendance alert";
   if (type === "threshold_critical") return "Critical attendance alert";
   if (type === "ir_escalation" || type === "attendance_ir") return "Drop-limit attendance alert";
-  if (type === "request_followup" || type === "followup_flag") return "Follow-up";
-  if (["request_decision", "new_request", "request_updated"].includes(type)) {
+  if (["request_followup", "followup_flag", "activity_followed_up_request"].includes(type)) return "Follow-up";
+  if (["new_request", "activity_submitted_request"].includes(type)) return "New request";
+  if (["request_decision", "request_updated"].includes(type)) {
     const requestType = /\blate\b/i.test(message) ? "Late" : /\babsence\b/i.test(message) ? "Absence" : "Request";
     const outcome = /\b(approved|noted)\b/i.test(message) ? " approved" : /\b(invalid|denied)\b/i.test(message) ? " invalid" : " update";
     return `${requestType}${outcome}`;
@@ -63,7 +86,7 @@ function destination(role, requestId, type) {
 export function notificationActivity(records, role, preferences, userId) {
   const normalizedRole = normalizeRole(role);
   const seen = new Set();
-  return records.flatMap(record => {
+  const activity = records.flatMap(record => {
     if (!record?.id || seen.has(record.id) || !record.message || !Number.isFinite(Date.parse(record.date_sent))) return [];
     if (userId != null && String(record.user_id) !== String(userId)) return [];
     // Preserve generic notices for their recipient; known events follow backend audiences.
@@ -71,10 +94,23 @@ export function notificationActivity(records, role, preferences, userId) {
     seen.add(record.id);
     const threshold = ["threshold_warning", "threshold_critical", "ir_escalation", "attendance_warning", "attendance_ir"].includes(record.type);
     if (!(threshold ? preferences.thresholdAlerts : preferences.requestUpdates)) return [];
-    const message = record.message;
+    const message = followupMessage(record.type, submissionMessage(record.type, record.message));
     return [{ id: record.id, type: record.type, requestId: record.request_id, message, detail: threshold ? thresholdDetail(message) : undefined,
       label: notificationLabel(record.type, message), date: record.date_sent, isRead: record.is_read === true, href: destination(role, record.request_id, record.type) }];
-  }).sort((a, b) => Date.parse(b.date) - Date.parse(a.date));
+  });
+  const directEvent = { new_request: "submitted", request_followup: "followed-up" };
+  const auditEvent = { activity_submitted_request: "submitted", activity_followed_up_request: "followed-up" };
+  const direct = new Map(activity.filter(item => directEvent[item.type] && item.requestId != null)
+    .map(item => [`${directEvent[item.type]}:${item.requestId}`, item]));
+  for (const item of activity) {
+    const retained = auditEvent[item.type] && item.requestId != null
+      ? direct.get(`${auditEvent[item.type]}:${item.requestId}`)
+      : null;
+    if (retained) retained.notificationIds = [...new Set([...(retained.notificationIds || [retained.id]), item.id])];
+  }
+  return activity
+    .filter(item => !auditEvent[item.type] || !direct.has(`${auditEvent[item.type]}:${item.requestId}`))
+    .sort((a, b) => Date.parse(b.date) - Date.parse(a.date));
 }
 
 export function groupNotificationActivity(activity, filter = "all", now = new Date(), readIds) {

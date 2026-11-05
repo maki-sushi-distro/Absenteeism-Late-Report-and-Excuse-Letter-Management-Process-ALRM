@@ -7,6 +7,16 @@ import {
 } from "../lib/formInputs.js";
 import { assertValidInputs } from "../lib/inputValidation.js";
 
+const auditActionFilters = {
+  Submitted: "submitted_request",
+  Updated: "updated_request",
+  Cancelled: "cancelled_request",
+  "Followed up": "followed_up_request",
+  Approved: "decided_request_approved",
+  Denied: "decided_request_invalid",
+  Resolved: "resolved_followup_flag",
+};
+
 export function getAdminDashboard() {
   return apiRequest("/admin/dashboard");
 }
@@ -22,14 +32,14 @@ export function getAdminAuditLogsPage({
 } = {}) {
   const query = new URLSearchParams();
   if (filters.search?.trim()) query.set("search", filters.search.trim());
-  if (filters.action) query.set("action", filters.action);
+  if (filters.action) query.set("action", auditActionFilters[filters.action] || filters.action);
   if (filters.subject) query.set("class_id", filters.subject);
   if (filters.date) {
     query.set("from", filters.date);
     query.set("to", filters.date);
   }
   const path = `/admin/audit-logs${query.toString() ? `?${query}` : ""}`;
-  return getCollectionPage(path, { signal, page, perPage });
+  return getCollectionPage(path, { signal, page, perPage, allowOutOfRange: true });
 }
 
 export function getAdminUsers() {
@@ -74,6 +84,15 @@ export function deleteProgram(programId) {
 
 export function getClasses() {
   return getCollection("/admin/classes");
+}
+
+export function getClassesPage({ signal, page = 1, perPage = 10, filters = {} } = {}) {
+  const query = new URLSearchParams();
+  const search = String(filters.search || "").trim();
+  if (search) query.set("search", search);
+  if (filters.programId) query.set("program_id", filters.programId);
+  const path = `/admin/classes${query.size ? `?${query}` : ""}`;
+  return getCollectionPage(path, { signal, page, perPage, allowOutOfRange: true });
 }
 
 export function createClass(data) {

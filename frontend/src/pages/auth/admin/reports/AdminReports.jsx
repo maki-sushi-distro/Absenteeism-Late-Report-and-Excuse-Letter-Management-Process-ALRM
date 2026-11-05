@@ -7,7 +7,7 @@ import { ErrorState } from "@/components/common/ErrorState";
 import RequestPagination from "@/pages/auth/instructor/InstructorRequests/RequestPagination";
 import { paginateRecords } from "@/pages/auth/student/records/pagination";
 import { getSelectablePrograms } from "@/lib/programs";
-import { reportHeadings as headings } from "./reportData.js";
+import { visibleReportHeadings as headings } from "./reportData.js";
 import { reportDatesComplete } from "./reportValidation.js";
 
 const emptyFilters = { program_id: "", status: "", date_from: "", date_to: "" };

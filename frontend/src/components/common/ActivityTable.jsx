@@ -15,6 +15,7 @@ import { filterActivity } from "@/pages/auth/admin/overviewData";
 import { paginateRecords } from "@/pages/auth/student/records/pagination";
 import RequestPagination from "@/pages/auth/instructor/InstructorRequests/RequestPagination";
 import { usePageViewState } from "@/hooks/usePageViewState";
+import { useCallback, useEffect, useState } from "react";
 
 const emptyFilters = { search: "", action: "", subject: "", date: "" };
 const actions = {
@@ -46,6 +47,7 @@ export default function ActivityTable({
     page: 1,
   });
   const { filters, page } = view;
+  const [searchInput, setSearchInput] = useState(filters.search);
   const serverMode = Boolean(serverPagination);
   const visible = serverMode ? rows : filterActivity(rows, filters);
   const pagination = serverMode
@@ -95,11 +97,16 @@ export default function ActivityTable({
     if (serverMode) onPageChange?.(nextPage);
     else setView((current) => ({ ...current, page: nextPage }));
   }
-  function change(key, value) {
+  const change = useCallback((key, value) => {
     const nextFilters = { ...filters, [key]: value };
     if (serverMode) onFilterChange?.(nextFilters);
     setView({ filters: nextFilters, page: 1 });
-  }
+  }, [filters, onFilterChange, serverMode, setView]);
+  useEffect(() => {
+    if (searchInput === filters.search) return undefined;
+    const timer = window.setTimeout(() => change("search", searchInput.trim()), 300);
+    return () => window.clearTimeout(timer);
+  }, [change, filters.search, searchInput]);
   if (loading)
     return (
       <LoadingSkeleton
@@ -137,8 +144,8 @@ export default function ActivityTable({
               <Input
                 aria-label="Search activity"
                 placeholder="Search Name, ID, Email..."
-                value={filters.search}
-                onChange={(event) => change("search", event.target.value)}
+                value={searchInput}
+                onChange={(event) => setSearchInput(event.target.value)}
                 className="h-10 rounded-lg border-[#c5d0e5] pr-10 text-sm shadow-sm"
               />
               <Search
@@ -146,12 +153,6 @@ export default function ActivityTable({
                 className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-[#8aa0bf]"
               />
             </div>
-            <Button
-              variant="ghost"
-              onClick={() => setView({ filters: emptyFilters, page: 1 })}
-            >
-              Clear filters
-            </Button>
             <ResourceRefresh
               updatedAt={updatedAt}
               loading={loading}
@@ -167,11 +168,7 @@ export default function ActivityTable({
                 onChange={change}
                 options={[
                   { value: "", label: "All actions" },
-                  ...Object.keys(actions)
-                    .filter((action) =>
-                      rows.some((row) => row.action === action),
-                    )
-                    .map((action) => ({ value: action, label: action })),
+                  ...Object.keys(actions).map((action) => ({ value: action, label: action })),
                 ]}
               />
               <RadioFilterGroup

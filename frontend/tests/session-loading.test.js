@@ -309,18 +309,40 @@ test('provider preserves a verified user during outage and supports retry', asyn
   await withCookieProvider(async ({ page, calls, state }) => {
     calls[0].resolve(Response.json({ data: { authenticated: true, user: cookieUser } }));
     await page.flush();
-    const refresh = state().refreshUser();
+    const refresh = state().refreshUser({ fresh: true });
     calls.at(-1).resolve(new Response('', { status: 503 }));
     await refresh;
     await page.flush();
     assert.deepEqual(state().user, cookieUser);
     assert.match(state().sessionError, /try again/i);
-    const retry = state().refreshUser();
+    const retry = state().refreshUser({ fresh: true });
     calls.at(-1).resolve(Response.json({ data: { authenticated: true, user: { ...cookieUser, name: 'Updated' } } }));
     await retry;
     await page.flush();
     assert.equal(state().user.name, 'Updated');
     assert.equal(state().sessionError, '');
+  });
+});
+
+test('pending fresh profile refresh cannot restore a logged-out session', async () => {
+  await withCookieProvider(async ({ page, calls, state, items }) => {
+    calls[0].resolve(Response.json({ data: { authenticated: true, user: cookieUser } }));
+    await page.flush();
+
+    const refresh = state().refreshUser({ fresh: true });
+    const pending = calls.at(-1);
+    const version = `expired:${crypto.randomUUID()}`;
+    items.set('alrm_session_version', version);
+    const event = new Event('storage');
+    Object.assign(event, { key: 'alrm_session_version', newValue: version });
+    window.dispatchEvent(event);
+    await page.flush();
+
+    pending.resolve(Response.json({ data: { authenticated: true, user: { ...cookieUser, name: 'Stale User' } } }));
+    await refresh;
+    await page.flush();
+    assert.equal(state().user, null);
+    assert.equal(state().loading, false);
   });
 });
 
@@ -368,6 +390,8 @@ test('logout awaits cookie clearance and late logout completion cannot erase a n
     const logout = state().logout({ redirectToSignedOut: true }).then(() => { completed = true; });
     await page.flush();
     assert.equal(state().logoutDestination, '/signed-out', 'The route guard needs the destination before session-expiry notifications arrive');
+    assert.equal(state().loading, false, 'The current page and logout modal must remain mounted while cookie logout is pending');
+    assert.deepEqual(state().user, cookieUser);
     assert.equal(calls.at(-1).path, '/api/auth/csrf');
     calls.at(-1).resolve(Response.json({ success: true, data: { csrf_token: 'proof' } }));
     await page.flush();

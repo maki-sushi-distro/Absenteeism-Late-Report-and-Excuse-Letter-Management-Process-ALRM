@@ -6,6 +6,13 @@ import { notificationActivity } from "../src/components/notifications/notificati
 
 afterEach(() => mock.restoreAll());
 
+test("Admin API does not expose removed program or class deletion operations", async () => {
+  const adminApi = await import("../src/api/admin.js");
+
+  assert.equal("deleteProgram" in adminApi, false);
+  assert.equal("deleteClass" in adminApi, false);
+});
+
 test("Admin user list requests only the selected filtered page", async () => {
   const { getUserManagementUsersPage } = await import("../src/api/adminUserManagement.js");
   const calls = [];

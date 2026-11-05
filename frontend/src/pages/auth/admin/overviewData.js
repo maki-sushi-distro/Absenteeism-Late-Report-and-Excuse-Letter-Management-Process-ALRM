@@ -54,13 +54,16 @@ export function filterActivity(rows, { search = "", action = "", subject = "", d
     return day === date;
   })()));
 }
+export function countAssignedInstructors(classes = []) {
+  return new Set(classes.map(course => course.active_teaching_assignment?.instructor_id || course.active_teaching_assignment?.instructor?.id || course.instructor_id).filter(Boolean)).size;
+}
 export function programOverviewRows(dashboard, classes = []) {
   return (dashboard?.programs_summary || []).filter(program => !isGeneralEducationProgram(program)).map(program => {
     const programClasses = classes.filter(course => course.program_id === program.id);
     return {
       id: program.id, name: program.program_name, students: program.student_count ?? null,
       classes: program.classes_count ?? programClasses.length,
-      instructors: new Set(programClasses.map(course => course.active_teaching_assignment?.instructor_id || course.active_teaching_assignment?.instructor?.id || course.instructor_id).filter(Boolean)).size,
+      instructors: countAssignedInstructors(programClasses),
     };
   });
 }

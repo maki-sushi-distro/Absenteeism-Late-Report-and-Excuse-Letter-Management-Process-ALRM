@@ -4,6 +4,7 @@ import { after, afterEach, before, beforeEach, mock, test } from "node:test";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createServer } from "vite";
+import { readFileSync } from "node:fs";
 import * as requests from "../src/api/studentRequests.js";
 
 let server;
@@ -69,28 +70,87 @@ test("follow-up does not retry network failures and passes cancellation to the e
 });
 
 test("a successful follow-up starts an exact 24-hour cooldown", async () => {
-  const { followUpCooldownExpiresAt } = await server.ssrLoadModule("/src/pages/auth/student/records/useRequestFollowUp.js");
+  const { activeFollowUpCooldown, followUpCooldownExpiresAt } = await server.ssrLoadModule("/src/pages/auth/student/records/useRequestFollowUp.js");
   const sentAt = "2026-10-29T08:00:00.000Z";
 
   assert.equal(followUpCooldownExpiresAt(sentAt), Date.parse(sentAt) + 24 * 60 * 60 * 1000);
   assert.equal(followUpCooldownExpiresAt(undefined, 1_000), 1_000 + 24 * 60 * 60 * 1000);
+  assert.equal(typeof activeFollowUpCooldown, "function");
+  assert.equal(activeFollowUpCooldown({ followup_flag: { flagged_date: sentAt } }, Date.parse(sentAt) + 1_000), Date.parse(sentAt) + 24 * 60 * 60 * 1000);
+  assert.equal(activeFollowUpCooldown({ followupFlag: { flagged_date: sentAt } }, Date.parse(sentAt) + 25 * 60 * 60 * 1000), null);
 });
 
-test("pending records use an accessible bell-check follow-up button", async () => {
+test("record rows only show the view action", async () => {
   const Actions = (await server.ssrLoadModule("/src/pages/auth/student/records/RecordActions.jsx")).default;
-  const props = { record, description: "Math", onView() {}, onFollowUp() {} };
+  const props = { record, description: "Math", onView() {} };
   const html = renderToStaticMarkup(React.createElement(Actions, props));
-  const followUp = html.match(/<button[^>]*aria-label="Follow up on Math"[^>]*>[\s\S]*?<\/button>/)?.[0];
-  assert.ok(followUp);
-  assert.doesNotMatch(html, /disabled=""/);
-  assert.match(html, /aria-busy="false"/);
-  assert.match(html, /flex-nowrap/);
-  assert.match(followUp, /lucide-bell-check/);
-  assert.match(followUp, /h-7/);
-  assert.match(followUp, /w-7/);
-  assert.doesNotMatch(followUp, />Follow up</);
-  const unavailable = renderToStaticMarkup(React.createElement(Actions, { ...props, onFollowUp: undefined }));
-  assert.match(unavailable, /disabled=""/);
+  assert.match(html, /View Record/);
+  assert.doesNotMatch(html, /Follow up|lucide-bell-check/);
+});
+
+test("record modal shows a text follow-up action without another view action", async () => {
+  const Actions = (await server.ssrLoadModule("/src/pages/auth/student/records/RecordActions.jsx")).default;
+  const html = renderToStaticMarkup(React.createElement(Actions, { record, description: "Math", onFollowUp() {} }));
+
+  assert.match(html, />Follow up</);
+  assert.doesNotMatch(html, /View Record|lucide-bell-check/);
+});
+
+test("record modal disables follow-up while refreshing its server cooldown", async () => {
+  const Actions = (await server.ssrLoadModule("/src/pages/auth/student/records/RecordActions.jsx")).default;
+  const html = renderToStaticMarkup(React.createElement(Actions, { record, onFollowUp() {}, checkingCooldown: true }));
+
+  assert.match(html, /disabled=""/);
+  assert.match(html, />Checking follow-up…</);
+});
+
+test("a successful server cooldown check is reused when the record modal reopens", async () => {
+  const { shouldRefreshFollowUpCooldown } = await server.ssrLoadModule("/src/pages/auth/student/records/useRequestFollowUp.js");
+  const checkedRequestIds = new Set();
+
+  assert.equal(typeof shouldRefreshFollowUpCooldown, "function");
+  assert.equal(shouldRefreshFollowUpCooldown(record, checkedRequestIds), true);
+  checkedRequestIds.add(record.id);
+  assert.equal(shouldRefreshFollowUpCooldown(record, checkedRequestIds), false);
+  assert.equal(shouldRefreshFollowUpCooldown({ ...record, id: "reviewed", status: "approved" }, checkedRequestIds), false);
+});
+
+test("follow-up requires a separate confirmation before it is sent", async () => {
+  const ConfirmDialog = (await server.ssrLoadModule("/src/pages/auth/student/records/FollowUpConfirmDialog.jsx")).default;
+  const calls = [];
+  const node = ConfirmDialog({
+    record,
+    description: "Digital Citizenship and Online Safety",
+    onCancel() { calls.push(["cancel"]); },
+    onConfirm(value) { calls.push(["confirm", value]); },
+  });
+  const elements = [];
+  function visit(element) {
+    if (!React.isValidElement(element)) return;
+    elements.push(element);
+    React.Children.forEach(element.props.children, visit);
+  }
+  visit(node);
+
+  assert.equal(calls.length, 0);
+  assert.match(node.props.children.props.className, /max-w-\[560px\]/);
+  assert.match(node.props.children.props.className, /sm:p-8/);
+  const confirm = elements.find((element) => element.props.children === "Send follow-up");
+  assert.ok(confirm);
+  confirm.props.onClick();
+  assert.deepEqual(calls, [["confirm", record]]);
+  node.props.onOpenChange(false);
+  assert.deepEqual(calls, [["confirm", record], ["cancel"]]);
+});
+
+test("follow-up feedback uses the shared toast instead of an inline notice", () => {
+  const main = readFileSync(new URL("../src/main.jsx", import.meta.url), "utf8");
+  const records = readFileSync(new URL("../src/pages/auth/student/StudentRecords.jsx", import.meta.url), "utf8");
+  const followUp = readFileSync(new URL("../src/pages/auth/student/records/useRequestFollowUp.js", import.meta.url), "utf8");
+
+  assert.match(main, /<Toaster>/);
+  assert.match(followUp, /toast\.add\(/);
+  assert.doesNotMatch(records, /FollowUpNotice/);
 });
 
 test("sending shows a spinner only for the active row and disables follow-ups on other rows", async () => {
@@ -117,8 +177,8 @@ test("cooldown replaces the follow-up action with a disabled 24-hour countdown",
 
   assert.match(html, /disabled=""/);
   assert.match(html, /aria-label="Follow up available in 23:59:59"/);
-  assert.match(html, /lucide-bell-check/);
-  assert.match(html, />23:59:59</);
+  assert.doesNotMatch(html, /lucide-bell-check/);
+  assert.match(html, />Follow up in 23:59:59</);
 });
 
 test("reviewed and cancelled requests do not offer follow-up and view remains available", async () => {

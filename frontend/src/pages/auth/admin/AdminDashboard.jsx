@@ -2,8 +2,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   createClass,
   createProgram,
-  deleteClass,
-  deleteProgram,
   getAdminDashboard,
   getClasses,
   getPrograms,
@@ -29,7 +27,7 @@ import ClassForm from "./classes/ClassForm";
 const emptyProgramForm = { program_name: "", program_head_id: "" };
 const endpoints = { dashboard: getAdminDashboard, users: getUserManagementUsers, programs: getPrograms, classes: getClasses };
 const resourceDefaults = { dashboard: false, users: false, programs: false, classes: false };
-const viewResources = { dashboard: ["dashboard"], users: ["users"], programs: ["programs", "users"], classes: [], reports: ["programs"] };
+const viewResources = { dashboard: ["dashboard", "classes"], users: ["users"], programs: ["programs", "users"], classes: [], reports: ["programs"] };
 
 function hoursValue(value) {
   if (value === null || value === undefined || value === "") return "Unavailable";
@@ -230,7 +228,7 @@ export function AdminDashboard({ view = "dashboard" }) {
             <div className="flex items-end md:col-span-2 xl:col-span-1"><Button type="submit" disabled={!programOptionsReady || working === "create-program"} className="h-11 w-full rounded-lg bg-[#172f6b] px-6 text-white hover:bg-[#203f8a] sm:w-[140px] xl:w-full">Create</Button></div>
           </form>
           {visiblePrograms.length === 0 ? <EmptyState title="No programs found" /> : (
-            <div className="grid gap-4 lg:grid-cols-2">{visiblePrograms.map((program) => <article key={program.id} className="min-w-0 rounded-lg border border-slate-200 p-4"><div className="flex items-start justify-between gap-3"><span className="min-w-0 break-words font-medium">{program.program_name}</span><Button size="sm" variant="destructive" className="shrink-0" onClick={() => { setWorking(`delete-program-${program.id}`); runAction(() => deleteProgram(program.id), "Program deleted."); }}>Delete</Button></div><p className="mt-2 break-words text-xs text-slate-500">ID {program.id} · {program.classes_count || 0} classes</p></article>)}</div>
+            <div className="grid gap-4 lg:grid-cols-2">{visiblePrograms.map((program) => <article key={program.id} className="min-w-0 rounded-lg border border-slate-200 p-4"><span className="min-w-0 break-words font-medium">{program.program_name}</span><p className="mt-2 break-words text-xs text-slate-500">ID {program.id} · {program.classes_count || 0} classes</p></article>)}</div>
           )}
         </div> : null}
 
@@ -242,7 +240,7 @@ export function AdminDashboard({ view = "dashboard" }) {
           <section aria-labelledby="existing-classes-title" className="min-w-0 rounded-lg border border-slate-200 bg-white p-5">
           <h2 id="existing-classes-title" className="mb-4 text-lg font-semibold">Existing Classes</h2>
           {visibleClasses.length === 0 ? <EmptyState title="No classes found" /> : (
-            <div className="grid gap-3 lg:grid-cols-2">{visibleClasses.map((item) => <article key={item.id} className="min-w-0 rounded-lg border border-slate-200 p-4"><div className="flex items-start justify-between gap-3"><span className="min-w-0 break-words font-medium">{item.subject_name}</span><div className="flex shrink-0 gap-2"><Button size="sm" variant="outline" onClick={() => setClassEditor({ item })} disabled={Boolean(working)}>Edit</Button><Button size="sm" variant="destructive" onClick={() => { setWorking(`delete-class-${item.id}`); runAction(() => deleteClass(item.id), "Class deleted."); }}>Delete</Button></div></div><p className="mt-2 break-words text-xs text-slate-500">{item.program?.program_name || "Program"} · {item.year_level || "Year unavailable"} · {item.semester || "Semester unavailable"} Semester</p><ClassHours item={item} /></article>)}</div>
+            <div className="grid gap-3 lg:grid-cols-2">{visibleClasses.map((item) => <article key={item.id} className="min-w-0 rounded-lg border border-slate-200 p-4"><div className="flex items-start justify-between gap-3"><span className="min-w-0 break-words font-medium">{item.subject_name}</span><Button size="sm" variant="outline" onClick={() => setClassEditor({ item })} disabled={Boolean(working)}>Edit</Button></div><p className="mt-2 break-words text-xs text-slate-500">{item.program?.program_name || "Program"} · {item.year_level || "Year unavailable"} · {item.semester || "Semester unavailable"} Semester</p><ClassHours item={item} /></article>)}</div>
           )}
           </section>
         </div> : null}

@@ -1,8 +1,8 @@
-import { useRef } from "react";
-import { DoorOpen } from "lucide-react";
+import { useRef, useState } from "react";
+import { DoorOpen, LoaderCircle } from "lucide-react";
 import { AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
-export function LogoutConfirmationBody({ onLogout, cancelRef }) {
+export function LogoutConfirmationBody({ onLogout, cancelRef, loggingOut = false }) {
   return <>
     <div className="grid justify-items-center gap-3 text-center">
       <div className="mb-1 flex size-18 items-center justify-center rounded-full bg-red-50 text-[#e44343]">
@@ -12,15 +12,28 @@ export function LogoutConfirmationBody({ onLogout, cancelRef }) {
       <AlertDialogDescription className="text-sm leading-5 text-slate-500">You can sign back in anytime with your LV email account to access your dashboard.</AlertDialogDescription>
     </div>
     <div className="flex flex-col gap-2">
-      <AlertDialogAction type="button" onClick={onLogout} className="h-12 w-full rounded-full bg-[#e44343] text-base font-bold text-white hover:bg-red-600">Yes, Log out</AlertDialogAction>
-      <AlertDialogCancel ref={cancelRef} variant="ghost" className="h-11 w-full rounded-full text-base font-semibold text-slate-500 hover:bg-slate-50 hover:text-slate-800">No, I am staying</AlertDialogCancel>
+      <AlertDialogAction type="button" onClick={onLogout} disabled={loggingOut} className="h-12 w-full rounded-full bg-[#e44343] text-base font-bold text-white hover:bg-red-600">
+        {loggingOut && <LoaderCircle aria-hidden="true" className="size-4 animate-spin" />}
+        {loggingOut ? "Signing out…" : "Yes, Log out"}
+      </AlertDialogAction>
+      <AlertDialogCancel ref={cancelRef} disabled={loggingOut} variant="ghost" className="h-11 w-full rounded-full text-base font-semibold text-slate-500 hover:bg-slate-50 hover:text-slate-800">No, I am staying</AlertDialogCancel>
     </div>
   </>;
 }
 
 export default function LogoutConfirmation({ onLogout }) {
   const cancelRef = useRef(null);
+  const [loggingOut, setLoggingOut] = useState(false);
+  async function handleLogout() {
+    if (loggingOut) return;
+    setLoggingOut(true);
+    try {
+      await onLogout();
+    } catch {
+      setLoggingOut(false);
+    }
+  }
   return <AlertDialogContent size="sm" initialFocus={cancelRef} className="w-[calc(100%-2rem)] max-w-[360px]! gap-6 rounded-[24px] border-slate-200 bg-white p-6 text-slate-950 shadow-2xl ring-0">
-    <LogoutConfirmationBody onLogout={onLogout} cancelRef={cancelRef} />
+    <LogoutConfirmationBody onLogout={handleLogout} cancelRef={cancelRef} loggingOut={loggingOut} />
   </AlertDialogContent>;
 }

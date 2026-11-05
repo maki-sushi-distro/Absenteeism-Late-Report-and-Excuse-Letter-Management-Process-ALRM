@@ -91,5 +91,5 @@ export function buildInstructorOverview(dashboard, requests, now = new Date(), w
   const pendingReports = reported(dashboard.pending_requests || []).filter(record => record.status === "pending");
   const pending = { absences: 0, lates: 0, total: pendingReports.length };
   for (const record of pendingReports) pending[record.type === "absence" ? "absences" : "lates"] += 1;
-  return { totalStudents: total(dashboard.total_students), totalClasses: total(dashboard.total_classes), today, pending, courses, week, flags: (dashboard.flagged_students || []).filter(flag => flag && ["warning", "IR"].includes(flag.status)) };
+  return { totalStudents: total(dashboard.total_students), totalClasses: total(dashboard.total_classes), today, pending, courses, week, flags: (dashboard.flagged_students || []).filter(flag => flag && ["warning", "critical", "IR"].includes(flag.status)) };
 }

@@ -20,7 +20,9 @@ import {
   ASSOCIATE_YEAR_LEVELS,
   YEAR_LEVELS,
   clearLegacyProfileSetup,
+  hasAssignedProgram,
   isProfileSetupComplete,
+  saveAndConfirmProfile,
   splitVerifiedName,
 } from "@/lib/profileSetup";
 import { normalizeRole } from "@/lib/roles";
@@ -101,7 +103,9 @@ function ProfileSetup() {
   const isStudent = serverRole === "student";
   const isInstructor = serverRole === "instructor";
   const roleLabel = ROLE_LABELS[user?.role] || user?.role || "";
-  const needsProgram = !user?.program_id;
+  const assignedProgram = user?.program || (isInstructor ? user?.programs?.[0] : null);
+  const assignedProgramId = user?.program_id || programId(assignedProgram);
+  const needsProgram = (isStudent || isInstructor) && !hasAssignedProgram(user);
   const needsSchoolId = (isStudent || isInstructor) && !user?.school_id_number;
   const needsYearLevel = isStudent && !user?.year_level;
 
@@ -111,9 +115,10 @@ function ProfileSetup() {
   const [programsError, setProgramsError] = useState("");
   const [programsRequestKey, setProgramsRequestKey] = useState(0);
   const [submitting, setSubmitting] = useState(false);
+  const [profileSaved, setProfileSaved] = useState(false);
   const [error, setError] = useState("");
   const [form, setForm] = useState({
-    programId: user?.program_id || "",
+    programId: assignedProgramId || "",
     schoolIdNumber: user?.school_id_number || "",
     yearLevel: user?.year_level || "",
   });
@@ -123,13 +128,13 @@ function ProfileSetup() {
     () =>
       programs.find(
         (program) => String(programId(program)) === String(form.programId),
-      ) || (!needsProgram ? user?.program : null),
-    [form.programId, needsProgram, programs, user?.program],
+      ) || (!needsProgram ? assignedProgram : null),
+    [assignedProgram, form.programId, needsProgram, programs],
   );
   const availableYearOptions = isAssociateComputerTechnology(selectedProgram)
     ? ASSOCIATE_YEAR_LEVELS
     : YEAR_LEVELS;
-  const validProgram = Boolean(form.programId) && (!needsProgram || Boolean(selectedProgram));
+  const validProgram = !needsProgram || (Boolean(form.programId) && Boolean(selectedProgram));
   const validSchoolId = !(isStudent || isInstructor) || Boolean(form.schoolIdNumber.trim());
   const validYear = !isStudent || availableYearOptions.some((year) => year.value === form.yearLevel);
   const formReady = Boolean(serverRole) && validProgram && validSchoolId && validYear;
@@ -234,15 +239,23 @@ function ProfileSetup() {
       payload.year_level = form.yearLevel; // "1st" | "2nd" | "3rd" | "4th"
     }
 
-    if (submitting || !validate(payload)) return;
+    if (submitting || (!profileSaved && !validate(payload))) return;
 
     setSubmitting(true);
     setError("");
 
     try {
-      await saveProfileSetup(payload);
-      await refreshUser(); // kunin ang bagong user mula sa server
-      navigate("/dashboard", { replace: true });
+      const result = await saveAndConfirmProfile({
+        saved: profileSaved,
+        payload,
+        save: saveProfileSetup,
+        refresh: refreshUser,
+      });
+      setProfileSaved(result.saved);
+      if (!result.complete) {
+        setError("Your profile was saved, but your account could not be refreshed. Retry account refresh.");
+        return;
+      }
     } catch (saveError) {
       // 422: ilagay ang mensahe sa mismong field
       if (saveError?.status === 422 && saveError.fieldErrors) {
@@ -287,9 +300,9 @@ function ProfileSetup() {
 
         <CardContent className="grid gap-5">
           {error && (
-            <Alert variant="destructive">
-              <AlertCircle className="size-4" />
-              <AlertTitle>Profile not saved</AlertTitle>
+            <Alert variant={profileSaved ? "default" : "destructive"}>
+              {profileSaved ? <RefreshCw className="size-4" /> : <AlertCircle className="size-4" />}
+              <AlertTitle>{profileSaved ? "Profile saved" : "Profile not saved"}</AlertTitle>
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
@@ -301,7 +314,7 @@ function ProfileSetup() {
                 Verified Information
               </h2>
             </div>
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid items-start gap-4 md:grid-cols-2">
               <ReadOnlyIdentityField label="Email" value={user?.email} />
               <ReadOnlyIdentityField
                 label="First Name"
@@ -419,11 +432,11 @@ function ProfileSetup() {
             <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
               <Button
                 type="submit"
-                disabled={!formReady || submitting || (needsProgram && (programsLoading || Boolean(programsError)))}
+                disabled={submitting || (!profileSaved && (!formReady || (needsProgram && (programsLoading || Boolean(programsError)))))}
                 className="h-10 rounded-[5px] bg-[#0b4bd3] px-5 font-bold text-white hover:bg-[#083da9]"
               >
                 {submitting && <Spinner className="mr-2" />}
-                {submitting ? "Saving..." : "Continue to Dashboard"}
+                {submitting ? (profileSaved ? "Refreshing..." : "Saving...") : profileSaved ? "Retry account refresh" : "Continue to Dashboard"}
               </Button>
             </div>
           </form>

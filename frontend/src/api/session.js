@@ -32,7 +32,8 @@ async function requestSessionUser(signal) {
   throw lastError;
 }
 
-export function getSessionUser() {
+export function getSessionUser({ fresh = false } = {}) {
+  if (fresh) clearSessionUserCache();
   const version = getSessionVersion();
   if (resolvedUsers.has(version)) return Promise.resolve(resolvedUsers.get(version));
   if (pendingRequests.has(version)) return pendingRequests.get(version).promise;
@@ -52,7 +53,10 @@ export function getSessionUser() {
     }
 
     const { data } = await response.json();
-    if (version !== getSessionVersion()) throw new DOMException('This session request is no longer current.', 'AbortError');
+    if (
+      version !== getSessionVersion() ||
+      pendingRequests.get(version)?.promise !== request
+    ) throw new DOMException('This session request is no longer current.', 'AbortError');
     if (data?.authenticated === false && data.user === null) {
       resolvedUsers.clear();
       return null;
@@ -61,7 +65,9 @@ export function getSessionUser() {
     resolvedUsers.clear();
     resolvedUsers.set(version, data.user);
     return data.user;
-  })().finally(() => pendingRequests.delete(version));
+  })().finally(() => {
+    if (pendingRequests.get(version)?.promise === request) pendingRequests.delete(version);
+  });
 
   pendingRequests.set(version, { promise: request, controller });
   return request;

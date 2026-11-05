@@ -15,8 +15,8 @@ import { paginateRecords } from "./records/pagination";
 import { filterRecords, groupRecordsByMonth, instructorOf, reasonOf, recordDate, subjectOf, typeOf } from "./records/recordData";
 import RecordsTabs from "./records/RecordsTabs";
 import RecordActions from "./records/RecordActions";
-import FollowUpNotice from "./records/FollowUpNotice";
-import useRequestFollowUp from "./records/useRequestFollowUp";
+import FollowUpConfirmDialog from "./records/FollowUpConfirmDialog";
+import useRequestFollowUp, { shouldRefreshFollowUpCooldown } from "./records/useRequestFollowUp";
 import LoadingSkeleton from "@/components/loading/LoadingSkeleton";
 import TablePageSkeleton from "@/components/loading/TablePageSkeleton";
 
@@ -159,8 +159,11 @@ export default function StudentRecords() {
   const [editing, setEditing] = useState(false);
   const [attachmentError, setAttachmentError] = useState("");
   const [openingAttachment, setOpeningAttachment] = useState(false);
+  const [confirmingFollowUp, setConfirmingFollowUp] = useState(null);
+  const [checkingFollowUpId, setCheckingFollowUpId] = useState(null);
   const dialogRef = useRef(null);
-  const { followingUpId, cooldownSecondsById, notice, followUp, dismissNotice } = useRequestFollowUp(user?.id);
+  const checkedFollowUpIds = useRef(new Set());
+  const { followingUpId, cooldownSecondsById, followUp, syncCooldown } = useRequestFollowUp(user?.id);
 
   useEffect(() => {
     const record = records.find((item) => item.id === requestedId);
@@ -197,11 +200,21 @@ export default function StudentRecords() {
     resource.reload();
   }
 
-  function viewRecord(record) {
+  async function viewRecord(record) {
     setSelected(record);
     setEditing(false);
     setAttachmentError("");
     dialogRef.current.showModal();
+    if (!shouldRefreshFollowUpCooldown(record, checkedFollowUpIds.current)) return;
+    setCheckingFollowUpId(record.id);
+    try {
+      syncCooldown(await getStudentRequest(record.id));
+      checkedFollowUpIds.current.add(record.id);
+    } catch {
+      // The backend still enforces the cooldown if refreshing its display fails.
+    } finally {
+      setCheckingFollowUpId((current) => current === record.id ? null : current);
+    }
   }
 
   async function viewAttachment() {
@@ -239,7 +252,6 @@ export default function StudentRecords() {
           </div>
         </div>
         {error && <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300">{error} <button type="button" onClick={refresh} className="ml-2 font-semibold underline">Try again</button></div>}
-        <FollowUpNotice notice={notice} onDismiss={dismissNotice} />
         <div aria-busy={loading} className="overflow-x-auto">
           <table className="w-full min-w-[1000px] table-auto border-collapse text-left text-sm leading-5">
             <thead className="text-sm font-bold text-[#101C4A] dark:text-blue-200">
@@ -265,7 +277,7 @@ export default function StudentRecords() {
                   <td className="break-words px-4 py-4">{instructorOf(record)}</td>
                   <td className="px-4 py-4">{typeOf(record)}</td>
                   <td className="px-4 py-4"><StatusBadge value={record.status} /></td>
-                  <td className="px-4 py-4"><RecordActions record={record} onView={viewRecord} description={`${subjectOf(record)}, ${formatDate(recordDate(record))}`} onFollowUp={followUp} followingUpId={followingUpId} cooldownSeconds={cooldownSecondsById[record.id] || 0} /></td>
+                  <td className="px-4 py-4"><RecordActions record={record} onView={viewRecord} description={`${subjectOf(record)}, ${formatDate(recordDate(record))}`} /></td>
                 </tr>)}
               </Fragment>)}
             </tbody>
@@ -330,10 +342,32 @@ export default function StudentRecords() {
           </div>
           {selected.evidence_file_url && <button type="button" disabled={openingAttachment} onClick={viewAttachment} className="justify-self-start rounded-lg border border-blue-200 px-4 py-2 text-sm font-semibold text-blue-600 hover:bg-blue-50 disabled:opacity-50 dark:border-blue-900 dark:text-blue-300 dark:hover:bg-slate-800">{openingAttachment ? "Opening attachment..." : selected.evidence_type === "application/pdf" ? "Download attachment" : "View attachment"}</button>}
           {attachmentError && <p role="alert" className="text-sm text-red-600">{attachmentError}</p>}
-          {selected.status === "pending" && <button type="button" onClick={() => setEditing(true)} className="justify-self-start rounded-lg bg-[#173D83] px-4 py-2 text-sm font-semibold text-white">Edit request</button>}
+          {selected.status === "pending" && <div className="flex flex-wrap items-center gap-3">
+            <button type="button" onClick={() => setEditing(true)} className="h-10 rounded-lg bg-[#173D83] px-4 text-sm font-semibold text-white">Edit request</button>
+            <RecordActions
+              record={selected}
+              description={`${subjectOf(selected)}, ${formatDate(recordDate(selected))}`}
+              onFollowUp={(record) => {
+                dialogRef.current.close();
+                setConfirmingFollowUp(record);
+              }}
+              followingUpId={followingUpId}
+              cooldownSeconds={cooldownSecondsById[selected.id] || 0}
+              checkingCooldown={checkingFollowUpId === selected.id}
+            />
+          </div>}
           </>}
         </div>}
       </dialog>
+      <FollowUpConfirmDialog
+        record={confirmingFollowUp}
+        description={confirmingFollowUp ? `${subjectOf(confirmingFollowUp)}, ${formatDate(recordDate(confirmingFollowUp))}` : ""}
+        onCancel={() => setConfirmingFollowUp(null)}
+        onConfirm={(record) => {
+          setConfirmingFollowUp(null);
+          void followUp(record);
+        }}
+      />
     </StudentPageLayout>
   );
 }

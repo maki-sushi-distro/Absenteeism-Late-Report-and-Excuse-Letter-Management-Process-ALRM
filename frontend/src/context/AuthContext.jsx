@@ -14,12 +14,12 @@ export function AuthProvider({ children }) {
   const requestVersion = useRef(0);
   const [logoutDestination, setLogoutDestination] = useState(null);
 
-  const loadUser = useCallback(({ silent = false } = {}) => {
+  const loadUser = useCallback(({ silent = false, fresh = false } = {}) => {
     const version = getSessionVersion();
     const request = ++requestVersion.current;
     setSession(current => ({ version, user: current.version === version ? current.user : null,
       error: '', loading: !silent || !current.user }));
-    return getSessionUser().then(user => {
+    return getSessionUser({ fresh }).then(user => {
       if (version !== getSessionVersion() || request !== requestVersion.current) return null;
       if (user) clearPendingOtp();
       setSession({ version, user, error: '', loading: false });
@@ -65,7 +65,7 @@ export function AuthProvider({ children }) {
   async function logout({ redirectToSignedOut = false } = {}) {
     const request = ++requestVersion.current;
     setLogoutDestination(redirectToSignedOut ? '/signed-out' : null);
-    setSession(current => ({ ...current, loading: true, error: '' }));
+    setSession(current => ({ ...current, loading: !redirectToSignedOut, error: '' }));
     try {
       const version = await logoutRequest();
       if (version !== getSessionVersion()) return;

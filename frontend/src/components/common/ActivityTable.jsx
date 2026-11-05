@@ -28,6 +28,7 @@ const actions = {
   Denied: "border-red-200 bg-red-50 text-red-700",
   Resolved: "border-green-200 bg-green-50 text-green-700",
 };
+const actionFilterOptions = ["Submitted", "Followed up", "Approved", "Denied", "Resolved"];
 
 export default function ActivityTable({
   rows = [],
@@ -168,7 +169,7 @@ export default function ActivityTable({
                 onChange={change}
                 options={[
                   { value: "", label: "All actions" },
-                  ...Object.keys(actions).map((action) => ({ value: action, label: action })),
+                  ...actionFilterOptions.map((action) => ({ value: action, label: action })),
                 ]}
               />
               <RadioFilterGroup

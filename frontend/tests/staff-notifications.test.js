@@ -66,7 +66,7 @@ test("notification preview and unread-count adapters validate their server respo
   await assert.rejects(api.getNotificationUnreadCount(), /unexpected/i);
 });
 
-test("preview loading caches per account and marks only returned unread notifications", async () => {
+test("preview loading caches raw rows without marking notifications read", async () => {
   const feed = await load("components/notifications/notificationFeed.js");
   const calls = [];
   mockApiFetch(async (url, options) => {
@@ -80,24 +80,83 @@ test("preview loading caches per account and marks only returned unread notifica
   });
 
   const result = await feed.loadNotificationPreview("account-one");
-  assert.deepEqual(calls, [["/api/notifications/preview", "GET"], ["/api/notifications/unread/read", "PATCH"]]);
-  assert.equal(result.notifications.find(item => item.id === "unread").is_read, true);
-  assert.equal(result.unreadCount, 2);
+  assert.deepEqual(calls, [["/api/notifications/preview", "GET"]]);
+  assert.equal(result.notifications.find(item => item.id === "unread").is_read, false);
+  assert.equal(result.unreadCount, 3);
   assert.deepEqual(feed.getCachedNotificationPreview("account-one"), result);
   assert.equal(feed.getCachedNotificationPreview("account-two"), null);
 });
 
-test("preview read failure keeps loaded records visible with a read error", async () => {
+test("reading a grouped preview item marks every underlying notification", async () => {
   const feed = await load("components/notifications/notificationFeed.js");
-  mockApiFetch(async (url) => String(url).endsWith("/preview")
-    ? Response.json({ success: true, data: { notifications: [{ id: "cannot-read", is_read: false }], unread_count: 1 } })
-    : Response.json({ success: false, message: "Read unavailable" }, { status: 503 }));
+  const { notificationActivity } = await load("components/notifications/notificationData.js");
+  const records = [
+    { id: "direct-submit", user_id: "account-grouped", type: "new_request", request_id: "request-one", message: "Alex just submitted an absence request for Math.", date_sent: "2026-11-05T08:00:00Z", is_read: true },
+    { id: "audit-submit", user_id: "account-grouped", type: "activity_submitted_request", request_id: "request-one", message: "Alex submitted a request: Alex's absence request for Math.", date_sent: "2026-11-05T08:00:01Z", is_read: false },
+  ];
+  const calls = [];
+  mockApiFetch(async (url, options) => {
+    const path = String(url);
+    calls.push([path, options.method || "GET"]);
+    if (path.endsWith("/preview")) return Response.json({ success: true, data: { notifications: records, unread_count: 1 } });
+    const id = decodeURIComponent(path.split("/").at(-2));
+    return Response.json({ success: true, data: { id, is_read: true } });
+  });
 
-  const result = await feed.loadNotificationPreview("read-failure-account");
-  assert.deepEqual(result.notifications.map(item => item.id), ["cannot-read"]);
-  assert.equal(result.unreadCount, 1);
-  assert.match(result.readError, /Read unavailable/);
-  assert.deepEqual(feed.getCachedNotificationPreview("read-failure-account"), result);
+  const preview = await feed.loadNotificationPreview("account-grouped");
+  const [grouped] = notificationActivity(preview.notifications, "instructor", { requestUpdates: true, thresholdAlerts: true }, "account-grouped");
+  assert.equal(grouped.isRead, false);
+  await feed.markFeedRead("account-grouped", [grouped]);
+
+  assert.deepEqual(calls[0], ["/api/notifications/preview", "GET"]);
+  assert.deepEqual(new Set(calls.slice(1).map(call => call.join(" "))), new Set([
+    "/api/notifications/direct-submit/read PATCH",
+    "/api/notifications/audit-submit/read PATCH",
+  ]));
+  assert.equal(feed.getCachedNotificationPreview("account-grouped").unreadCount, 0);
+  assert.ok(feed.getCachedNotificationPreview("account-grouped").notifications.every(item => item.is_read));
+});
+
+test("notification grouping matches the backend logical-event rules", async () => {
+  const { notificationActivity } = await load("components/notifications/notificationData.js");
+  const owner = "logical-owner";
+  const row = (id, requestId, type, minute, message = type) => ({
+    id, user_id: owner, request_id: requestId, type, message,
+    date_sent: `2026-11-05T08:${String(minute).padStart(2, "0")}:00Z`, is_read: false,
+  });
+  const records = [];
+  for (let request = 1; request <= 4; request++) {
+    records.push(row(`direct-${request}`, `submission-${request}`, "new_request", request));
+    records.push(row(`activity-${request}`, `submission-${request}`, "activity_submitted_request", request));
+  }
+  records.push(
+    row("follow-direct-one", "follow", "request_followup", 10),
+    row("follow-activity-one", "follow", "activity_followed_up_request", 11),
+    row("follow-direct-two", "follow", "request_followup", 12),
+    row("follow-activity-late", "follow", "activity_followed_up_request", 20),
+    row("update-direct", "update", "request_updated", 30),
+    row("update-activity", "update", "activity_updated_request", 34),
+    row("approval-direct", "approval", "request_decision", 40, "Your absence request was approved."),
+    row("approval-activity", "approval", "activity_decided_request_noted", 45),
+    row("denial-direct", "denial", "request_decision", 46, "Your absence request was denied."),
+    row("denial-activity", "denial", "activity_decided_request_invalid", 49),
+    row("legacy-one", null, "new_request", 50),
+    row("legacy-two", null, "activity_submitted_request", 50),
+  );
+
+  const preferences = { requestUpdates: true, thresholdAlerts: true };
+  const instructorActivity = notificationActivity(records, "instructor", preferences, owner);
+  const studentActivity = notificationActivity(records, "student", preferences, owner);
+  const submissions = instructorActivity.filter(item => item.requestId?.startsWith("submission-"));
+  const followups = instructorActivity.filter(item => item.requestId === "follow");
+
+  assert.equal(submissions.length, 4);
+  assert.ok(submissions.every(item => item.notificationIds.length === 2));
+  assert.equal(followups.length, 3, "one direct/activity pair plus two unmatched repeated events");
+  assert.deepEqual(studentActivity.find(item => item.requestId === "update").notificationIds, ["update-direct", "update-activity"]);
+  assert.deepEqual(studentActivity.find(item => item.requestId === "approval").notificationIds, ["approval-direct", "approval-activity"]);
+  assert.deepEqual(studentActivity.find(item => item.requestId === "denial").notificationIds, ["denial-direct", "denial-activity"]);
+  assert.equal(instructorActivity.filter(item => item.requestId == null).length, 2);
 });
 
 test("full notification loading includes the authoritative unread count", async () => {

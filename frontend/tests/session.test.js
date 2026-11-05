@@ -34,6 +34,43 @@ test('cookie restoration probes without a marker and shares concurrent validatio
   assert.deepEqual(await first, user);
   assert.equal(calls.mock.callCount(), 1);
 });
+test('fresh session refresh bypasses a cached incomplete user', async () => {
+  const incomplete = { ...user, program_id: null, school_id_number: null, year_level: null };
+  const complete = { ...user, program_id: 1, school_id_number: '2026-1001', year_level: '1st' };
+  const responses = [incomplete, complete];
+  const calls = mock.method(globalThis, 'fetch', async () => Response.json({ data: { authenticated: true, user: responses.shift() } }));
+
+  assert.deepEqual(await getSessionUser(), incomplete);
+  assert.deepEqual(await getSessionUser(), incomplete);
+  assert.deepEqual(await getSessionUser({ fresh: true }), complete);
+  assert.equal(calls.mock.callCount(), 2);
+});
+test('fresh session refresh keeps its replacement request current', async () => {
+  const stale = { ...user, program_id: null, school_id_number: null, year_level: null };
+  const fresh = { ...user, year_level: '2nd Year' };
+  let resolveStale;
+  let resolveFresh;
+  let calls = 0;
+  mock.method(globalThis, 'fetch', () => {
+    calls += 1;
+    return new Promise(resolve => {
+      if (calls === 1) resolveStale = resolve;
+      else resolveFresh = resolve;
+    });
+  });
+
+  const staleRequest = getSessionUser();
+  const freshRequest = getSessionUser({ fresh: true });
+  resolveStale(Response.json({ data: { authenticated: true, user: stale } }));
+  await assert.rejects(staleRequest, { name: 'AbortError' });
+  assert.equal(getSessionUser(), freshRequest);
+  assert.equal(calls, 2);
+
+  resolveFresh(Response.json({ data: { authenticated: true, user: fresh } }));
+  assert.deepEqual(await freshRequest, fresh);
+  assert.deepEqual(await getSessionUser(), fresh);
+  assert.equal(calls, 2);
+});
 test('forged hints never authenticate without a successful me response', async () => {
   items.set('alrm_session_version', 'forged-hint');
   items.set('auth_token', 'forged-bearer');

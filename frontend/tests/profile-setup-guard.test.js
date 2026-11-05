@@ -107,6 +107,21 @@ test("persisted profile fields keep instructors complete across login sessions",
   assert.equal(profileSetup.needsProfileSetup(programHead), false);
 });
 
+test("an instructor assigned through programs is not asked to select another program", () => {
+  const instructor = {
+    id: "instructor-with-membership",
+    role: "instructor",
+    program_id: null,
+    school_id_number: "",
+    programs: [{ id: "program-1", program_name: "BSIS" }],
+  };
+
+  assert.equal(profileSetup.hasAssignedProgram(instructor), true);
+  const html = renderProfile(instructor);
+  assert.match(html, /Instructor ID/);
+  assert.doesNotMatch(html, /Select program/);
+});
+
 test("profile completion requires the persisted fields for each role", () => {
   const instructor = { id: "staff", role: "instructor", program_id: "program-1", school_id_number: "FAC-2026-002" };
   const student = { id: "student", role: "student", program_id: "program-1", school_id_number: "24-001", year_level: "1st" };
@@ -136,7 +151,7 @@ test("the form button is unavailable until the role-specific fields are complete
 
   const completeInstructor = renderProfile({ id: "database-uuid", role: "instructor", program_id: "program-1", school_id_number: "FAC-2026-001" });
   assert.equal(isDisabled(submitButton(completeInstructor)), false);
-  assert.match(completeInstructor, /value="FAC-2026-001"/);
+  assert.doesNotMatch(completeInstructor, /Instructor ID/);
   assert.doesNotMatch(completeInstructor, /value="database-uuid"/);
 
   const completeStaff = renderProfile({ id: "staff-1", role: "program_head", program_id: "program-1" });

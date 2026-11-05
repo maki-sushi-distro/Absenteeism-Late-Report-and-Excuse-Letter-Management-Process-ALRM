@@ -22,21 +22,21 @@ test("the signed-out page shows the current school branding and a link back to t
     React.createElement(TestAuthContext.Provider, { value: { user: null, loading: false, sessionError: "" } }, React.createElement(Page))));
   assert.match(html, /You&#x27;ve been signed out/);
   assert.match(html, /Thanks for using the system/);
-  assert.match(html, /LV_Logo\.png/);
+  assert.match(html, /lv-logo-auth\.webp/);
   assert.match(html, /LV_Picture\.jpg/);
   assert.match(html, /alt="La Verdad Christian College logo"/);
   assert.match(html, /<a[^>]*href="\/login"[^>]*>/);
   assert.match(html, /Sign in again/);
 });
 
-test("confirmed logout starts the existing request and navigates without waiting on the network", async () => {
+test("confirmed logout navigates only after the session is fully cleared", async () => {
   const { logoutToSignedOut } = await import("../src/lib/logout.js");
   const actions = [];
   let finish;
   const pending = new Promise(resolve => { finish = resolve; });
   const result = logoutToSignedOut(() => { actions.push("logout"); return pending; },
     (path, options) => actions.push({ path, options }));
-  assert.deepEqual(actions, ["logout", { path: "/signed-out", options: { replace: true } }]);
+  assert.deepEqual(actions, ["logout"]);
   let completed = false;
   result.then(() => { completed = true; });
   await Promise.resolve();
@@ -44,6 +44,7 @@ test("confirmed logout starts the existing request and navigates without waiting
   finish();
   await result;
   assert.equal(completed, true);
+  assert.deepEqual(actions, ["logout", { path: "/signed-out", options: { replace: true } }]);
 });
 
 test("mobile signed-out Google sign-in starts the existing same-origin OAuth flow", async () => {

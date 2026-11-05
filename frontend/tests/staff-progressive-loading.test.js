@@ -109,7 +109,7 @@ const adminData = { total_programs: 9, total_classes: 12, total_students: 123, t
 const flags = [{ id: "flag-one", status: "open", request: { enrollment: { student: { id: "student-one", name: "Test Student" } } } }];
 const users = [{ id: "instructor-one", name: "Test Instructor", email: "test@example.test", role: "instructor", status: "active" }];
 const programs = [{ id: "program-one", program_name: "Test Program" }];
-const classes = [{ id: "class-one", subject_name: "Test Subject" }];
+const classes = [{ id: "class-one", subject_name: "Test Subject", instructor_id: "instructor-one" }];
 const phPath = "/src/pages/auth/programHead/ProgramHeadDashboard.jsx";
 const adminPath = "/src/pages/auth/admin/AdminDashboard.jsx";
 
@@ -200,7 +200,7 @@ test("program refresh rejects superseded responses and non-dashboard views ignor
   } finally { page.unmount(); }
 });
 
-test("admin metrics and pending approval widgets reveal independently", async () => {
+test("admin metrics and assigned-instructor total reveal independently", async () => {
   const { AdminDashboard } = await server.ssrLoadModule(adminPath);
   const api = network();
   const page = mount(() => AdminDashboard({}));
@@ -214,17 +214,13 @@ test("admin metrics and pending approval widgets reveal independently", async ()
     api.reply("admin/dashboard", adminData);
     await page.flush();
     assert.match(page.html(), />123</);
+    assert.match(page.html(), /metric-placeholder/);
     api.reply("admin/classes", classes);
-    api.reply("admin/programs", programs);
     await page.flush();
+    assert.match(page.html(), /Total Instructors<\/p><p[^>]*>1<\/p>/);
     assert.match(page.html(), /Absences and Tardiness by Department/);
-    assert.match(page.html(), /approval-placeholder/);
-    assert.doesNotMatch(page.html(), /Create class|Staff role assignment/);
+    assert.doesNotMatch(page.html(), /approval-placeholder|Create class|Staff role assignment/);
     assert.equal(api.calls.filter(call => call.options.method === "POST").length, 0);
-    api.reply("admin/users", [{ ...users[0], status: "pending" }]);
-    await page.flush();
-    assert.match(page.html(), /Test Instructor/);
-    assert.match(page.html(), /href="\/user-management\?tab=waiting/);
     assert.doesNotMatch(page.html(), /Loading administrator data/);
   } finally { page.unmount(); }
 });
@@ -341,6 +337,41 @@ test("Manage Classes shows existing classes without a create form", async () => 
   } finally { page.unmount(); }
 });
 
+test("Manage Programs does not offer program deletion", async () => {
+  const { clearResourceCache } = await server.ssrLoadModule("/src/api/resourceCache.js");
+  clearResourceCache();
+  const { AdminDashboard } = await server.ssrLoadModule(adminPath);
+  const api = network();
+  const page = mount(() => AdminDashboard({ view: "programs" }));
+  try {
+    await page.flush();
+    api.reply("admin/users", users);
+    api.reply("admin/programs", programs);
+    await page.flush();
+    assert.match(page.html(), /Test Program/);
+    assert.doesNotMatch(page.html(), />Delete</);
+  } finally { page.unmount(); }
+});
+
+test("Manage Classes keeps Edit, removes Delete, and opens editing in a modal", async () => {
+  const { default: AdminClassManagement } = await server.ssrLoadModule("/src/pages/auth/admin/AdminClassManagement.jsx");
+  const api = network();
+  const page = mount(() => AdminClassManagement());
+  try {
+    await page.flush();
+    api.reply("admin/programs", programs);
+    api.reply("admin/classes", classes);
+    await page.flush();
+    assert.ok(button(page, "Edit"));
+    assert.equal(button(page, "Delete"), undefined);
+
+    button(page, "Edit").props.onClick();
+    await page.flush();
+    assert.equal(elements(page.value, node => node.type?.name === "AlertDialogContent").length, 1);
+    assert.equal(elements(page.value, node => node.type?.name === "ClassForm").length, 1);
+  } finally { page.unmount(); }
+});
+
 test("Manage Class uses actual contact hours for both class-hour values", async () => {
   const { ClassHours } = await server.ssrLoadModule(adminPath);
   assert.equal(typeof ClassHours, "function");
@@ -387,15 +418,15 @@ test("admin program failure leaves classes visible and report options recover wi
   } finally { report.unmount(); }
 });
 
-test("administrator program creation and deletion retain their payloads and await all reload resources", async () => {
+test("administrator program creation retains its payload and awaits the required reload resources", async () => {
+  const { clearResourceCache } = await server.ssrLoadModule("/src/api/resourceCache.js");
+  clearResourceCache();
   const { AdminDashboard } = await server.ssrLoadModule(adminPath);
   const api = network();
   const page = mount(() => AdminDashboard({ view: "programs" }));
   const settle = async () => {
-    api.reply("admin/dashboard", adminData);
     api.reply("admin/users", users);
     api.reply("admin/programs", programs);
-    api.reply("admin/classes", classes);
     await page.flush();
   };
   const fill = (name, value) => {
@@ -420,47 +451,10 @@ test("administrator program creation and deletion retain their payloads and awai
     await page.flush();
     // Working state survives partial reload completion.
     assert.equal(button(page, "Create").props.disabled, true);
-    api.reply("admin/dashboard", adminData);
     api.reply("admin/programs", programs);
-    api.reply("admin/classes", classes);
     await action;
     await page.flush();
     assert.equal(elements(page.value, node => node.props.name === "program_name")[0].props.value, "");
-    const buttons = elements(page.value, node => node.props.children === "Delete");
-    buttons[0].props.onClick();
-    await page.flush();
-    const deletion = api.calls.find(call => call.path === "/api/admin/programs/program-one");
-    assert.equal(deletion.options.method, "DELETE");
-    api.reply("admin/programs/program-one", {});
-    await page.flush();
-    await settle();
-    assert.match(page.html(), /Program deleted/);
-  } finally { page.unmount(); }
-});
-
-test("Manage Classes keeps class deletion after removing creation", async () => {
-  const { AdminDashboard } = await server.ssrLoadModule(adminPath);
-  const api = network();
-  const page = mount(() => AdminDashboard({ view: "classes" }));
-  const settle = async () => {
-    api.reply("admin/dashboard", adminData);
-    api.reply("admin/users", users);
-    api.reply("admin/programs", programs);
-    api.reply("admin/classes", classes);
-    await page.flush();
-  };
-  try {
-    await page.flush();
-    await settle();
-    elements(page.value, node => node.props.children === "Delete")[0].props.onClick();
-    await page.flush();
-    const deletion = api.calls.find(call => call.path === "/api/admin/classes/class-one");
-    assert.equal(deletion.options.method, "DELETE");
-    api.reply("admin/classes/class-one", {});
-    await page.flush();
-    await settle();
-    assert.match(page.html(), /Class deleted/);
-    assert.doesNotMatch(page.html(), /Create Class|Create class/);
   } finally { page.unmount(); }
 });
 

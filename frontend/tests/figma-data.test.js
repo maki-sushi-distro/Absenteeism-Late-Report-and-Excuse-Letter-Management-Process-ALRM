@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { afterEach, mock, test } from "node:test";
 import { getCollection } from "../src/api/collections.js";
-import { auditActivity, flagActivity, requestActivity, filterActivity, programOverviewRows } from "../src/pages/auth/admin/overviewData.js";
+import { auditActivity, countAssignedInstructors, flagActivity, requestActivity, filterActivity, programOverviewRows } from "../src/pages/auth/admin/overviewData.js";
 
 const storage = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
 afterEach(() => { mock.restoreAll(); if (storage) Object.defineProperty(globalThis, "localStorage", storage); else delete globalThis.localStorage; });
@@ -71,6 +71,15 @@ test("program overview rows contain only real per-program student, class and ins
   assert.equal(rows[0].instructors, 1);
   assert.equal(Object.hasOwn(rows[0], "atRisk"), false);
   assert.equal(Object.hasOwn(rows[0], "pending"), false);
+});
+
+test("assigned instructor total deduplicates current assignments and ignores empty classes", () => {
+  assert.equal(countAssignedInstructors([
+    { id: "c1", program_id: "p1", active_teaching_assignment: { instructor_id: "i1" } },
+    { id: "c2", program_id: "p2", instructor_id: "i1" },
+    { id: "c3", program_id: "p2", active_teaching_assignment: { instructor: { id: "i2" } } },
+    { id: "c4", program_id: "p2", instructor_id: null },
+  ]), 2);
 });
 
 test("admin program overview excludes the General Education program", () => {

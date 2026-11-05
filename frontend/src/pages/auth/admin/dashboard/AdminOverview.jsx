@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { ErrorState } from "@/components/common/ErrorState";
 import { ActivityChartPlaceholder, MetricPlaceholder } from "@/components/loading/DashboardSkeleton/StaffDashboardPlaceholder";
 import { isGeneralEducationProgram } from "@/lib/programs";
+import { countAssignedInstructors } from "../overviewData.js";
 import { academicTermLabel } from "./adminOverviewData.js";
 import AdminDepartmentChart from "./AdminDepartmentChart";
 
@@ -11,13 +12,13 @@ function ResourceError({ message, onRetry }) {
 }
 
 export default function AdminOverview({ resources, onRetry }) {
-  const { dashboard, loading, errors, ready } = resources;
+  const { dashboard, classes = [], loading, errors, ready } = resources;
   const waiting = key => loading[key] && !ready[key];
   const busy = Object.values(loading).some(Boolean);
   const listedPrograms = dashboard?.programs_summary || [];
   const visiblePrograms = listedPrograms.filter(program => !isGeneralEducationProgram(program));
   const totalPrograms = dashboard?.programs_summary ? visiblePrograms.length : dashboard?.total_programs;
-  const metrics = [["Total Students", dashboard?.total_students], ["Total Instructors", dashboard?.total_instructors], ["Total Programs", totalPrograms]];
+  const metrics = [["Total Students", dashboard?.total_students, "dashboard"], ["Total Instructors", errors.classes ? null : countAssignedInstructors(classes), "classes"], ["Total Programs", totalPrograms, "dashboard"]];
   const quickAccess = [
     { label: "Manage users", detail: "View and manage user accounts", path: "/user-management", Icon: UsersRound },
     { label: "Export Report", detail: "Download absence and late reports", path: "/reports", Icon: FileDown },
@@ -27,7 +28,7 @@ export default function AdminOverview({ resources, onRetry }) {
     {busy && <span role="status" aria-busy="true" className="sr-only">Loading administrator data</span>}
     <header><h1 className="text-2xl font-bold text-slate-950">Welcome back, Admin!</h1><p className="mt-1 text-sm text-slate-600">{academicTermLabel([])}</p></header>
     {errors.dashboard ? <ResourceError message={errors.dashboard} onRetry={onRetry} /> : <section aria-label="Administrator summary" className="grid min-w-0 gap-4 sm:grid-cols-3">
-      {metrics.map(([label, value]) => waiting("dashboard") ? <MetricPlaceholder key={label} /> : <article key={label} className="min-w-0 rounded-md border border-[#D0D0D0] bg-[#F7F7F7] p-5">
+      {metrics.map(([label, value, resource]) => waiting(resource) ? <MetricPlaceholder key={label} /> : <article key={label} className="min-w-0 rounded-md border border-[#D0D0D0] bg-[#F7F7F7] p-5">
         <p className="text-sm font-medium text-slate-600">{label}</p>
         <p className="mt-3 text-3xl font-semibold text-slate-900">{Number.isFinite(value) ? value : "Unavailable"}</p>
       </article>)}

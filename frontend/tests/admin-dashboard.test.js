@@ -18,12 +18,13 @@ before(async () => {
   ({ default: Overview } = await server.ssrLoadModule("/src/pages/auth/admin/dashboard/AdminOverview.jsx"));
 });
 after(async () => { await server?.close(); });
-const resources = { dashboard: { total_students: 110, total_instructors: 20, total_programs: 4, pending_staff_approvals: 14 }, users: [{ id: "one", name: "Ana Student", role: "student", status: "pending", year_level: "1st", program: { program_name: "Information Systems" } }], programs: [], classes: [], loading: {}, ready: {}, errors: {} };
+const resources = { dashboard: { total_students: 110, total_instructors: 20, total_programs: 4, pending_staff_approvals: 14 }, users: [{ id: "one", name: "Ana Student", role: "student", status: "pending", year_level: "1st", program: { program_name: "Information Systems" } }], programs: [], classes: [{ id: "c1", instructor_id: "assigned-1" }, { id: "c2", instructor_id: "assigned-1" }, { id: "c3", active_teaching_assignment: { instructor_id: "assigned-2" } }], loading: {}, ready: { dashboard: true, classes: true }, errors: {} };
 const render = props => renderToStaticMarkup(React.createElement(MemoryRouter, null, React.createElement(Overview, { resources, onRetry() {}, ...props })));
 
 test("overview removes pending-account metrics and preview", () => {
   const html = render();
-  for (const label of ["Welcome back, Admin!", "Total Students", "Total Instructors", "Total Programs", ">110<", ">20<", "Quick Access", "Manage users", "Export Report", "System Settings"]) assert.ok(html.includes(label), label);
+  for (const label of ["Welcome back, Admin!", "Total Students", "Total Instructors", "Total Programs", ">110<", ">2<", "Quick Access", "Manage users", "Export Report", "System Settings"]) assert.ok(html.includes(label), label);
+  assert.doesNotMatch(html, />20</);
   for (const removed of ["Pending for Approval", "Pending Account Approvals", "Ana Student", ">14<"]) assert.doesNotMatch(html, new RegExp(removed));
   for (const path of ["/user-management", "/reports", "/settings"]) assert.ok(html.includes(`href="${path}"`), path);
   assert.doesNotMatch(html, /tab=waiting/);
@@ -34,7 +35,7 @@ test("overview removes pending-account metrics and preview", () => {
 });
 
 test("dashboard skeleton matches three cards and the independently loading chart", () => {
-  const html = render({ resources: { ...resources, dashboard: null, users: [], loading: { dashboard: true, users: true, programs: true, classes: true } } });
+  const html = render({ resources: { ...resources, dashboard: null, users: [], loading: { dashboard: true, users: true, programs: true, classes: true }, ready: {} } });
   assert.match(html, /data-slot="dashboard-skeleton"/);
   assert.equal((html.match(/data-slot="metric-placeholder"/g) || []).length, 3);
   assert.match(html, /data-slot="activity-chart-placeholder"/);
@@ -45,7 +46,7 @@ test("dashboard skeleton matches three cards and the independently loading chart
 test("admin total programs excludes General Education when program data has loaded", () => {
   const html = render({ resources: {
     ...resources,
-    programs: [{ id: "ge", program_name: "General Education" }, { id: "bsis", program_name: "BS in Information Systems" }],
+    dashboard: { ...resources.dashboard, programs_summary: [{ id: "ge", program_name: "General Education" }, { id: "bsis", program_name: "BS in Information Systems" }] },
     ready: { programs: true },
   } });
   assert.match(html, /Total Programs<\/p><p[^>]*>1<\/p>/);

@@ -83,6 +83,72 @@ function destination(role, requestId, type) {
   return "/dashboard";
 }
 
+function logicalNotificationAction(item) {
+  if (["new_request", "submitted_request", "activity_submitted_request"].includes(item.type)) return "submitted";
+  if (["request_updated", "activity_updated_request"].includes(item.type)) return "updated";
+  if (["request_followup", "activity_followed_up_request"].includes(item.type)) return "followed_up";
+  if (["activity_decided_request_approved", "activity_decided_request_noted"].includes(item.type)) return "approved";
+  if (item.type === "activity_decided_request_invalid") return "denied";
+  if (item.type !== "request_decision") return null;
+  if (/\b(approved|noted)\b/i.test(item.message)) return "approved";
+  return /\b(invalid|denied)\b/i.test(item.message) ? "denied" : null;
+}
+
+function deliverySource(item) {
+  return item.type.startsWith("activity_") ? "activity" : "direct";
+}
+
+function mergeDelivery(group, item) {
+  const preferItem = deliverySource(group.item) === "activity" && deliverySource(item) === "direct";
+  const notificationIds = [...new Set(preferItem
+    ? [item.id, ...(group.item.notificationIds || [group.item.id])]
+    : [...(group.item.notificationIds || [group.item.id]), item.id])];
+  const isRead = group.item.isRead && item.isRead;
+  if (preferItem) {
+    Object.assign(group.item, item, { notificationIds, isRead });
+  } else {
+    Object.assign(group.item, { notificationIds, isRead });
+  }
+}
+
+function groupLogicalNotifications(activity) {
+  const ordered = [...activity].sort((a, b) => Date.parse(b.date) - Date.parse(a.date));
+  const submissions = new Map();
+  const events = new Map();
+  const groups = [];
+  for (const item of ordered) {
+    const action = logicalNotificationAction(item);
+    const requestId = item.requestId == null ? null : String(item.requestId);
+    if (requestId && action === "submitted") {
+      const group = submissions.get(requestId);
+      if (group) mergeDelivery(group, item);
+      else {
+        const created = { item };
+        submissions.set(requestId, created);
+        groups.push(created);
+      }
+      continue;
+    }
+    if (requestId && action) {
+      const key = `${requestId}:${action}`;
+      const source = deliverySource(item);
+      const timestamp = Date.parse(item.date);
+      const group = (events.get(key) || []).find(candidate => !candidate.sources.has(source) && candidate.timestamp - timestamp <= 5 * 60 * 1000);
+      if (group) {
+        mergeDelivery(group, item);
+        group.sources.add(source);
+      } else {
+        const created = { item, timestamp, sources: new Set([source]) };
+        events.set(key, [...(events.get(key) || []), created]);
+        groups.push(created);
+      }
+      continue;
+    }
+    groups.push({ item });
+  }
+  return groups.map(group => group.item).sort((a, b) => Date.parse(b.date) - Date.parse(a.date));
+}
+
 export function notificationActivity(records, role, preferences, userId) {
   const normalizedRole = normalizeRole(role);
   const seen = new Set();
@@ -98,19 +164,7 @@ export function notificationActivity(records, role, preferences, userId) {
     return [{ id: record.id, type: record.type, requestId: record.request_id, message, detail: threshold ? thresholdDetail(message) : undefined,
       label: notificationLabel(record.type, message), date: record.date_sent, isRead: record.is_read === true, href: destination(role, record.request_id, record.type) }];
   });
-  const directEvent = { new_request: "submitted", request_followup: "followed-up" };
-  const auditEvent = { activity_submitted_request: "submitted", activity_followed_up_request: "followed-up" };
-  const direct = new Map(activity.filter(item => directEvent[item.type] && item.requestId != null)
-    .map(item => [`${directEvent[item.type]}:${item.requestId}`, item]));
-  for (const item of activity) {
-    const retained = auditEvent[item.type] && item.requestId != null
-      ? direct.get(`${auditEvent[item.type]}:${item.requestId}`)
-      : null;
-    if (retained) retained.notificationIds = [...new Set([...(retained.notificationIds || [retained.id]), item.id])];
-  }
-  return activity
-    .filter(item => !auditEvent[item.type] || !direct.has(`${auditEvent[item.type]}:${item.requestId}`))
-    .sort((a, b) => Date.parse(b.date) - Date.parse(a.date));
+  return groupLogicalNotifications(activity);
 }
 
 export function groupNotificationActivity(activity, filter = "all", now = new Date(), readIds) {

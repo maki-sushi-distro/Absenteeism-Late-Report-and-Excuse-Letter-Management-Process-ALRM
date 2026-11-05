@@ -8,12 +8,15 @@ import { ActivityChartPlaceholder, MetricPlaceholder, ProgramHeaderPlaceholder, 
 const panel = "border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900";
 
 function Summary({ dashboard, flags, errors, resourceLoading, ready }) {
+  const thresholdAlerts = [dashboard?.warning_count, dashboard?.critical_count, dashboard?.ir_count]
+    .every(Number.isFinite) ? dashboard.warning_count + dashboard.critical_count + dashboard.ir_count : null;
   const metrics = [
     { label: "Classes", value: dashboard?.total_classes, icon: BookOpen, resource: "dashboard" },
     { label: "Total students", value: dashboard?.total_students, icon: GraduationCap, resource: "dashboard" },
+    { label: "Threshold alerts", value: thresholdAlerts, icon: TriangleAlert, resource: "dashboard" },
     { label: "Students at risk", value: ready.flags ? new Set(flags.filter((flag) => flag.status === "open").map((flag) => flag.request?.enrollment?.student?.id || flag.id)).size : null, icon: TriangleAlert, resource: "flags" },
   ];
-  return <div className="grid gap-4 sm:grid-cols-3">{metrics.map(({ label, value, icon: Icon, resource }) => resourceLoading[resource] && !ready[resource] ? <MetricPlaceholder key={label} /> : (
+  return <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{metrics.map(({ label, value, icon: Icon, resource }) => resourceLoading[resource] && !ready[resource] ? <MetricPlaceholder key={label} /> : (
     <div key={label} className={`${panel} flex items-center justify-between rounded-md p-5`}>
       <div><p className="text-sm text-slate-500 dark:text-slate-400">{label}</p><p className="mt-2 text-3xl font-bold text-slate-950 dark:text-white">{errors[resource] ? "—" : value ?? "—"}</p></div>
       <Icon className="size-7 text-blue-900 dark:text-blue-300" aria-hidden="true" />

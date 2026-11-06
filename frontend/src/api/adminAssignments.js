@@ -1,6 +1,30 @@
 import { apiRequest } from "./client.js";
 import { getCollection, getCollectionPage } from "./collections.js";
 
+export async function getAvailableAdminClasses({ signal } = {}) {
+  const classes = await getCollection("/api/admin/classes", { signal });
+  return [...new Map(classes.map((item) => [String(item.id), item])).values()];
+}
+
+export async function changeTeachingAssignment(classId, payload) {
+  const id = String(classId || "").trim();
+  if (!id) throw new Error("Select an existing class.");
+
+  const result = await apiRequest(
+    `/api/admin/classes/${encodeURIComponent(id)}/assignment`,
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    },
+  );
+  if (!Array.isArray(result?.classes)) {
+    throw new Error(
+      "The server did not confirm the teaching assignment change. Reload the page before trying again.",
+    );
+  }
+  return result;
+}
+
 export async function getAdminAssignments({
   signal,
   page = 1,

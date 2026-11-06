@@ -117,6 +117,51 @@ test("reading a grouped preview item marks every underlying notification", async
   assert.ok(feed.getCachedNotificationPreview("account-grouped").notifications.every(item => item.is_read));
 });
 
+test("confirmed reads update preview, full-feed, and unread-count resource caches", async () => {
+  const feed = await load("components/notifications/notificationFeed.js");
+  const cache = await load("api/resourceCache.js");
+  cache.clearResourceCache();
+  const rows = [{ id: "one", is_read: false }, { id: "two", is_read: false }];
+  await cache.requestCachedResource("notifications:preview:cache-user", async () => ({ notifications: rows, unreadCount: 2 }));
+  await cache.requestCachedResource("notifications:feed:instructor:cache-user", async () => ({ notifications: rows, unreadCount: 2 }));
+  await cache.requestCachedResource("notifications:unread:cache-user", async () => 2);
+  mockApiFetch(async (url) => Response.json({ success: true, data: { id: String(url).includes("one") ? "one" : "two", is_read: true } }));
+
+  await feed.markFeedRead("cache-user", [{ id: "group", notificationIds: ["one", "two"] }], false, "instructor");
+
+  assert.ok(cache.getResourceCacheEntry("notifications:preview:cache-user").data.notifications.every(item => item.is_read));
+  assert.ok(cache.getResourceCacheEntry("notifications:feed:instructor:cache-user").data.notifications.every(item => item.is_read));
+  assert.equal(cache.getResourceCacheEntry("notifications:unread:cache-user").data, 0);
+});
+
+test("partial read failures retain confirmed reads and reject for reconciliation", async () => {
+  const feed = await load("components/notifications/notificationFeed.js");
+  const cache = await load("api/resourceCache.js");
+  cache.clearResourceCache();
+  const rows = [{ id: "saved", is_read: false }, { id: "failed", is_read: false }];
+  await cache.requestCachedResource("notifications:preview:partial-user", async () => ({ notifications: rows, unreadCount: 2 }));
+  mockApiFetch(async (url) => String(url).includes("failed")
+    ? Response.json({ success: false, message: "Write failed" }, { status: 503 })
+    : Response.json({ success: true, data: { id: "saved", is_read: true } }));
+
+  await assert.rejects(feed.markFeedRead("partial-user", [{ id: "group", notificationIds: ["saved", "failed"] }], false, "student"), /Write failed/);
+  const cached = cache.getResourceCacheEntry("notifications:preview:partial-user").data;
+  assert.equal(cached.notifications.find(item => item.id === "saved").is_read, true);
+  assert.equal(cached.notifications.find(item => item.id === "failed").is_read, false);
+  assert.equal(cached.unreadCount, 1);
+});
+
+test("read failures remain in shared notification cache after bell closes", async () => {
+  const feed = await load("components/notifications/notificationFeed.js");
+  const cache = await load("api/resourceCache.js");
+  cache.clearResourceCache();
+  await feed.loadNotificationPreview("error-user").catch(() => {});
+  await cache.requestCachedResource("notifications:preview:error-user", async () => ({ notifications: [], unreadCount: 0, readError: "" }));
+  feed.cacheNotificationReadError("error-user", "student", "Read status could not be saved.");
+  assert.equal(feed.getCachedNotificationPreview("error-user").readError, "Read status could not be saved.");
+  assert.equal(cache.getResourceCacheEntry("notifications:preview:error-user").data.readError, "Read status could not be saved.");
+});
+
 test("notification grouping matches the backend logical-event rules", async () => {
   const { notificationActivity } = await load("components/notifications/notificationData.js");
   const owner = "logical-owner";
@@ -188,7 +233,7 @@ test("an unread-count failure does not discard a successfully loaded full feed",
 });
 
 test("API resources can stay idle and retain cached data until enabled", async () => {
-  const { initialApiResourceState } = await load("hooks/useApiResource.js");
+  const { initialApiResourceState } = await server.ssrLoadModule("/src/hooks/useApiResource.js");
   const cached = { notifications: [{ id: "cached" }] };
   assert.deepEqual(initialApiResourceState(false, cached), { data: cached, error: "", loading: false });
   assert.deepEqual(initialApiResourceState(true, cached), { data: cached, error: "", loading: true });
@@ -197,8 +242,8 @@ test("API resources can stay idle and retain cached data until enabled", async (
 test("notification resource options keep preview lazy and full-page cached data active", async () => {
   const { notificationResourceOptions } = await server.ssrLoadModule("/src/components/notifications/useServerNotifications.js");
   const cached = { notifications: [{ id: "cached" }], unreadCount: 1 };
-  assert.deepEqual(notificationResourceOptions(true, false, cached), { enabled: false, initialData: cached });
-  assert.deepEqual(notificationResourceOptions(false, false, cached), { enabled: true, initialData: cached });
+  assert.deepEqual(notificationResourceOptions(true, false, cached, "one"), { enabled: false, initialData: cached, cacheKey: "notifications:preview:one", revalidateOnEnable: true });
+  assert.deepEqual(notificationResourceOptions(false, false, cached, "one", "student"), { enabled: true, initialData: cached, cacheKey: "notifications:feed:student:one", revalidateOnEnable: false });
 });
 
 test("email preference writes use the authenticated profile endpoint and require a confirmed boolean", async () => {

@@ -31,20 +31,35 @@ export async function getAdminAssignments({
   perPage = 25,
   filters = {},
 } = {}) {
+  const [pageData, references] = await Promise.all([
+    getAdminAssignmentPage({ signal, page, perPage, filters }),
+    getAdminAssignmentReferences({ signal }),
+  ]);
+  return { ...pageData, ...references };
+}
+
+export async function getAdminAssignmentPage({
+  signal,
+  page = 1,
+  perPage = 25,
+  filters = {},
+} = {}) {
   const classQuery = new URLSearchParams();
   if (filters.search?.trim()) classQuery.set("search", filters.search.trim());
   if (filters.programId) classQuery.set("program_id", filters.programId);
   const classPath = `/api/admin/classes${classQuery.toString() ? `?${classQuery}` : ""}`;
-  const [classes, programs, users] = await Promise.all([
-    getCollectionPage(classPath, { signal, page, perPage }),
+  const classes = await getCollectionPage(classPath, { signal, page, perPage });
+  return { classes: classes.data, classesMeta: classes.meta };
+}
+
+export async function getAdminAssignmentReferences({ signal } = {}) {
+  const [programs, users] = await Promise.all([
     getCollection("/api/admin/programs", { signal }),
     getCollection("/api/admin/users?role=instructor&status=approved", {
       signal,
     }),
   ]);
   return {
-    classes: classes.data,
-    classesMeta: classes.meta,
     programs,
     instructors: users.filter(
       (user) => user.role === "instructor" && user.status === "approved",

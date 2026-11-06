@@ -10,8 +10,9 @@ export function initialApiResourceState(enabled, initialData) {
   return { data: initialData ?? null, error: "", loading: enabled };
 }
 
-export function useApiResource(load, key = "", { enabled = true, initialData = null, cacheKey = "" } = {}) {
+export function useApiResource(load, key = "", { enabled = true, initialData = null, cacheKey = "", revalidateOnEnable = false } = {}) {
   const mounted = useRef(true);
+  const sequence = useRef(0);
   const resolvedKey = useMemo(() => resourceKey(load, key, cacheKey), [load, key, cacheKey]);
   const [state, setState] = useState(() => {
     const cached = enabled ? getResourceCacheEntry(resolvedKey) : null;
@@ -22,6 +23,7 @@ export function useApiResource(load, key = "", { enabled = true, initialData = n
 
   const loadResource = useCallback((force = false) => {
     if (!enabled) return Promise.resolve(null);
+    const request = ++sequence.current;
     const cached = !force && getResourceCacheEntry(resolvedKey);
     if (cached) {
       if (mounted.current) setState({ data: cached.data, error: "", loading: false, updatedAt: cached.updatedAt });
@@ -31,11 +33,11 @@ export function useApiResource(load, key = "", { enabled = true, initialData = n
     return requestCachedResource(resolvedKey, (signal) => load(key, signal), { force }).then(
       (data) => {
         const entry = getResourceCacheEntry(resolvedKey);
-        if (mounted.current) setState({ data, error: "", loading: false, updatedAt: entry?.updatedAt || Date.now() });
+        if (mounted.current && request === sequence.current) setState({ data, error: "", loading: false, updatedAt: entry?.updatedAt || Date.now() });
         return data;
       },
       (error) => {
-        if (mounted.current) setState((current) => ({ ...current, error: error.message, loading: false }));
+        if (mounted.current && request === sequence.current) setState((current) => ({ ...current, error: error.message, loading: false }));
         throw error;
       },
     );
@@ -49,9 +51,9 @@ export function useApiResource(load, key = "", { enabled = true, initialData = n
       const entry = getResourceCacheEntry(resolvedKey);
       if (entry) setState({ data: entry.data, error: "", loading: false, updatedAt: entry.updatedAt });
     });
-    if (enabled) queueMicrotask(() => active && loadResource().catch(() => {}));
+    if (enabled) queueMicrotask(() => active && loadResource(revalidateOnEnable).catch(() => {}));
     return () => { active = false; mounted.current = false; unsubscribe(); };
-  }, [enabled, loadResource, resolvedKey]);
+  }, [enabled, loadResource, resolvedKey, revalidateOnEnable]);
 
   const reload = useCallback(() => loadResource(true).catch(() => null), [loadResource]);
 

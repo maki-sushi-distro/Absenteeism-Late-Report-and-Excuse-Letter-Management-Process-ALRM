@@ -63,6 +63,9 @@ test("notification panel keeps cached entries visible during refresh", async () 
   const loading = await renderPanel({ loading: true, activity });
   assert.doesNotMatch(loading, /role="status"/);
   assert.match(loading, /Old update/);
+  const failedRefresh = await renderPanel({ error: "Refresh failed", activity });
+  assert.match(failedRefresh, /Refresh failed/);
+  assert.match(failedRefresh, /Old update/);
 });
 
 test("notification panel shows initial loading, retryable errors, and empty results", async () => {
@@ -72,7 +75,7 @@ test("notification panel shows initial loading, retryable errors, and empty resu
   const failed = await renderPanel({ error: "Cannot load requests", activity });
   assert.match(failed, /role="alert"/);
   assert.match(failed, /Try again/);
-  assert.doesNotMatch(failed, /Old update/);
+  assert.match(failed, /Old update/);
   assert.match(await renderPanel({ activity: [] }), /No recent request updates/);
 });
 

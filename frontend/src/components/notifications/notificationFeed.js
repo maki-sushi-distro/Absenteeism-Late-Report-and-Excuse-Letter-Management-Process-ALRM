@@ -4,6 +4,7 @@ import { getProgramHeadAuditLogs } from "../../api/programHead.js";
 import { getNotificationPreview, getNotifications, getNotificationUnreadCount, markAllNotificationsRead, markNotificationRead } from "../../api/notifications.js";
 import { normalizeRole } from "../../lib/roles.js";
 import { initializeNotificationReadIds, markNotificationsRead } from "../../pages/auth/student/notifications/notificationReadStore.js";
+import { updateResourceCache } from "../../api/resourceCache.js";
 
 const previewCache = new Map();
 
@@ -20,6 +21,14 @@ export function getCachedNotificationPreview(userId) {
   return previewCache.get(cacheKey(userId)) || null;
 }
 
+export function cacheNotificationReadError(userId, role, message) {
+  const current = getCachedNotificationPreview(userId) || { notifications: [], requests: [], auditLogs: [], unreadCount: 0 };
+  cachePreview(userId, { ...current, readError: message });
+  for (const key of [`notifications:preview:${userId}`, `notifications:feed:${normalizeRole(role)}:${userId}`]) {
+    updateResourceCache(key, value => ({ ...value, readError: message }));
+  }
+}
+
 function cachedPreviewWithReadIds(userId, ids, all = false) {
   const cached = getCachedNotificationPreview(userId);
   if (!cached) return null;
@@ -31,6 +40,38 @@ function cachedPreviewWithReadIds(userId, ids, all = false) {
     return { ...item, is_read: true };
   });
   return cachePreview(userId, { ...cached, notifications, unreadCount: all ? 0 : Math.max(0, cached.unreadCount - newlyRead), readError: "" });
+}
+
+function withReadIds(value, ids, all) {
+  if (!value?.notifications) return { value, newlyRead: 0 };
+  const readIds = new Set(ids);
+  let newlyRead = 0;
+  const notifications = value.notifications.map(item => {
+    if (item.is_read === true || (!all && !readIds.has(item.id))) return item;
+    newlyRead += 1;
+    return { ...item, is_read: true };
+  });
+  return { value: { ...value, notifications, unreadCount: all ? 0 : Math.max(0, (value.unreadCount ?? 0) - newlyRead), readError: "" }, newlyRead };
+}
+
+function syncConfirmedReads(userId, role, ids, all) {
+  const previewKey = `notifications:preview:${userId}`;
+  const feedKey = `notifications:feed:${normalizeRole(role)}:${userId}`;
+  let newlyRead = 0;
+  const cached = getCachedNotificationPreview(userId);
+  if (cached) {
+    const updated = withReadIds(cached, ids, all);
+    newlyRead = updated.newlyRead;
+    cachePreview(userId, updated.value);
+  }
+  for (const key of [previewKey, feedKey]) {
+    updateResourceCache(key, value => {
+      const updated = withReadIds(value, ids, all);
+      newlyRead = Math.max(newlyRead, updated.newlyRead);
+      return updated.value;
+    });
+  }
+  updateResourceCache(`notifications:unread:${userId}`, count => all ? 0 : Math.max(0, Number(count || 0) - newlyRead));
 }
 
 function fallbackUnreadCount(notifications) {
@@ -90,13 +131,21 @@ export async function loadNotificationPreview(userId) {
   return cachePreview(userId, { notifications: preview.notifications, requests: [], auditLogs: [], warning: "", unreadCount: preview.unreadCount, readError: "" });
 }
 
-export async function markFeedRead(userId, items, all = false) {
+export async function markFeedRead(userId, items, all = false, role = "student") {
   const serverIds = [...new Set(items.filter(item => !item.source).flatMap(item => item.notificationIds || [item.id]))];
+  let failure;
+  let confirmedIds = serverIds;
   if (all) await markAllNotificationsRead();
-  else if (serverIds.length) await Promise.all(serverIds.map(markNotificationRead));
-  cachedPreviewWithReadIds(userId, serverIds, all);
+  else if (serverIds.length) {
+    const results = await Promise.allSettled(serverIds.map(markNotificationRead));
+    confirmedIds = serverIds.filter((_, index) => results[index].status === "fulfilled");
+    failure = results.find(result => result.status === "rejected")?.reason;
+  }
+  cachedPreviewWithReadIds(userId, confirmedIds, all);
+  syncConfirmedReads(userId, role, confirmedIds, all);
   const localItems = items.filter(item => item.source);
   for (const readKey of new Set(localItems.map(item => item.readKey || `instructor:${userId}`))) {
     markNotificationsRead(readKey, localItems.filter(item => (item.readKey || `instructor:${userId}`) === readKey).map(item => item.id), window.localStorage);
   }
+  if (failure) throw failure;
 }

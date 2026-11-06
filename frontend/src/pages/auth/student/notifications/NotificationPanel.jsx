@@ -12,9 +12,10 @@ export default function NotificationPanel({ activity = [], loading, error, warni
         <RefreshCw aria-hidden="true" className={`size-4 ${loading ? "animate-spin" : ""}`} />
       </button>
     </div>}
-    {!loading && !error && warning && <p role="alert" className="rounded-md border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-900">{warning}</p>}
+    {!loading && warning && <p role="alert" className="rounded-md border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-900">{warning}</p>}
+    {error && activity.length > 0 && <p role="alert" className="rounded-md bg-red-50 p-3 text-sm text-red-700 dark:bg-red-950 dark:text-red-200">{error} <button type="button" onClick={onRefresh} className="font-semibold underline">Try again</button></p>}
     {loading && !activity.length ? <LoadingSkeleton variant="list" rows={showFooter ? 3 : 6} label="Loading notifications..." />
-      : error ? <div role="alert" className="rounded-md bg-red-50 p-3 text-sm text-red-700 dark:bg-red-950 dark:text-red-200">
+      : error && !activity.length ? <div role="alert" className="rounded-md bg-red-50 p-3 text-sm text-red-700 dark:bg-red-950 dark:text-red-200">
         <p>{error}</p><button type="button" onClick={onRefresh} className="mt-2 font-semibold underline">Try again</button>
       </div>
       : !activity.length ? <p className="py-6 text-center text-sm text-slate-500 dark:text-slate-400">{emptyMessage}</p>

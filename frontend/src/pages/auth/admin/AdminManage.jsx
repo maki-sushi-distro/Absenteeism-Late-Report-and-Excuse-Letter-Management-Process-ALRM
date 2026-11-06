@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { GraduationCap, Search, UserRoundArrowLeft } from "lucide-react";
-import { getAdminAssignments, getAdminClass } from "@/api/adminAssignments";
+import { getAdminAssignmentPage, getAdminAssignmentReferences, getAdminClass } from "@/api/adminAssignments";
 import {
+  cancelResourceRequest,
   getResourceCacheEntry,
   requestCachedResource,
   updateResourceCache,
@@ -32,6 +33,7 @@ import {
   assignedInstructor,
 } from "./manage/assignments.js";
 import { usePageViewState } from "@/hooks/usePageViewState";
+import { compileBoyerMoore, prepareAssignmentSearchText } from "@/lib/boyerMoore";
 
 export default function AdminManage() {
   const cached = getResourceCacheEntry("admin:assignments");
@@ -46,17 +48,30 @@ export default function AdminManage() {
     page: 1,
   });
   const { search, programId, page } = view;
+  const [searchInput, setSearchInput] = useState(search);
+  const referenceCache = getResourceCacheEntry("admin:assignment-references");
+  const [references, setReferences] = useState(referenceCache?.data || {
+    programs: cached?.data?.programs || [],
+    instructors: cached?.data?.instructors || [],
+  });
   const [dialog, setDialog] = useState(null);
   const [removingId, setRemovingId] = useState(null);
   const mounted = useRef(false);
+  const requestSequence = useRef(0);
+  const activeRequestKey = useRef("");
 
   const cacheKey = `admin:assignments:${page}:${search.trim()}:${programId}`;
   const load = useCallback(
-    (force = false) =>
-      requestCachedResource(
+    (force = false) => {
+      const sequence = ++requestSequence.current;
+      if (activeRequestKey.current && activeRequestKey.current !== cacheKey) cancelResourceRequest(activeRequestKey.current);
+      activeRequestKey.current = cacheKey;
+      setLoading(true);
+      setError("");
+      return requestCachedResource(
         cacheKey,
         (signal) =>
-          getAdminAssignments({
+          getAdminAssignmentPage({
             signal,
             page,
             perPage: 25,
@@ -65,48 +80,64 @@ export default function AdminManage() {
         { force },
       )
         .then((next) => {
-          if (mounted.current) {
-            setData(next);
+          if (mounted.current && sequence === requestSequence.current) {
+            setData(current => ({ ...(current || {}), ...next }));
             setUpdatedAt(
               getResourceCacheEntry(cacheKey)?.updatedAt || Date.now(),
             );
           }
         })
         .catch((failure) => {
-          if (mounted.current) {
-            setData(null);
+          if (mounted.current && sequence === requestSequence.current && failure.name !== "AbortError") {
             setError(failure.message || "Assignments could not be loaded.");
           }
         })
         .finally(() => {
-          if (mounted.current) setLoading(false);
-        }),
+          if (mounted.current && sequence === requestSequence.current) setLoading(false);
+        });
+    },
     [cacheKey, page, search, programId],
   );
 
   useEffect(() => {
     mounted.current = true;
-    void load();
     return () => {
       mounted.current = false;
+      if (activeRequestKey.current) cancelResourceRequest(activeRequestKey.current);
     };
-  }, [load]);
+  }, []);
+  useEffect(() => { queueMicrotask(() => void load()); }, [load]);
+  useEffect(() => {
+    requestCachedResource("admin:assignment-references", signal => getAdminAssignmentReferences({ signal }))
+      .then(next => { if (mounted.current) setReferences(next); })
+      .catch(failure => { if (mounted.current && failure.name !== "AbortError") setError(failure.message || "Assignment references could not be loaded."); });
+  }, []);
+  useEffect(() => {
+    if (searchInput.trim().toLowerCase() === search.trim().toLowerCase()) return undefined;
+    const timer = window.setTimeout(() => setView(current => ({ ...current, search: searchInput.trim(), page: 1 })), 200);
+    return () => window.clearTimeout(timer);
+  }, [search, searchInput, setView]);
 
-  const selectablePrograms = getSelectablePrograms(data?.programs || []);
-  const assignableClasses = data?.classes || [];
-  const rows = assignableClasses.map((row) => {
-    const instructor = assignedInstructor(row, data?.instructors || []);
-    return {
+  const selectablePrograms = getSelectablePrograms(references.programs || []);
+  const assignableClasses = useMemo(() => data?.classes || [], [data?.classes]);
+  const preparedRows = useMemo(() => assignableClasses.map((row) => {
+    const instructor = assignedInstructor(row, references.instructors || []);
+    const prepared = {
       ...row,
       displayInstructor: instructor?.name || "Unassigned",
       displayProgram:
         row.program?.program_name ||
-        data?.programs.find(
+        references.programs.find(
           (program) => String(program.id) === String(row.program_id),
         )?.program_name ||
         "Program unavailable",
     };
-  });
+    return { ...prepared, searchText: prepareAssignmentSearchText(prepared) };
+  }), [assignableClasses, references]);
+  const matcher = useMemo(() => compileBoyerMoore(searchInput), [searchInput]);
+  const rows = searchInput.trim().toLowerCase() === search.trim().toLowerCase()
+    ? preparedRows
+    : preparedRows.filter(row => matcher.matchesPrepared(row.searchText));
   const classesMeta = data?.classesMeta || {};
   const pagination = {
     currentPage: Number(classesMeta.page || page),
@@ -178,7 +209,7 @@ export default function AdminManage() {
       className="space-y-5 font-sans"
     >
       <h1 className="sr-only">Manage</h1>
-      {loading ? (
+      {loading && !data ? (
         <LoadingSkeleton
           variant="table"
           rows={5}
@@ -202,18 +233,19 @@ export default function AdminManage() {
                   type="search"
                   aria-label="Search instructor assignments"
                   placeholder="Search Instructor, Subject, Program, Section..."
-                  value={search}
-                  onChange={(event) =>
-                    setView((current) => ({
-                      ...current,
-                      search: event.target.value,
-                      page: 1,
-                    }))
-                  }
+                  value={searchInput}
+                  onChange={(event) => setSearchInput(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      setView(current => ({ ...current, search: searchInput.trim(), page: 1 }));
+                    }
+                  }}
                   className="h-10 rounded-[8px] border-slate-300 pr-9! shadow-sm"
                 />
                 <Search className="pointer-events-none absolute right-3 top-1/2 z-10 size-4 -translate-y-1/2 text-slate-400" />
               </div>
+              {loading && data && <span role="status" className="text-xs text-slate-500">Updating results…</span>}
               <FilterMenu
                 label="Filter instructor assignments"
                 chips={
@@ -416,7 +448,7 @@ export default function AdminManage() {
       {dialog && data && (
         <AssignmentDialog
           row={dialogRow}
-          data={{ ...data, classes: assignableClasses }}
+          data={{ ...data, ...references, classes: assignableClasses }}
           onClose={() => setDialog(null)}
           onConflict={refreshRows}
           onSaved={saved}
@@ -425,7 +457,7 @@ export default function AdminManage() {
       {removingRow && data && (
         <RemoveAssignmentDialog
           row={removingRow}
-          instructors={data.instructors}
+          instructors={references.instructors}
           onClose={() => setRemovingId(null)}
           onConflict={refreshRows}
           onSaved={saved}

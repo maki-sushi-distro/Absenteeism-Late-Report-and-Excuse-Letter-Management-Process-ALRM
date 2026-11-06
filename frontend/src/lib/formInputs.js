@@ -94,16 +94,24 @@ export function prepareClassInput(data, partial = false) {
       || !/^([01]\d|2[0-3]):[0-5]\d$/.test(meeting.start)
       || !/^([01]\d|2[0-3]):[0-5]\d$/.test(meeting.end)
       || meeting.end <= meeting.start);
-    errors.schedule = invalidMeeting ? 'Complete each meeting with a valid day and an end time after its start.' : '';
-  }
-  if (payload.schedule?.length === 0) {
-    payload.weekly_hours = Number(data.weekly_hours);
-    payload.meetings_per_week = Number(data.meetings_per_week);
-    errors.weekly_hours = Number.isFinite(payload.weekly_hours) && payload.weekly_hours > 0 && payload.weekly_hours <= 168 ? '' : 'Enter confirmed weekly contact hours.';
-    errors.meetings_per_week = Number.isInteger(payload.meetings_per_week) && payload.meetings_per_week >= 1 && payload.meetings_per_week <= 42 ? '' : 'Enter the confirmed meetings per week.';
+    const overlap = payload.schedule.some((meeting, index) => payload.schedule.slice(0, index).some(other => meeting.day === other.day && meeting.start < other.end && other.start < meeting.end));
+    const longRoom = payload.schedule.some(meeting => (meeting.room?.length || 0) > 100);
+    errors.schedule = payload.schedule.length === 0 ? 'Add at least one complete meeting.'
+      : invalidMeeting ? 'Complete each meeting with a valid day and an end time after its start.'
+        : overlap ? 'Meetings on the same day cannot overlap.'
+          : longRoom ? 'Room must not exceed 100 characters.' : '';
   }
   assertValidInputs(errors);
   return payload;
+}
+
+export function scheduleTotals(schedule = []) {
+  const minutes = schedule.reduce((total, meeting) => {
+    if (!/^\d{2}:\d{2}$/.test(meeting.start || '') || !/^\d{2}:\d{2}$/.test(meeting.end || '')) return total;
+    const toMinutes = value => Number(value.slice(0, 2)) * 60 + Number(value.slice(3));
+    return total + Math.max(0, toMinutes(meeting.end) - toMinutes(meeting.start));
+  }, 0);
+  return { weeklyHours: Math.round(minutes / 0.6) / 100, meetingsPerWeek: schedule.length };
 }
 
 export function prepareReportFilters(filters) {

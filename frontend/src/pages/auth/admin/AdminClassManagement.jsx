@@ -76,6 +76,7 @@ export default function AdminClassManagement() {
       setReload((current) => current + 1);
     } catch (failure) {
       setError(failure.message || "The class could not be saved.");
+      throw failure;
     } finally {
       setWorking("");
     }

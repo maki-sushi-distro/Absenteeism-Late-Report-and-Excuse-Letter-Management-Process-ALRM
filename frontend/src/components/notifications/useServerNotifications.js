@@ -5,18 +5,23 @@ import useNotificationReadState from "@/pages/auth/student/notifications/useNoti
 import { normalizeRole } from "@/lib/roles";
 import { getNotificationUnreadCount } from "@/api/notifications";
 import { mergeAdminAuditActivity, mergeProgramAuditActivity, mergeRequestActivity, notificationActivity } from "./notificationData";
-import { getCachedNotificationPreview, loadNotificationFeed, loadNotificationPreview, markFeedRead } from "./notificationFeed";
+import { cacheNotificationReadError, getCachedNotificationPreview, loadNotificationFeed, loadNotificationPreview, markFeedRead } from "./notificationFeed";
 
 const changedEvent = "alrm:notifications-updated";
 
-export function notificationResourceOptions(preview, enabled, initialData) {
-  return { enabled: preview ? enabled : true, initialData };
+export function notificationResourceOptions(preview, enabled, initialData, id, role = "student") {
+  return {
+    enabled: preview ? enabled : true,
+    initialData,
+    cacheKey: preview ? `notifications:preview:${id}` : `notifications:feed:${normalizeRole(role)}:${id}`,
+    revalidateOnEnable: preview,
+  };
 }
 
 export default function useServerNotifications(user, { preview = false, enabled = true } = {}) {
   const { id, role } = user;
   const load = useCallback(() => preview ? loadNotificationPreview(id) : loadNotificationFeed(role, id), [id, preview, role]);
-  const resource = useApiResource(load, id, notificationResourceOptions(preview, enabled, getCachedNotificationPreview(id)));
+  const resource = useApiResource(load, id, notificationResourceOptions(preview, enabled, getCachedNotificationPreview(id), id, role));
   const unread = useApiResource(getNotificationUnreadCount, id, { enabled: preview && Boolean(id), cacheKey: `notifications:unread:${id}` });
   const reloadResource = resource.reload;
   const reloadUnread = unread.reload;
@@ -35,11 +40,13 @@ export default function useServerNotifications(user, { preview = false, enabled 
     return () => window.removeEventListener(changedEvent, reload);
   }, [reload]);
   useEffect(() => {
-    if (!preview) return undefined;
-    const timer = window.setInterval(() => document.visibilityState === "visible" && reload(), 60_000);
-    window.addEventListener("focus", reload);
-    return () => { window.clearInterval(timer); window.removeEventListener("focus", reload); };
-  }, [preview, reload]);
+    if (preview && !enabled) return undefined;
+    const refreshVisible = () => { if (!document.hidden) reload(); };
+    const timer = window.setInterval(refreshVisible, 60_000);
+    window.addEventListener("focus", refreshVisible);
+    document.addEventListener("visibilitychange", refreshVisible);
+    return () => { window.clearInterval(timer); window.removeEventListener("focus", refreshVisible); document.removeEventListener("visibilitychange", refreshVisible); };
+  }, [enabled, preview, reload]);
 
   async function saveRead(items, all = false) {
     if (busy.current || (!all && !items.length)) return;
@@ -47,9 +54,11 @@ export default function useServerNotifications(user, { preview = false, enabled 
     setWorking(true);
     setReadError("");
     try {
-      await markFeedRead(id, items, all);
+      await markFeedRead(id, items, all, role);
     } catch (error) {
-      if (mounted.current) setReadError(error.message || "Read status could not be saved.");
+      const message = error.message || "Read status could not be saved.";
+      cacheNotificationReadError(id, role, message);
+      if (mounted.current) setReadError(message);
     } finally {
       window.dispatchEvent(new Event("alrm:notification-read"));
       window.dispatchEvent(new Event(changedEvent));

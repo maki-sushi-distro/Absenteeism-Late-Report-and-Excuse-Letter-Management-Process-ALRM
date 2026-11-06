@@ -23,16 +23,14 @@ export function normalizeReportRows(sheet) {
 
 export function departmentWeekRows(programs, records, week) {
   const names = [...new Set([...programs.map(program => program.program_name || program.name).filter(Boolean), ...records.map(row => row.Program).filter(Boolean)])];
-  const counts = new Map(names.map(name => [name, 0]));
+  const counts = new Map(names.map(name => [name, { absences: 0, lates: 0 }]));
   const counted = new Set();
   for (const row of records) {
     const day = row["Start Date"];
-    if (row.Type === "absence" && day >= week.date_from && day <= week.date_to && !counted.has(row["Request ID"])) {
-      counts.set(row.Program, (counts.get(row.Program) || 0) + 1);
+    if (counts.has(row.Program) && ["absence", "late"].includes(row.Type) && day >= week.date_from && day <= week.date_to && !counted.has(row["Request ID"])) {
+      counts.get(row.Program)[row.Type === "late" ? "lates" : "absences"] += 1;
       counted.add(row["Request ID"]);
     }
   }
-  // The current export excludes requests without an absence start date.
-  // A missing late total must remain unknown rather than a fabricated zero.
-  return names.map(name => ({ name, absences: counts.get(name), lates: null }));
+  return names.map(name => ({ name, ...counts.get(name) }));
 }

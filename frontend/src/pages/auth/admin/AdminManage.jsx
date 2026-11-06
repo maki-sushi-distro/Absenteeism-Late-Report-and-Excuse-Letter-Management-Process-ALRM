@@ -427,6 +427,7 @@ export default function AdminManage() {
           row={removingRow}
           instructors={data.instructors}
           onClose={() => setRemovingId(null)}
+          onConflict={refreshRows}
           onSaved={saved}
         />
       )}

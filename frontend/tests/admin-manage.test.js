@@ -96,14 +96,59 @@ function elements(node, predicate) {
 const elementById = (page, id) => elements(page.value, node => node.props.id === id)[0];
 const formOf = page => elements(page.value, node => node.type === "form")[0];
 
-async function withAssignmentDialog(run) {
+async function withAssignmentDialog(run, modulePath = "/src/pages/auth/admin/manage/AssignmentDialog.jsx") {
   const server = await createServer({ server: { middlewareMode: true, ws: false }, appType: "custom" });
   try {
-    const AssignmentDialog = (await server.ssrLoadModule("/src/pages/auth/admin/manage/AssignmentDialog.jsx")).default;
+    const AssignmentDialog = (await server.ssrLoadModule(modulePath)).default;
     await run(AssignmentDialog);
   } finally {
     await server.close();
   }
+}
+
+test("removal uses the revisioned endpoint, locks duplicate clicks and refreshes the affected class", async () => {
+  let release;
+  let calls = 0;
+  mockApiFetch(async (url, options) => {
+    calls++;
+    assert.equal(new URL(url, "http://fixture.local").pathname, "/api/admin/classes/c1/assignment");
+    assert.equal(options.method, "POST");
+    assert.deepEqual(JSON.parse(options.body), { action: "remove", expected_revision: 3, reason: "Removed instructor assignment in Admin Manage." });
+    return new Promise(resolve => { release = () => resolve(Response.json({ data: { classes: [{ id: "c1", instructor_id: null, assignment_revision: 4 }] } })); });
+  });
+  await withAssignmentDialog(async Dialog => {
+    const saved = mock.fn(async () => {});
+    const page = mount(() => Dialog({ row: { ...classes[0], assignment_revision: 3 }, instructors, onSaved: saved, onConflict() {}, onClose() {} }));
+    try {
+      const button = elements(page.value, node => node.props.onClick)[0];
+      const first = button.props.onClick();
+      await button.props.onClick();
+      await page.flush();
+      assert.equal(calls, 1);
+      release();
+      await first;
+      assert.deepEqual(saved.mock.calls[0].arguments, [["c1"], "Instructor assignment removed."]);
+    } finally { page.unmount(); }
+  }, "/src/pages/auth/admin/manage/RemoveAssignmentDialog.jsx");
+});
+
+for (const message of ["This assignment changed since you opened it. Refresh the list and try again.", "Cannot change assignment: 2 pending request(s) must be resolved first."]) {
+  test(`removal preserves a 409 restriction and requires review: ${message}`, async () => {
+    mockApiFetch(async () => Response.json({ message }, { status: 409 }));
+    await withAssignmentDialog(async Dialog => {
+      const refresh = mock.fn(async () => []);
+      const saved = mock.fn();
+      const page = mount(() => Dialog({ row: { ...classes[0], assignment_revision: 3 }, instructors, onSaved: saved, onConflict: refresh, onClose() {} }));
+      try {
+        await elements(page.value, node => node.props.onClick)[0].props.onClick();
+        await page.flush();
+        assert.deepEqual(refresh.mock.calls[0].arguments, [["c1"]]);
+        assert.equal(saved.mock.callCount(), 0);
+        assert.equal(elements(page.value, node => node.props.role === "alert")[0].props.children, `${message} Close and reopen this dialog to review the current assignment.`);
+        assert.equal(elements(page.value, node => node.props.onClick)[0].props.disabled, true);
+      } finally { page.unmount(); }
+    }, "/src/pages/auth/admin/manage/RemoveAssignmentDialog.jsx");
+  });
 }
 
 test("collection loading includes paginated classes, programs and approved role data", async () => {

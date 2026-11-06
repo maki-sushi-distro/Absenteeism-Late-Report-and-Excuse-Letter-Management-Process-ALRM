@@ -50,11 +50,11 @@ function AttendanceNotice({ flags }) {
 
 export default function InstructorOverview({ user, overview, onPreviousWeek, onNextWeek, loading = {}, errors = {}, onRetrySnapshot, onRetryReports }) {
   const name = user?.name?.trim() || "Instructor";
-  const greeting = name === "Instructor" || /^prof\.?\s/i.test(name) ? name : `Prof. ${name}`;
+  const greeting = name === "Instructor" || /^prof\.?\s/i.test(name) ? name : `${name}`;
   const pending = Boolean(loading.snapshot || loading.reports);
   return <div data-slot={pending ? "dashboard-skeleton" : undefined} data-variant="instructor" aria-busy={pending || undefined} className="grid min-w-0 gap-7">
     {pending && <span role="status" aria-label="Loading instructor data" className="sr-only">Loading instructor data</span>}
-    {user ? <header><h1 className="break-words text-2xl font-bold leading-8 text-slate-950">Welcome, {greeting}!</h1><p className="mt-1 text-base font-medium text-slate-700">Here&apos;s your class overview</p></header> : <InstructorHeadingPlaceholder />}
+    {user ? <header><h1 className="break-words text-2xl font-bold leading-8 text-slate-950">Welcome,  {greeting}!</h1><p className="mt-1 text-base font-medium text-slate-700">Here&apos;s your class overview</p></header> : <InstructorHeadingPlaceholder />}
     {errors.snapshot && <ResourceState error={errors.snapshot} onRetry={onRetrySnapshot} />}
     <Metrics overview={overview} loading={loading} errors={errors} />
     {loading.reports ? <><InstructorChartPlaceholder /><InstructorSummaryPlaceholder /></> : <ResourceState error={errors.reports} onRetry={onRetryReports}>

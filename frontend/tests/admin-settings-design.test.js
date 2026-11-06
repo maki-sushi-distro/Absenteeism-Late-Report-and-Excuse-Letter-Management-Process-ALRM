@@ -53,8 +53,11 @@ test("administrator settings use the faculty profile design without removing wor
   assert.equal((html.match(/\sreadonly(?:=""|(?=[\s>]))/gi) || []).length, 4);
   assert.ok(html.indexOf("Faculty Profile") < html.indexOf("Notification Preferences"));
   assert.ok(html.indexOf("Notification Preferences") < html.indexOf("Absenteeism &amp; Late Policy"));
-  for (const text of ["New requests from students", "Attendance threshold warnings", "Email notifications", "Save academic period"]) {
+  for (const text of ["New requests from students", "Attendance threshold warnings", "Email notifications", "Edit academic period", "Save academic period"]) {
     assert.ok(html.includes(text), text);
   }
+  assert.match(html, /Controls the default data shown in dashboards, classes, attendance, and reports\./);
+  assert.match(html, /Existing records are preserved\./);
+  assert.match(html, /Loading current academic period/);
   assert.equal((html.match(/role="switch"/g) || []).length, 3);
 });

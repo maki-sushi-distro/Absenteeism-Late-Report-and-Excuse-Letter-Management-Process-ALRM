@@ -27,7 +27,14 @@ import ProgramHeadPageLayout from "./programHead/ProgramHeadPageLayout";
 import StudentPageLayout from "./student/StudentPageLayout";
 import StudentSettings from "./student/StudentSettings";
 import LoadingSkeleton from "@/components/loading/LoadingSkeleton";
-import { getAcademicPeriod, isConsecutiveSchoolYear, updateAcademicPeriod } from "@/api/academicPeriod";
+import {
+  academicPeriodError,
+  academicPeriodLabel,
+  academicPeriodsMatch,
+  getAcademicPeriod,
+  isConsecutiveSchoolYear,
+  updateAcademicPeriod,
+} from "@/api/academicPeriod";
 
 const ROLE_CONFIG = {
   administrator: {
@@ -304,27 +311,54 @@ function ProfileCard({ user, config, role }) {
   );
 }
 
-function AdminPolicyCard() {
+export function AdminPolicyCard() {
   const [period, setPeriod] = useState({ semester: "1st", school_year: "" });
+  const [savedPeriod, setSavedPeriod] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [editing, setEditing] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
   useEffect(() => {
     let active = true;
     getAcademicPeriod()
-      .then((data) => { if (active) setPeriod({ semester: data.semester, school_year: data.school_year }); })
+      .then((data) => {
+        if (!active) return;
+        const loaded = { semester: data.semester, school_year: data.school_year };
+        setPeriod(loaded);
+        setSavedPeriod(loaded);
+      })
       .catch((requestError) => { if (active) setError(requestError.message || "Could not load the academic period."); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, []);
+
+  const valid = ["1st", "2nd"].includes(period.semester) && isConsecutiveSchoolYear(period.school_year);
+  const dirty = Boolean(savedPeriod) && !academicPeriodsMatch(period, savedPeriod);
+  const locked = loading || saving || !editing;
+  const localError = editing && period.school_year.trim() && !isConsecutiveSchoolYear(period.school_year)
+    ? "Enter two consecutive years, for example 2026-2027."
+    : "";
+
+  function changePeriod(field, value) {
+    setPeriod((current) => ({ ...current, [field]: value }));
+    setMessage("");
+    setError("");
+  }
+
+  function editPeriod() {
+    setEditing(true);
+    setMessage("");
+    setError("");
+  }
 
   async function savePeriod(event) {
     event.preventDefault();
     setMessage("");
     setError("");
     const schoolYear = period.school_year.trim();
+    if (!editing || loading || saving || !dirty) return;
     if (!isConsecutiveSchoolYear(schoolYear)) {
       setError("Enter two consecutive years, for example 2026-2027.");
       return;
@@ -333,9 +367,11 @@ function AdminPolicyCard() {
     try {
       const updated = await updateAcademicPeriod({ ...period, school_year: schoolYear });
       setPeriod(updated);
+      setSavedPeriod(updated);
+      setEditing(false);
       setMessage("Academic period saved.");
     } catch (requestError) {
-      setError(requestError.message || "Could not save the academic period.");
+      setError(academicPeriodError(requestError));
     } finally {
       setSaving(false);
     }
@@ -382,14 +418,24 @@ function AdminPolicyCard() {
       </div>
       <Separator className="my-5" />
       <form className="grid gap-4" onSubmit={savePeriod}>
-        <div><p className="text-sm font-black text-slate-950">Academic period</p><p className="mt-1 text-sm text-slate-600">This period is used by attendance and reporting workflows.</p></div>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="grid gap-2"><Label htmlFor="academic-semester">Semester</Label><select id="academic-semester" value={period.semester} onChange={(event) => setPeriod((current) => ({ ...current, semester: event.target.value }))} disabled={loading || saving} className="h-10 rounded-[5px] border border-slate-300 bg-white px-3 text-sm"><option value="1st">1st Semester</option><option value="2nd">2nd Semester</option></select></div>
-          <div className="grid gap-2"><Label htmlFor="academic-school-year">School year</Label><Input id="academic-school-year" value={period.school_year} onChange={(event) => setPeriod((current) => ({ ...current, school_year: event.target.value }))} placeholder="2026-2027" disabled={loading || saving} /></div>
+        <div>
+          <p className="text-sm font-black text-slate-950">Academic period</p>
+          <p className="mt-1 text-sm text-slate-600">Controls the default data shown in dashboards, classes, attendance, and reports. Existing records are preserved.</p>
         </div>
-        {error && <p role="alert" className="text-sm font-semibold text-red-700">{error}</p>}
+        {loading
+          ? <p role="status" className="text-sm font-semibold text-slate-600">Loading current academic period…</p>
+          : savedPeriod && <p role="status" className="text-sm font-semibold text-slate-700">Current active period: {academicPeriodLabel(savedPeriod)}</p>}
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-2"><Label htmlFor="academic-semester">Semester</Label><select id="academic-semester" value={period.semester} onChange={(event) => changePeriod("semester", event.target.value)} disabled={locked} className="h-10 rounded-[5px] border border-slate-300 bg-white px-3 text-sm"><option value="1st">1st Semester</option><option value="2nd">2nd Semester</option></select></div>
+          <div className="grid gap-2"><Label htmlFor="academic-school-year">School year</Label><Input id="academic-school-year" value={period.school_year} onChange={(event) => changePeriod("school_year", event.target.value)} placeholder="2026-2027" disabled={locked} /></div>
+        </div>
+        {editing && dirty && <p role="status" className="text-sm font-semibold text-amber-700">Unsaved changes</p>}
+        {(error || localError) && <p role="alert" className="text-sm font-semibold text-red-700">{error || localError}</p>}
         {message && <p role="status" className="text-sm font-semibold text-emerald-700">{message}</p>}
-        <Button type="submit" className="w-fit bg-[#172f6b] text-white hover:bg-[#203f8a]" disabled={loading || saving}>{saving ? "Saving..." : "Save academic period"}</Button>
+        <div className="flex flex-wrap gap-2">
+          <Button type="submit" className="bg-[#172f6b] text-white hover:bg-[#203f8a]" disabled={locked || !dirty || !valid}>{saving ? "Saving..." : "Save academic period"}</Button>
+          <Button type="button" variant="outline" onClick={editPeriod} disabled={loading || saving || editing || !savedPeriod}>Edit academic period</Button>
+        </div>
       </form>
     </SettingsCard>
   );

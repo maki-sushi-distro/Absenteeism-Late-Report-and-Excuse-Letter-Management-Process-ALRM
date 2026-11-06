@@ -110,6 +110,11 @@ function ProfileSetup() {
   const needsYearLevel = isStudent && !user?.year_level;
 
   const parsedName = useMemo(() => splitVerifiedName(user?.name), [user?.name]);
+  const fullName = user?.name || [
+    user?.first_name || user?.firstName,
+    user?.middle_name || user?.middleName,
+    user?.last_name || user?.lastName,
+  ].filter(Boolean).join(" ");
   const [programs, setPrograms] = useState([]);
   const [programsLoading, setProgramsLoading] = useState(true);
   const [programsError, setProgramsError] = useState("");
@@ -316,22 +321,26 @@ function ProfileSetup() {
             </div>
             <div className="grid items-start gap-4 md:grid-cols-2">
               <ReadOnlyIdentityField label="Email" value={user?.email} />
-              <ReadOnlyIdentityField
-                label="First Name"
-                value={user?.first_name || user?.firstName || parsedName.firstName}
-              />
-              <ReadOnlyIdentityField
-                label="Middle Name"
-                value={user?.middle_name || user?.middleName || parsedName.middleName}
-              />
-              <ReadOnlyIdentityField
-                label="Last Name"
-                value={user?.last_name || user?.lastName || parsedName.lastName}
-              />
+              {isStudent ? (
+                <ReadOnlyIdentityField label="Full Name" value={fullName} />
+              ) : <>
+                <ReadOnlyIdentityField
+                  label="First Name"
+                  value={user?.first_name || user?.firstName || parsedName.firstName}
+                />
+                <ReadOnlyIdentityField
+                  label="Middle Name"
+                  value={user?.middle_name || user?.middleName || parsedName.middleName}
+                />
+                <ReadOnlyIdentityField
+                  label="Last Name"
+                  value={user?.last_name || user?.lastName || parsedName.lastName}
+                />
+              </>}
             </div>
           </section>
 
-          <form className="grid gap-5" onSubmit={handleSubmit}>
+          <form className="grid gap-5 px-4" onSubmit={handleSubmit}>
             <div className="grid gap-4 md:grid-cols-2">
               {needsProgram && <div className="grid min-w-0 gap-2">
                 <Label htmlFor="setup-program">Program</Label>

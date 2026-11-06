@@ -1,5 +1,9 @@
 import { historicalInstructor, historicalRequestClass } from "../../../lib/requestHistory.js";
 
+export function isAtRisk(flag) {
+  return ["warning", "critical", "IR"].includes(flag.threshold);
+}
+
 export function requestDate(request) {
   const value = request.date_submitted || request.created_at;
   const date = value ? new Date(value) : null;

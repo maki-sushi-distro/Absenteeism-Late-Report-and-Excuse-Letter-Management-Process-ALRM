@@ -1,6 +1,18 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { filterReportRows, formatRiskPercentage, instructorRows, monthlyActivity, requestDate } from "../src/pages/auth/programHead/programHeadData.js";
+import { filterReportRows, formatRiskPercentage, instructorRows, isAtRisk, monthlyActivity, requestDate } from "../src/pages/auth/programHead/programHeadData.js";
+
+test("risk lists exclude safe and unknown thresholds regardless of flag resolution", () => {
+  const flags = [
+    { threshold: "safe", percentage: 0, status: "open" },
+    { threshold: "safe", percentage: 2, status: "resolved" },
+    { threshold: null },
+    { threshold: "warning", status: "open" },
+    { threshold: "critical", status: "resolved" },
+    { threshold: "IR", status: "open" },
+  ];
+  assert.deepEqual(flags.filter(isAtRisk), flags.slice(3));
+});
 
 const makeRequest = (type, date, instructorId = "i-1") => ({
   type,

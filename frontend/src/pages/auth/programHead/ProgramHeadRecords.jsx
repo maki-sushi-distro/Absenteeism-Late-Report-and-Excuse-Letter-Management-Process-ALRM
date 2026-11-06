@@ -2,7 +2,7 @@ import { useState } from "react";
 import { EmptyState } from "@/components/common/EmptyState";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { resolveProgramHeadFlag } from "@/api/programHead";
-import { formatRiskPercentage, requestClass, requestStudent } from "./programHeadData";
+import { formatRiskPercentage, isAtRisk, requestClass, requestStudent } from "./programHeadData";
 import { normalizeRequestStatus } from "@/lib/requestStatus";
 import EvidenceViewerDialog from "@/components/evidence/EvidenceViewerDialog";
 
@@ -12,7 +12,7 @@ export function FlaggedRecords({ flags, onRefresh }) {
   const [status, setStatus] = useState("");
   const [resolving, setResolving] = useState("");
   const [error, setError] = useState("");
-  const visible = flags.filter((flag) => !status || flag.status === status);
+  const visible = flags.filter((flag) => isAtRisk(flag) && (!status || flag.status === status));
 
   async function resolveFlag(flagId) {
     setResolving(flagId);

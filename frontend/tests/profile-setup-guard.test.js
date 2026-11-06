@@ -53,6 +53,10 @@ function isDisabled(button) {
   return /\sdisabled(?:=""|(?=[\s>]))/.test(button);
 }
 
+function profileForm(html) {
+  return html.match(/<form\b[^>]*>/)?.[0] || "";
+}
+
 test("students cannot continue until every required profile field is complete", () => {
   assert.equal(typeof profileSetup.isProfileSetupReady, "function");
 
@@ -120,6 +124,32 @@ test("an instructor assigned through programs is not asked to select another pro
   const html = renderProfile(instructor);
   assert.match(html, /Instructor ID/);
   assert.doesNotMatch(html, /Select program/);
+});
+
+test("the student pre-dashboard shows one full-name field from the verified backend name", () => {
+  const html = renderProfile({
+    id: "student-with-name",
+    role: "student",
+    name: "Maria Santos Cruz",
+    program_id: "",
+    school_id_number: "",
+    year_level: "",
+  });
+
+  assert.match(html, />Full Name<\/label>/);
+  assert.match(html, /value="Maria Santos Cruz"/);
+  assert.doesNotMatch(html, />First Name<\/label>/);
+  assert.doesNotMatch(html, />Middle Name<\/label>/);
+  assert.doesNotMatch(html, />Last Name<\/label>/);
+});
+
+test("student and instructor editable fields align with the verified information inset", () => {
+  for (const user of [
+    { id: "student-alignment", role: "student", program_id: "", school_id_number: "", year_level: "" },
+    { id: "instructor-alignment", role: "instructor", program_id: "", school_id_number: "" },
+  ]) {
+    assert.match(profileForm(renderProfile(user)), /class="[^"]*\bpx-4\b[^"]*"/);
+  }
 });
 
 test("profile completion requires the persisted fields for each role", () => {

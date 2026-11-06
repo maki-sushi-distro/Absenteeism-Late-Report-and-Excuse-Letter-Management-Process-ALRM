@@ -43,7 +43,7 @@ export default function RequestSummary({ form, user, classes = [], editing, onSt
     {editing ? <RequestReviewEditor form={form} user={user} classes={classes} disabled={disabled} {...editorProps} /> : <dl className="grid gap-x-6 gap-y-5 sm:grid-cols-2">
       {fields.map(([label, value]) => <SummaryField key={label} label={label} value={value} />)}
       <SummaryField label={isAbsence ? "Reason of absence" : "Reason for being late"} value={payload.reason} wide />
-      {isAbsence && <SummaryField label="Supporting document types" value={payload.proof_types.join(", ") || "None selected"} wide />}
+      <SummaryField label="Supporting document type" value={payload.proof_types[0] || "None selected"} wide />
       <SummaryField label="Supporting document" value={file ? `${file.name} (${(file.size / 1024).toFixed(1)} KB)` : "No file selected"} wide />
     </dl>}
   </SectionBox>;

@@ -119,12 +119,12 @@ export function validateStep({ step, form, classes = [], classesError }) {
   if (step === 4) return validateDetails(form, classes, classesError);
 
   if (step === 5) {
-    if (form.requestType === "absence" && (!Array.isArray(form.proof_types) || new Set(form.proof_types).size !== form.proof_types.length || form.proof_types.some(proof => !proofOptions.includes(proof)))) {
-      return { proof_types: "Select valid supporting document types." };
+    const errors = {};
+    if (!Array.isArray(form.proof_types) || form.proof_types.length !== 1 || !proofOptions.includes(form.proof_types[0])) {
+      errors.proof_types = "Select one supporting document type before continuing.";
     }
-    return form.evidenceFile
-      ? {}
-      : { evidenceFile: "Upload a supporting document before continuing." };
+    if (!form.evidenceFile) errors.evidenceFile = "Upload a supporting document before continuing.";
+    return errors;
   }
 
   if (step === 6) {

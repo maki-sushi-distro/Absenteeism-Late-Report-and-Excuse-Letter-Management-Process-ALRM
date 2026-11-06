@@ -16,7 +16,6 @@ export default function AttachmentStep({
   user,
   fieldErrors = {},
   updateField,
-  toggleListField,
   onBack,
   onNext,
 }) {
@@ -122,33 +121,30 @@ export default function AttachmentStep({
     <RequestShell requestType={form.requestType} step={step}>
       <HeaderIdentity requestType={form.requestType} step={step} user={user} />
 
-      {form.requestType === "absence" && (
-        <section aria-labelledby="absence-proof-heading" className={`grid gap-4 rounded-md bg-[#F7F7F7] p-4 ${fieldErrors.proof_types ? "ring-2 ring-red-500" : ""}`}>
-          <h2 id="absence-proof-heading" className="text-sm font-bold uppercase text-[#203B82]">Explanation</h2>
-          <fieldset className="grid gap-3">
-            <legend className="mb-4 text-sm font-bold text-[#203B82]">Supporting Documents/ Proof of Absence</legend>
+      <section aria-labelledby="supporting-evidence-heading" className={`grid min-w-0 gap-4 rounded-md bg-[#F7F7F7] p-4 ${fieldErrors.proof_types ? "ring-2 ring-red-500" : ""}`}>
+          <h2 id="supporting-evidence-heading" className="text-sm font-bold uppercase text-[#203B82]">Supporting Evidence</h2>
+          <fieldset aria-required="true" className="grid min-w-0 gap-3">
+            <legend className="mb-4 text-sm font-bold text-[#203B82]">Supporting document types</legend>
             {proofOptions.map((proof) => (
               <label
                 key={proof}
-                className="flex items-center gap-2 text-sm text-slate-700"
+                className="flex min-w-0 items-start gap-2 text-sm text-slate-700"
               >
                 <input
-                  type="checkbox"
+                  type="radio"
                   name="proof_types"
                   value={proof}
                   checked={(form.proof_types || []).includes(proof)}
-                  onChange={() => toggleListField("proof_types", proof)}
+                  onChange={() => updateField("proof_types", [proof])}
                   aria-invalid={Boolean(fieldErrors.proof_types)}
-                  className="accent-[#203B82]"
+                  className="mt-0.5 shrink-0 accent-[#203B82]"
                 />
-                {proof}
+                <span className="min-w-0 break-words">{proof}</span>
               </label>
             ))}
           </fieldset>
           <ErrorText message={fieldErrors.proof_types} />
-        </section>
-      )}
-      {form.requestType !== "absence" && <ErrorText message={fieldErrors.proof_types} />}
+      </section>
 
       <section aria-labelledby="attachment-heading" aria-busy={processing} className="grid gap-5 rounded-2xl border border-[#D8E0EF] bg-white p-4 shadow-[0_8px_30px_rgba(16,28,74,0.03)] sm:p-6">
         <div className="grid gap-2">

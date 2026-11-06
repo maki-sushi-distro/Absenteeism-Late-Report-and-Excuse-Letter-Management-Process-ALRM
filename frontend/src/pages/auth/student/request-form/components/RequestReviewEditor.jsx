@@ -28,10 +28,8 @@ export default function RequestReviewEditor({ form, user, classes, classesLoadin
   ];
   return <fieldset disabled={disabled} aria-label="Edit request details" className="grid min-w-0 gap-x-6 gap-y-5 sm:grid-cols-2">
     {fields.map((field) => <ReviewField key={field.name} value={form[field.name]} error={fieldErrors[field.name]} onChange={(value) => updateField(field.name, value)} {...field} />)}
-    {isAbsence && <>
-      <ReviewCheckboxGroup name="absenceReasons" label="Reason of absence" options={absenceReasonOptions} selected={form.absenceReasons} onToggle={toggleListField} error={fieldErrors.absenceReasons} />
-      <ReviewCheckboxGroup name="proof_types" label="Supporting document types" options={proofOptions} selected={form.proof_types || []} onToggle={toggleListField} error={fieldErrors.proof_types} />
-    </>}
+    {isAbsence && <ReviewCheckboxGroup name="absenceReasons" label="Reason of absence" options={absenceReasonOptions} selected={form.absenceReasons} onToggle={toggleListField} error={fieldErrors.absenceReasons} />}
+    <ReviewCheckboxGroup name="proof_types" label="Supporting document types" options={proofOptions} selected={form.proof_types || []} onToggle={(name, option) => updateField(name, [option])} error={fieldErrors.proof_types} type="radio" />
     <ReviewAttachment file={form.evidenceFile} error={fieldErrors.evidenceFile} />
   </fieldset>;
 }

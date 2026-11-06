@@ -11,9 +11,9 @@ test("proof options exactly match the backend allowlist", () => {
   assert.deepEqual(initialForm.proof_types, []);
 });
 
-test("absence create separates proof labels, reason, attachment MIME and contact fields", () => {
-  const payload = buildRequestPayload({ ...form, proof_types: ["Medical Certificate", "Letter from Parent/Guardian"] }, classes, { path: "attachment-1", type: "image/jpeg" });
-  assert.deepEqual(payload.proof_types, ["Medical Certificate", "Letter from Parent/Guardian"]);
+test("absence create separates its selected proof, reason, attachment MIME and contact fields", () => {
+  const payload = buildRequestPayload({ ...form, proof_types: ["Medical Certificate"] }, classes, { path: "attachment-1", type: "image/jpeg" });
+  assert.deepEqual(payload.proof_types, ["Medical Certificate"]);
   assert.equal(payload.reason, "Family Emergency");
   assert.equal(payload.evidence_type, "image/jpeg");
   assert.equal(payload.evidence_file_url, "attachment-1");
@@ -21,13 +21,13 @@ test("absence create separates proof labels, reason, attachment MIME and contact
   assert.equal(payload.contact_number, "09000000000");
 });
 
-test("late create sends an empty proof array and a plain explanation", () => {
+test("late create sends its selected proof type and a plain explanation", () => {
   const payload = buildRequestPayload({ ...form, requestType: "late", reason: " may sakit po e ", minutesLate: "23", proof_types: ["Others"] }, classes);
   assert.equal(payload.reason, "may sakit po e");
   assert.equal(payload.minutes_late, 23);
   assert.equal(payload.start_date_of_absence, "2026-10-12");
   assert.equal(payload.end_date_of_absence, null);
-  assert.deepEqual(payload.proof_types, []);
+  assert.deepEqual(payload.proof_types, ["Others"]);
   assert.equal(payload.evidence_type, null);
 });
 

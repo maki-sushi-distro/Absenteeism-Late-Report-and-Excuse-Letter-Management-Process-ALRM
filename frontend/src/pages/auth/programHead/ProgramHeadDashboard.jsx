@@ -1,4 +1,5 @@
 import { ErrorState } from "@/components/common/ErrorState";
+import PageBreadcrumbs from "@/components/navigation/PageBreadcrumbs";
 import LoadingSkeleton from "@/components/loading/LoadingSkeleton";
 import ProgramHeadOverview from "./ProgramHeadOverview";
 import { FlaggedRecords, RequestRecords } from "./ProgramHeadRecords";
@@ -11,6 +12,7 @@ export function ProgramHeadDashboard({ view = "dashboard" }) {
   const waiting = needed.some((key) => resourceLoading[key] && !ready[key]);
   const failed = needed.some((key) => errors[key]);
   return <div className="space-y-5" data-slot={view === "dashboard" && loading ? "dashboard-skeleton" : undefined} data-variant={view === "dashboard" ? "program" : undefined}>
+    {view === "flagged" ? <PageBreadcrumbs items={[{ label: "Dashboard", to: "/dashboard" }, { label: "Students at risk" }]} /> : null}
     {view === "dashboard" && loading ? <span role="status" aria-busy="true" className="sr-only">Loading program records</span> : null}
     {view !== "dashboard" && waiting ? <LoadingSkeleton variant="table" columns={4} label="Loading program records" /> : null}
     {view !== "dashboard" ? needed.filter((key) => errors[key]).map((key) => <ErrorState key={key} title={`Could not load ${key}`} message={errors[key]} />) : null}

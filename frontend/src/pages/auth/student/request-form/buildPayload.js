@@ -25,7 +25,7 @@ export function buildRequestPayload(form, classes, evidence = null) {
     start_date_of_absence: form.startDateOfAbsence,
     end_date_of_absence: isAbsence ? form.endDateOfAbsence : null,
     reason: buildReason(form, isAbsence),
-    proof_types: isAbsence ? [...(form.proof_types || [])] : [],
+    proof_types: [...(form.proof_types || [])],
     evidence_file_url: evidence?.path || null,
     evidence_type: evidence?.type || null,
     guardian_name: sanitizeText(form.guardianName),
